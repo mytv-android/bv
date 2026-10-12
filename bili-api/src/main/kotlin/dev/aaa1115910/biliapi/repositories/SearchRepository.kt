@@ -9,6 +9,7 @@ import dev.aaa1115910.biliapi.entity.search.Hotword
 import dev.aaa1115910.biliapi.grpc.utils.handleGrpcException
 import dev.aaa1115910.biliapi.http.BiliHttpApi
 import dev.aaa1115910.biliapi.http.BiliHttpProxyApi
+import dev.aaa1115910.biliapi.util.convertStringTimeToSeconds
 import org.koin.core.annotation.Single
 
 @Single
@@ -396,12 +397,4 @@ data class SearchTypeResult(
                 )
         }
     }
-}
-
-private fun convertStringTimeToSeconds(time: String): Int {
-    val parts = time.split(":")
-    val hours = if (parts.size == 3) parts[0].toInt() else 0
-    val minutes = parts[parts.size - 2].toInt()
-    val seconds = parts[parts.size - 1].toInt()
-    return (hours * 3600) + (minutes * 60) + seconds
 }
