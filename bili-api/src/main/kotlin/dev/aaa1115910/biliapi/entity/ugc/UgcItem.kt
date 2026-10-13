@@ -72,7 +72,7 @@ data class UgcItem(
             UgcItem(
                 aid = card.base.param.toLong(),
                 title = card.base.title,
-                duration = convertStringTimeToSeconds(card.coverRightText1),
+                duration = card.coverRightText1.convertStringTimeToSeconds(),
                 author = card.rightDesc1,
                 cover = card.base.cover,
                 play = -1,
