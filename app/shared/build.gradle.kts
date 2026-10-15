@@ -107,6 +107,7 @@ dependencies {
     api(androidx.compose.material.icons)
     api(androidx.compose.material)
     api(androidx.compose.material3)
+    api(libs.material.kolor)
     api(androidx.compose.material3.adaptive)
     api(androidx.compose.material3.adaptive.layout)
     api(androidx.compose.material3.adaptive.navigation)

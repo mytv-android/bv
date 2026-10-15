@@ -2,6 +2,8 @@
 
 package dev.aaa1115910.bv.util
 
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -11,12 +13,16 @@ import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import com.materialkolor.PaletteStyle
 import de.schnettler.datastore.manager.PreferenceRequest
 import dev.aaa1115910.biliapi.entity.ApiType
 import dev.aaa1115910.biliapi.http.util.generateBuvid
 import dev.aaa1115910.bv.BVApp
 import dev.aaa1115910.bv.BuildConfig
+import dev.aaa1115910.bv.entity.DarkMode
 import dev.aaa1115910.bv.entity.PlayerType
+import dev.aaa1115910.bv.entity.ThemePrefs
+import dev.aaa1115910.bv.entity.ThemeSource
 import dev.aaa1115910.bv.entity.ThemeType
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
@@ -25,6 +31,7 @@ import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoCodec
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.runBlocking
@@ -319,6 +326,35 @@ object Prefs {
             PlayMode.entries[dsm.getPreferenceFlow(PrefKeys.prefPlayModeRequest).first()]
         }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayModeKey, value.ordinal) }
+
+    val themePrefsFlow: Flow<ThemePrefs>
+        get() = combine(
+            dsm.getPreferenceFlow(PrefKeys.prefThemeSourceRequest),
+            dsm.getPreferenceFlow(PrefKeys.prefSeedColorRequest),
+            dsm.getPreferenceFlow(PrefKeys.prefPaletteStyleRequest),
+            dsm.getPreferenceFlow(PrefKeys.prefContrastRequest),
+            dsm.getPreferenceFlow(PrefKeys.prefDarkModeRequest),
+        ) { source, seed, style, contrast, dark ->
+            ThemePrefs(
+                source = ThemeSource.entries[source],
+                seed = Color(seed),
+                style = PaletteStyle.entries[style],
+                contrast = contrast.toDouble(),
+                darkMode = DarkMode.entries[dark],
+            )
+        }
+            .combine(dsm.getPreferenceFlow(PrefKeys.prefContentSeedRequest)) { p, c -> p.copy(contentSeed = if (c == 0) null else Color(c)) }
+            .combine(dsm.getPreferenceFlow(PrefKeys.prefCoverThemeRequest)) { p, v -> p.copy(coverTheme = v) }
+            .combine(dsm.getPreferenceFlow(PrefKeys.prefReduceMotionRequest)) { p, v -> p.copy(reduceMotion = v) }
+
+    suspend fun setThemeSource(v: ThemeSource) = dsm.editPreference(PrefKeys.prefThemeSourceKey, v.ordinal)
+    suspend fun setSeedColor(v: Color) = dsm.editPreference(PrefKeys.prefSeedColorKey, v.toArgb())
+    suspend fun setContentSeed(v: Color) = dsm.editPreference(PrefKeys.prefContentSeedKey, v.toArgb())
+    suspend fun setPaletteStyle(v: PaletteStyle) = dsm.editPreference(PrefKeys.prefPaletteStyleKey, v.ordinal)
+    suspend fun setContrast(v: Float) = dsm.editPreference(PrefKeys.prefContrastKey, v)
+    suspend fun setDarkMode(v: DarkMode) = dsm.editPreference(PrefKeys.prefDarkModeKey, v.ordinal)
+    suspend fun setCoverTheme(v: Boolean) = dsm.editPreference(PrefKeys.prefCoverThemeKey, v)
+    suspend fun setReduceMotion(v: Boolean) = dsm.editPreference(PrefKeys.prefReduceMotionKey, v)
 }
 
 object PrefKeys {
@@ -423,4 +459,22 @@ object PrefKeys {
     val prefBlacklistUserRequest = PreferenceRequest(prefBlacklistUserKey, false)
     val prefThemeTypeRequest = PreferenceRequest(prefThemeTypeKey, ThemeType.Auto.ordinal)
     val prefPlayModeRequest = PreferenceRequest(prefPlayModeKey, PlayMode.Sequential.ordinal)
+
+    val prefThemeSourceKey = intPreferencesKey("bv_theme_source")
+    val prefSeedColorKey = intPreferencesKey("bv_seed_color")
+    val prefContentSeedKey = intPreferencesKey("bv_content_seed")          // 0 表示没有
+    val prefPaletteStyleKey = intPreferencesKey("bv_palette_style")
+    val prefContrastKey = floatPreferencesKey("bv_contrast")
+    val prefDarkModeKey = intPreferencesKey("bv_dark_mode")
+    val prefCoverThemeKey = booleanPreferencesKey("bv_cover_theme")
+    val prefReduceMotionKey = booleanPreferencesKey("bv_reduce_motion")
+
+    val prefThemeSourceRequest = PreferenceRequest(prefThemeSourceKey, ThemeSource.Custom.ordinal)
+    val prefSeedColorRequest = PreferenceRequest(prefSeedColorKey, 0xFFFB7299.toInt())
+    val prefContentSeedRequest = PreferenceRequest(prefContentSeedKey, 0)
+    val prefPaletteStyleRequest = PreferenceRequest(prefPaletteStyleKey, PaletteStyle.Vibrant.ordinal)
+    val prefContrastRequest = PreferenceRequest(prefContrastKey, 0f)
+    val prefDarkModeRequest = PreferenceRequest(prefDarkModeKey, DarkMode.System.ordinal)
+    val prefCoverThemeRequest = PreferenceRequest(prefCoverThemeKey, true)
+    val prefReduceMotionRequest = PreferenceRequest(prefReduceMotionKey, false)
 }

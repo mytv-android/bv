@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 公共组件 -->
+    <string name="ds_play_count">%s播放</string>
+    <string name="ds_danmaku_count">%s弹幕</string>
+    <string name="ds_card_stats">▶ %1$s　弹 %2$s</string>
+    <string name="ds_card_menu_shorts">从这里开始刷</string>
+    <string name="ds_card_menu_toview">稍后再看</string>
+    <string name="ds_card_menu_up">UP 主主页</string>
+    <string name="ds_search">搜索</string>
+    <string name="ds_voice_search">语音搜索</string>
+    <string name="ds_reply">回复</string>
+    <string name="ds_reply_count">回复 %d</string>
+    <string name="ds_expand">展开</string>
+    <string name="ds_collapse">收起</string>
+    <string name="ds_all">全部</string>
+    <string name="ds_all_more">全部 ›</string>
+    <string name="ds_back">返回</string>
+    <string name="ds_more">更多</string>
+    <string name="ds_load_failed">加载失败</string>
+    <string name="ds_retry">重试</string>
+    <string name="ds_empty">这里还没有内容</string>
+</resources>
