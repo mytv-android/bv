@@ -76,6 +76,7 @@ dependencies {
     implementation(project(":app:shared"))
     implementation(project(":player:core"))
     implementation(project(":player:shared"))
+    implementation(project(":player:ui"))
     implementation(androidx.media3.common)
     implementation(androidx.media3.exoplayer)
     implementation(libs.logging)
