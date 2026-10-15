@@ -2,6 +2,7 @@ package dev.aaa1115910.biliapi.http.entity.dynamic
 
 import dev.aaa1115910.biliapi.http.entity.user.Pendant
 import dev.aaa1115910.biliapi.http.entity.user.Vip
+import dev.aaa1115910.biliapi.http.util.IntAsBooleanSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -52,7 +53,8 @@ data class DynamicItem(
             val actionUrl: String,
             @SerialName("end_url")
             val endUrl: String,
-            val id: Int,
+            // B 站现在会返回超过 Int 取值范围的 id，用 Int 会在反序列化时抛异常导致整条动态列表解析失败
+            val id: Long,
             @SerialName("start_url")
             val startUrl: String
         )
@@ -80,6 +82,8 @@ data class DynamicItem(
             val face: String,
             @SerialName("face_nft")
             val faceNft: Boolean,
+            // 接口返回的是 0/1 而不是 true/false
+            @Serializable(with = IntAsBooleanSerializer::class)
             val following: Boolean = false,
             @SerialName("jump_url")
             val jumpUrl: String,

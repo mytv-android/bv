@@ -37,11 +37,13 @@ data class IndexResultItem(
                 subTitle = item.subTitle,
                 cover = item.cover,
                 score = item.score,
-                badge = Badge(
-                    text = item.badgeInfo.text,
-                    bgColor = item.badgeInfo.bgColor,
-                    bgColorNight = item.badgeInfo.bgColorNight
-                ).takeIf { item.badgeInfo.text.isNotEmpty() },
+                badge = item.badgeInfo?.let { badgeInfo ->
+                    Badge(
+                        text = badgeInfo.text,
+                        bgColor = badgeInfo.bgColor,
+                        bgColorNight = badgeInfo.bgColorNight
+                    ).takeIf { badgeInfo.text.isNotEmpty() }
+                },
                 indexShow = item.indexShow,
                 seasonId = item.seasonId
             )

@@ -43,7 +43,9 @@ class ExoMediaPlayer(
         val renderersFactory = DefaultRenderersFactory(context).apply {
             setExtensionRendererMode(
                 when (options.enableFfmpegAudioRenderer) {
-                    true -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON
+                    // 用 PREFER 而不是 ON：ON 会对所有轨道强制走扩展渲染器，
+                    // 设备上 ffmpeg 扩展初始化失败时整路画面都渲染不出来（黑屏）
+                    true -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER
                     false -> DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF
                 }
             )

@@ -181,7 +181,7 @@ object BiliHttpApi {
         av: Long? = null,
         bv: String? = null,
         sessData: String? = null
-    ): BiliResponse<VideoDetail> = client.get("/x/web-interface/view/detail") {
+    ): BiliResponse<VideoDetail> = client.get("/x/web-interface/wbi/view/detail") {
         parameter("aid", av)
         parameter("bvid", bv)
         sessData?.let { header("Cookie", "SESSDATA=$sessData;") }
@@ -825,7 +825,8 @@ object BiliHttpApi {
         keyword: String? = null,
         pageNumber: Int = 1,
         pageSize: Int = 30,
-        sessData: String
+        sessData: String,
+        dedeUserID: Long? = null
     ): BiliResponse<WebSpaceVideoData> = client.get("/x/space/wbi/arc/search") {
         parameter("mid", mid)
         parameter("order", order)
@@ -833,11 +834,12 @@ object BiliHttpApi {
         keyword?.let { parameter("keyword", it) }
         parameter("pn", pageNumber)
         parameter("ps", pageSize)
-        // 风控
+        // 风控：dm_cover_img_str / dm_img_inter 需要与真实设备一致，过期的值会被风控拒绝导致 UP 主页加载失败
         parameter("dm_img_list", "[]")
         parameter("dm_img_str", "V2ViR0wgMS4wIChPcGVuR0wgRVMgMi4wIENocm9taXVtKQ")
-        parameter("dm_cover_img_str", "V2ViR0wgMS4wIChPcGVuR0wgRVMgMi4wIENocm9taXVtKQ")
-        header("Cookie", "SESSDATA=$sessData;")
+        parameter("dm_cover_img_str", "QU5HTEUgKEFNRCwgQU1EIFJhZGVvbiA3ODBNIEdyYXBoaWNzICgweDAwMDAxNUJGKSBEaXJlY3QzRDExIHZzXzVfMCBwc181XzAsIEQzRDExKUdvb2dsZSBJbmMuIChBTU")
+        parameter("dm_img_inter", "{\"ds\":[],\"wh\":[4769,2793,43],\"of\":[285,570,285]}")
+        header("Cookie", "SESSDATA=$sessData;DedeUserID=$dedeUserID;")
         header("referer", "https://space.bilibili.com")
     }.body()
 
@@ -1267,6 +1269,8 @@ object BiliHttpApi {
         order?.let { parameter("order", it) }
         duration?.let { parameter("duration", it) }
         header("Cookie", "buvid3=$buvid3;")
+        // 搜索接口的 referer 必须是 search.bilibili.com，用 www 会被风控返回空结果
+        header("referer", "https://search.bilibili.com/")
     }.body()
 
     /** 获取番剧首页数据 */

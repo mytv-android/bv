@@ -59,7 +59,8 @@ data class SearchArticleResult(
     val rankIndex: Int,
     val desc: String,
     @SerialName("rank_score")
-    val rankScore: Int,
+    // 部分文章结果不返回 rank_score，缺失时反序列化会抛异常导致整页搜索结果解析失败
+    val rankScore: Int? = null,
     val type: String,
     val id: Int,
     @SerialName("category_name")
@@ -320,7 +321,8 @@ data class SearchTopicResult(
     @SerialName("arcurl")
     val arcUrl: String,
     @SerialName("rank_score")
-    val rankScore: Int
+    // 部分话题结果不返回 rank_score，缺失时反序列化会抛异常导致整页搜索结果解析失败
+    val rankScore: Int? = null
 ) : SearchResultItem()
 
 /**
@@ -385,7 +387,8 @@ data class SearchVideoResult(
     @SerialName("arcrank")
     val arcRank: String? = null,
     val pic: String,
-    val play: Int,
+    // 部分视频结果不返回 play，缺失时反序列化会抛异常导致整页搜索结果解析失败
+    val play: Int? = null,
     @SerialName("video_review")
     val videoReview: Int,
     val favorites: Int,
@@ -409,7 +412,7 @@ data class SearchVideoResult(
     @SerialName("rec_tags")
     val recTags: JsonElement? = null,
     @SerialName("new_rec_tags")
-    val newRecTags: List<JsonElement>,
+    val newRecTags: List<JsonElement>? = null,
     @SerialName("rank_score")
     val rankScore: Int? = null,
     val like: Int,

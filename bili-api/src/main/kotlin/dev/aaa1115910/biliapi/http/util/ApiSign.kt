@@ -83,7 +83,12 @@ suspend fun HttpRequestBuilder.encWbi() {
     val sortedParams = url.encodedParameters.entries()
         .associate { it.key to it.value.first() }
         .toSortedMap()
-        .map { (key, value) -> "$key=$value" }
+        .map { (key, value) ->
+            // 服务端计算 w_rid 前会剔除参数值里的 !'()* ，这里必须同步剔除，
+            // 否则关键词里带这些字符（如 "NBA(2024)"）时签名对不上，返回 -400/被风控
+            val filteredValue = value.filter { c -> c !in setOf('!', '\'', '(', ')', '*') }
+            "$key=$filteredValue"
+        }
         .joinToString("&")
 
     val wRid = MessageDigest.getInstance("MD5").digest((sortedParams + mixinKey).toByteArray())

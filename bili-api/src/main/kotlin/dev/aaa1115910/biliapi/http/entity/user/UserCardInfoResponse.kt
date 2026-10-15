@@ -1,5 +1,6 @@
 package dev.aaa1115910.biliapi.http.entity.user
 
+import dev.aaa1115910.biliapi.http.util.IntAsBooleanSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
@@ -18,6 +19,8 @@ import kotlinx.serialization.Serializable
 data class UserCardData(
     val card: UserCardInfo,
     val space: Space? = null,
+    // 接口返回的是 0/1 而不是 true/false，这个字段没有默认值，类型不匹配会让整个视频详情解析失败
+    @Serializable(with = IntAsBooleanSerializer::class)
     val following: Boolean,
     @SerialName("archive_count")
     val archiveCount: Int,

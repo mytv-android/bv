@@ -97,8 +97,12 @@ fun AnimeTimelineScreen(
                         ApiType.Web -> 7
                         ApiType.App -> 6
                     }
-                    listState.animateScrollToItem(targetIndex, 0)
-                    defaultFocusRequester.requestFocus(scope)
+                    // listState / FocusRequester 会读写 Compose 快照状态，只能在主线程调用，
+                    // 否则抛异常被上面的 runCatching 吞掉，表现为放送时间表页面空白
+                    withContext(Dispatchers.Main) {
+                        listState.animateScrollToItem(targetIndex, 0)
+                        defaultFocusRequester.requestFocus(scope)
+                    }
                 }
             }.onFailure {
                 logger.fInfo { "Get timeline failed: ${it.stackTraceToString()}" }

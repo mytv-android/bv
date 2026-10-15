@@ -87,6 +87,8 @@ class VideoPlayRepository(
                                         qn = 127
                                         fnver = 0
                                         fourk = true
+                                        // 2 = 强制返回 https 地址，部分设备/网络下 http 直连会失败
+                                        forceHost = 2
                                         preferCodecType = codecType.toPlayerSharedCodeType()
                                     }
                                 }) ?: throw IllegalStateException("Player stub is not initialized")

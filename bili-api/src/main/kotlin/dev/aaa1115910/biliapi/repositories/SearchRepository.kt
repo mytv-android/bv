@@ -328,7 +328,7 @@ data class SearchTypeResult(
                     cover = "https:${video.pic}",
                     author = video.author,
                     duration = video.duration.convertStringTimeToSeconds(),
-                    play = video.play,
+                    play = video.play ?: 0,
                     danmaku = video.danmaku,
                     pubDate = video.pubDate
                 )

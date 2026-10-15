@@ -64,7 +64,8 @@ class TagViewModel : ViewModel() {
                         upName = tagVideoItem.owner.name,
                         play = tagVideoItem.stat.view,
                         danmaku = tagVideoItem.stat.danmaku,
-                        time = tagVideoItem.duration.toLong()
+                        // 标签接口返回的 duration 单位是秒，而 VideoCardData.time 用的是毫秒
+                        time = tagVideoItem.duration * 1000L
                     )
                 )
             }

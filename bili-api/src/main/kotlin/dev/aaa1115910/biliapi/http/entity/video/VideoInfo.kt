@@ -234,7 +234,9 @@ data class VideoOwner(
 @Serializable
 data class VideoStat(
     val aid: Long = 0,
-    val view: Int = 0,
+    // 个别视频（如凡人修仙传）播放量超过 int 最大值，用 long 保存再透出为 int，避免大范围改动调用方
+    @SerialName("view")
+    private val _view: Long = 0,
     val danmaku: Int = 0,
     val reply: Int = 0,
     val favorite: Int = 0,
@@ -249,7 +251,10 @@ data class VideoStat(
     val evaluation: String = "",
     @SerialName("argue_msg")
     val argueMsg: String = ""
-)
+) {
+    val view: Int
+        get() = if (_view > Int.MAX_VALUE) Int.MIN_VALUE else _view.toInt()
+}
 
 /**
  * 分辨率

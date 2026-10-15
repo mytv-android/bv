@@ -211,6 +211,8 @@ enum class Producer(val id: Int) : PgcIndexParam {
  */
 enum class Year(val str: String) : PgcIndexParam {
     All("-1"),          // 全部
+    Year2026("[2026,2027)"), // 2026
+    Year2025("[2025,2026)"), // 2025
     Year2024("[2024,2025)"), // 2024
     Year2023("[2023,2024)"), // 2023
     Year2022("[2022,2023)"), // 2022
@@ -231,9 +233,9 @@ enum class Year(val str: String) : PgcIndexParam {
     companion object {
         fun getList(pgcType: PgcType) = when (pgcType) {
             PgcType.Anime, PgcType.GuoChuang -> listOf(
-                All, Year2024, Year2023, Year2022, Year2021, Year2020, Year2019, Year2018,
-                Year2017, Year2016, Year2015, Year2014_2010, Year2009_2005, Year2004_2000,
-                Year199x, Year198x, Earlier
+                All, Year2026, Year2025, Year2024, Year2023, Year2022, Year2021, Year2020,
+                Year2019, Year2018, Year2017, Year2016, Year2015, Year2014_2010,
+                Year2009_2005, Year2004_2000, Year199x, Year198x, Earlier
             )
 
             else -> emptyList()
@@ -246,6 +248,8 @@ enum class Year(val str: String) : PgcIndexParam {
  */
 enum class ReleaseDate(val str: String) : PgcIndexParam {
     All("-1"),          // 全部
+    Year2026("[2026-01-01 00:00:00,2027-01-01 00:00:00)"),  // 2026
+    Year2025("[2025-01-01 00:00:00,2026-01-01 00:00:00)"),  // 2025
     Year2024("[2024-01-01 00:00:00,2025-01-01 00:00:00)"),  // 2024
     Year2023("[2023-01-01 00:00:00,2024-01-01 00:00:00)"),  // 2023
     Year2022("[2022-01-01 00:00:00,2023-01-01 00:00:00)"),  // 2022
@@ -265,9 +269,9 @@ enum class ReleaseDate(val str: String) : PgcIndexParam {
     companion object {
         fun getList(pgcType: PgcType) = when (pgcType) {
             PgcType.Movie, PgcType.Documentary, PgcType.Tv -> listOf(
-                All, Year2024, Year2023, Year2022, Year2021, Year2020, Year2019, Year2018,
-                Year2017, Year2016, Year2015_2010, Year2009_2005, Year2004_2000,
-                Year199x, Year198x, Earlier
+                All, Year2026, Year2025, Year2024, Year2023, Year2022, Year2021, Year2020,
+                Year2019, Year2018, Year2017, Year2016, Year2015_2010,
+                Year2009_2005, Year2004_2000, Year199x, Year198x, Earlier
             )
 
             else -> emptyList()

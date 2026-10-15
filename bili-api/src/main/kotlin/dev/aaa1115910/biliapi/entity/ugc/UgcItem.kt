@@ -41,7 +41,10 @@ data class UgcItem(
                         }
                     }.getOrDefault(-1)
                 },
-                duration = rcmdItem.coverRightText?.convertStringTimeToSeconds() ?: 0,
+                // playerArgs.duration 是精确的秒数；coverRightText 是可能为空的字符串，仅作兜底
+                duration = rcmdItem.playerArgs?.duration
+                    ?: rcmdItem.coverRightText?.convertStringTimeToSeconds()
+                    ?: 0,
                 idx = rcmdItem.idx
             )
 

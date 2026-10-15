@@ -10,23 +10,25 @@ import kotlinx.serialization.json.JsonObject
 data class VideoDetail(
     @SerialName("View")
     val view: VideoInfo,
+    // Card / Related / hot_share / view_addit 在接口里经常缺失，
+    // 用非空类型时一处缺失就会让整个视频详情解析失败
     @SerialName("Card")
-    val card: UserCardData,
+    val card: UserCardData? = null,
     @SerialName("Tags")
     val tags: List<Tag>,
     //TODO 评论
     //@SerialName("Reply")
     //val reply:Any
     @SerialName("Related")
-    val related: List<RelatedVideoInfo>?,
+    val related: List<RelatedVideoInfo>? = null,
     @SerialName("Spec")
     val spec: JsonObject? = null,
     @SerialName("hot_share")
-    val hotShare: HotShare,
+    val hotShare: HotShare? = null,
     val elec: JsonObject? = null,
     val recommend: JsonObject? = null,
     @SerialName("view_addit")
-    val viewAddit: JsonObject,
+    val viewAddit: JsonObject? = null,
     val guide: JsonObject? = null,
     @SerialName("query_tags")
     val queryTags: JsonObject? = null,

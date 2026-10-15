@@ -3,6 +3,7 @@ package dev.aaa1115910.bv.player.util
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
@@ -55,11 +56,23 @@ fun Modifier.danmakuWebMask(
 fun Modifier.danmakuMobMask(
     frame: DanmakuMobMaskFrame
 ): Modifier = composed {
-    val binaryBitmap = Bitmap.createBitmap(40, 180, Bitmap.Config.ARGB_8888)
-    frame.image.forEachIndexed { index, byte ->
-        val y = index / 40
-        val x = index % 40
-        binaryBitmap.setPixel(x, y, if (byte.toInt() == 0) Color.BLACK else Color.TRANSPARENT)
+    // remember(frame) 保证像素解码和 Bitmap 创建只在帧变化时执行一次，
+    // 避免每次 recompose 都重建 Bitmap 并逐像素 setPixel
+    val binaryBitmap = remember(frame) {
+        val width = frame.width
+        val height = frame.height
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+
+        // MobMask 是 1bpp 连续 bit 流（MSB first），每位一个像素：
+        // 1 = 透明（露出弹幕），0 = 不透明（遮挡弹幕）
+        val pixels = IntArray(width * height) { i ->
+            val byteIndex = i / 8
+            val bitOffset = 7 - (i % 8)
+            val bit = (frame.image[byteIndex].toInt() shr bitOffset) and 1
+            if (bit == 1) Color.TRANSPARENT else Color.BLACK
+        }
+        bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
+        bitmap
     }
 
     bitmapMask(binaryBitmap)

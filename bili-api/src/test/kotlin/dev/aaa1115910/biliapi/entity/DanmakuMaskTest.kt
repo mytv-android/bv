@@ -41,6 +41,26 @@ class DanmakuMaskTest {
         println()
     }
 
+    @Test
+    fun `mob mask frames carry 1bpp payload sized from width and height`() {
+        val maskFile = Any::class::class.java.getResource("/3540266_25_2.exp.mobmask")!!
+        val binary = File(maskFile.toURI()).readBytes()
+        val mask = DanmakuMask.fromBinary(binary, DanmakuMaskType.MobMask)
+
+        val frames = mask.segments.flatMap { it.frames }.filterIsInstance<DanmakuMobMaskFrame>()
+        assert(frames.isNotEmpty()) { "sample mob mask should contain frames" }
+
+        frames.forEach { frame ->
+            // MobMask 是 1bpp 位图：每 8 个像素占 1 字节（向上取整）。
+            // 解析时若按固定长度读取，遇到非 320x180 的蒙版就会让字节流错位。
+            val expectedSize = (frame.width * frame.height + 7) / 8
+            assert(frame.image.size == expectedSize) {
+                "frame ${frame.range}: expected $expectedSize bytes for " +
+                    "${frame.width}x${frame.height} 1bpp, got ${frame.image.size}"
+            }
+        }
+    }
+
     @OptIn(ExperimentalStdlibApi::class)
     @Test
     fun `parse mob mask file and output`() {

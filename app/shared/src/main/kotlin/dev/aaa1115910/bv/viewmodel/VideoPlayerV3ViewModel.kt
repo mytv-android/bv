@@ -375,9 +375,11 @@ class VideoPlayerV3ViewModel(
             ?: playData!!.dolby.takeIf { it?.codecId == audio.code }
             ?: playData!!.flac.takeIf { it?.codecId == audio.code }
             ?: playData!!.dashAudios.minByOrNull { it.codecId }
-        var audioUrl = audioItem?.baseUrl ?: playData!!.dashAudios.first().baseUrl
-        val audioUrls = mutableListOf<String?>()
-        audioUrls.add(audioItem?.baseUrl)
+        // App 播放源可能返回空的 dashAudios，此时允许仅播放视频，
+        // 否则 dashAudios.first() 会抛 NoSuchElementException 导致播放失败
+        var audioUrl: String? = audioItem?.baseUrl
+        val audioUrls = mutableListOf<String>()
+        audioItem?.baseUrl?.let { audioUrls.add(it) }
         audioUrls.addAll(audioItem?.backUrl ?: emptyList())
 
         logger.fInfo { "all video hosts: ${videoUrls.map { with(URI(it)) { "$scheme://$authority" } }}" }
@@ -386,15 +388,15 @@ class VideoPlayerV3ViewModel(
         //replace cdn
         if (Prefs.enableProxy && proxyArea != ProxyArea.MainLand) {
             videoUrl = videoUrl.replaceUrlDomainWithAliCdn()
-            audioUrl = audioUrl.replaceUrlDomainWithAliCdn()
+            audioUrl = audioUrl?.replaceUrlDomainWithAliCdn()
         } else {
             // 如果未通过网络代理获得播放地址，才判断是否应该替换为官方 cdn
             videoUrl = selectOfficialCdnUrl(videoUrls.filterNotNull())
-            audioUrl = selectOfficialCdnUrl(audioUrls.filterNotNull())
+            audioUrl = if (audioUrls.isNotEmpty()) selectOfficialCdnUrl(audioUrls) else null
         }
 
         addLogs("video host: ${with(URI(videoUrl)) { "$scheme://$authority" }}")
-        addLogs("audio host: ${with(URI(audioUrl)) { "$scheme://$authority" }}")
+        addLogs("audio host: ${audioUrl?.let { with(URI(it)) { "$scheme://$authority" } } ?: "无音频流"}")
 
         logger.fInfo { "Select audio: $audioItem" }
         addLogs("音频编码：${(Audio.fromCode(audioItem?.codecId ?: 0))?.getDisplayName(BVApp.context) ?: "未知"}")

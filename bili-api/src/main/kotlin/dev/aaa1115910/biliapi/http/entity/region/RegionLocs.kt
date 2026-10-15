@@ -11,7 +11,8 @@ data class RegionLocs(
     val adsControl: AdsControl,
     val code: Int,
     val count: Int,
-    val data: Map<String, List<LocData>>,
+    // 接口会对没有广告位的分区返回 null，值必须是可空的，否则整个轮播图数据解析失败
+    val data: Map<String, List<LocData>?>,
     val live: JsonObject? = null,
     val message: String
 ) {

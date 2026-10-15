@@ -106,7 +106,8 @@ fun UpSpaceScreen(
         ) {
             itemsIndexed(
                 items = userSpaceViewModel.tvSpaceVideos,
-                key = { index, _ -> index }
+                // 用索引作 key 会在分页/刷新后复用陈旧项，导致出现重复卡片
+                key = { _, video -> video.avid }
             ) { index, video ->
                 Box(
                     contentAlignment = Alignment.Center

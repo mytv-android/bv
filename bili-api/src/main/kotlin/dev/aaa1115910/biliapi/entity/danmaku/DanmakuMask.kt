@@ -111,7 +111,10 @@ data class DanmakuMask(
                             val width = stream.readShort().toInt()
                             val height = stream.readShort().toInt()
                             val time = stream.readLong()
-                            val imageBinary = ByteArray(7200)
+                            // MobMask 是 1bpp 位图，按实际宽高计算字节数；
+                            // 原先硬编码 7200 会让流错位（小蒙版少读、大蒙版残留字节污染后续帧）
+                            val imageSize = (width * height + 7) / 8
+                            val imageBinary = ByteArray(imageSize)
                             stream.read(imageBinary)
                             frameList.add(
                                 DanmakuMobMaskFrame(

@@ -16,7 +16,8 @@ data class IndexResultData(
     data class IndexResultItem(
         val badge: String,
         @SerialName("badge_info")
-        val badgeInfo: BadgeInfo,
+        // 部分索引项不返回 badge_info，缺失时反序列化会抛异常导致索引页筛选/排序报错
+        val badgeInfo: BadgeInfo? = null,
         @SerialName("badge_type")
         val badgeType: Int,
         val cover: String,

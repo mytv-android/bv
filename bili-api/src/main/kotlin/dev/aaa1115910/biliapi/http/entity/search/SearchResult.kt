@@ -45,7 +45,8 @@ data class SearchResultData(
     val inBlackKey: Int,
     @SerialName("in_white_key")
     val inWhiteKey: Int,
-    val result: List<JsonElement>,
+    // 无搜索结果或搜索被灰度时接口不会返回 result，缺失时反序列化会抛异常导致搜索页显示不出结果
+    val result: List<JsonElement>? = mutableListOf(),
     @Transient
     val searchAllResults: MutableList<SearchResult<SearchResultItem>> = mutableListOf(),
     @Transient
@@ -54,7 +55,7 @@ data class SearchResultData(
     val isSearchPageGrayed: Int? = null
 ) {
     init {
-        result.forEach { searchResultJsonElement ->
+        result?.forEach { searchResultJsonElement ->
             val searchResultJsonObject = searchResultJsonElement.jsonObject
             var resultType = searchResultJsonObject["result_type"]?.jsonPrimitive?.content
             val json = Json {

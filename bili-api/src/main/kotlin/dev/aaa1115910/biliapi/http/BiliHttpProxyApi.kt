@@ -118,5 +118,7 @@ object BiliHttpProxyApi {
         order?.let { parameter("order", it) }
         duration?.let { parameter("duration", it) }
         header("Cookie", "buvid3=$buvid3;")
+        // 搜索接口的 referer 必须是 search.bilibili.com，用 www 会被风控返回空结果
+        header("referer", "https://search.bilibili.com/")
     }?.body() ?: throw IllegalStateException("no proxy server")
 }

@@ -20,7 +20,8 @@ data class DanmakuData(
     val pool: Int,
     val midHash: String,
     val dmid: Long,
-    val level: Int,
+    // 旧版 XML 弹幕的这一段可能比预期短，缺省时给 0 而不是抛 IndexOutOfBoundsException
+    val level: Int = 0,
     val text: String
 ) {
     companion object {
