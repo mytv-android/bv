@@ -159,6 +159,14 @@ internal fun PgcPhone(nav: NavController, state: PgcUiState) {
                     onRetry = { vm.reloadAll() },
                 )
             } else {
+                // 轮播数据晚于时间表到达时会插在可见项上方，LazyColumn 会保持锚点导致轮播被滚出屏幕：
+                // 用户还没滚动时回到顶部
+                val hasFeatured = feed.featured.isNotEmpty()
+                LaunchedEffect(hasFeatured) {
+                    if (hasFeatured && listState.firstVisibleItemIndex <= 1 && !listState.isScrollInProgress) {
+                        listState.scrollToItem(0)
+                    }
+                }
                 LazyColumn(
                     state = listState,
                     modifier = Modifier.fillMaxSize(),
