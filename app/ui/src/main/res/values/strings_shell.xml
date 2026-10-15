@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_shell_title">BV</string>
+    <string name="nav_home">首页</string>
+    <string name="nav_shorts">刷刷</string>
+    <string name="nav_pgc">影视</string>
+    <string name="nav_dynamic">动态</string>
+    <string name="nav_me">我的</string>
+    <string name="nav_search">搜索</string>
+    <string name="nav_settings">设置</string>
+    <string name="nav_menu">菜单</string>
+    <string name="shell_press_back_again_exit">再按一次退出</string>
+    <string name="shell_toview_added">已添加到稍后再看</string>
+    <string name="shell_toview_failed">添加稍后再看失败</string>
+    <string name="shell_developing">开发中</string>
+</resources>

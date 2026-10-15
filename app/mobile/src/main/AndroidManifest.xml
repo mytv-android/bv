@@ -6,10 +6,6 @@
             android:name="dev.aaa1115910.bv.mobile.activities.MainActivity"
             android:exported="true"
             android:theme="@style/Theme.BV.Mobile.Splash">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
         </activity>
         <activity
             android:name=".activities.VideoPlayerActivity"
@@ -63,16 +59,6 @@
             android:label="@string/title_mobile_activity_intent_handler"
             android:launchMode="singleTask"
             android:theme="@style/Theme.BV.Mobile">
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-
-                <data
-                    android:host="qrtoken"
-                    android:scheme="bugvideo" />
-            </intent-filter>
         </activity>
         <activity
             android:name=".activities.QrTokenResultActivity"
