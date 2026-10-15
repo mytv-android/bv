@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 刷刷（第 9.2 节） -->
+    <string name="shorts_title">刷刷</string>
+    <string name="shorts_search">搜索</string>
+    <string name="shorts_like">点赞</string>
+    <string name="shorts_coin">投币</string>
+    <string name="shorts_favorite">收藏</string>
+    <string name="shorts_comment">评论</string>
+    <string name="shorts_share">分享</string>
+    <string name="shorts_detail">详情</string>
+    <string name="shorts_follow">关注</string>
+    <string name="shorts_followed">已关注</string>
+    <string name="shorts_prev">上一条</string>
+    <string name="shorts_next">下一条</string>
+    <string name="shorts_up_page">UP 主主页</string>
+    <string name="shorts_speed_boost">2× 倍速中</string>
+    <string name="shorts_at_up">\@%1$s</string>
+    <string name="shorts_fans">粉丝 %1$s</string>
+    <string name="shorts_count_wan">%1$s万</string>
+    <string name="shorts_count_yi">%1$s亿</string>
+    <string name="shorts_like_count">%1$s 点赞</string>
+    <string name="shorts_reply_count">%1$s 评论</string>
+    <string name="shorts_meta_separator">" · "</string>
+    <string name="shorts_tags_like">%1$s　%2$s 点赞</string>
+    <string name="shorts_today">今天 %1$s</string>
+    <string name="shorts_yesterday">昨天 %1$s</string>
+    <string name="shorts_tab_comments">评论 %1$s</string>
+    <string name="shorts_tab_related">相关</string>
+    <string name="shorts_replies">回复</string>
+    <string name="shorts_no_comments">还没有评论</string>
+    <string name="shorts_empty">暂时没有可以刷的视频</string>
+    <string name="shorts_play_failed">播放失败</string>
+
+    <!-- 投币 / 收藏 对话框 -->
+    <string name="shorts_coin_title">投币</string>
+    <string name="shorts_coin_one">1 枚</string>
+    <string name="shorts_coin_two">2 枚</string>
+    <string name="shorts_coin_also_like">同时点赞</string>
+    <string name="shorts_coin_full">已经投满 2 枚硬币了</string>
+    <string name="shorts_favorite_title">选择收藏夹</string>
+    <string name="shorts_favorite_count">%1$d 个内容</string>
+    <string name="shorts_favorite_empty">没有收藏夹</string>
+    <string name="shorts_confirm">确定</string>
+    <string name="shorts_cancel">取消</string>
+    <string name="shorts_share_chooser">分享到</string>
+
+    <!-- 操作结果提示 -->
+    <string name="shorts_toast_coin">投币成功</string>
+    <string name="shorts_toast_favorite">收藏已更新</string>
+    <string name="shorts_toast_follow">已关注</string>
+    <string name="shorts_toast_unfollow">已取消关注</string>
+    <string name="shorts_toast_toview_add">已添加到稍后再看</string>
+    <string name="shorts_toast_toview_del">已从稍后再看移除</string>
+    <string name="shorts_toast_failed">操作失败：%1$s</string>
+    <string name="shorts_toast_login">请先登录</string>
+    <string name="shorts_toast_load_failed">加载失败：%1$s</string>
+</resources>
