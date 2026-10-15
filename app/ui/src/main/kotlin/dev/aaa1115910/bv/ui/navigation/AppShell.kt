@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -83,6 +84,12 @@ fun AppShell(nav: NavHostController) {
         }
     }
 
+    // 手机横竖屏切换会在 Bar / Rail 两种外壳之间切换：NavHost 用 movableContentOf 原地移动，
+    // 页面（含正在播放的播放器）不会被销毁重建（第 14.3 节「布局切换且正在播放的视频不中断」）
+    val navHost = remember(nav) {
+        movableContentOf { modifier: Modifier -> BvNavHost(nav, modifier) }
+    }
+
     CompositionLocalProvider(
         LocalVideoCardActions provides actions,
         // 原型尺寸精确到 dp，不让 M3 把小按钮的布局撑到 48dp
@@ -96,7 +103,7 @@ fun AppShell(nav: NavHostController) {
             ) {
                 val barPadding = 64.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                 CompositionLocalProvider(LocalBottomBarPadding provides if (current != null) barPadding else 0.dp) {
-                    BvNavHost(nav, Modifier.fillMaxSize())
+                    navHost(Modifier.fillMaxSize())
                 }
                 if (current != null) {
                     PhoneNavBar(
@@ -122,7 +129,7 @@ fun AppShell(nav: NavHostController) {
                         onSettings = { nav.navigate(SettingsRoute()) },
                     )
                 }
-                BvNavHost(nav, Modifier.weight(1f))
+                navHost(Modifier.weight(1f))
             }
 
             NavKind.TvRail -> TvShell(nav, current, onSearchPage, context as? Activity)

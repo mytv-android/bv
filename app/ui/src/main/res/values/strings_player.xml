@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 9.4 播放器（PlayerRoute 页面） -->
+    <string name="player_screen_comments">评论</string>
+    <string name="player_screen_comments_empty">还没有评论</string>
+    <string name="player_screen_sort_hot">最热</string>
+    <string name="player_screen_sort_time">最新</string>
+</resources>
