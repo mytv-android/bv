@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 通用文案 -->
+    <string name="player_ui_part_label">P%1$d %2$s</string>
+    <string name="player_ui_episode_label">EP%1$d %2$s</string>
+    <string name="player_ui_title_join">%1$s · %2$s</string>
+    <string name="player_ui_speed_value">%1$s×</string>
+    <string name="player_ui_area_full">全屏</string>
+    <string name="player_ui_area_fraction">%1$s 屏</string>
+    <string name="player_ui_time_progress">%1$s / %2$s</string>
+    <string name="player_ui_unit_sp">%1$d SP</string>
+    <string name="player_ui_unit_dp">%1$d DP</string>
+    <string name="player_ui_on">开启</string>
+    <string name="player_ui_off">关闭</string>
+
+    <!-- 控制层 -->
+    <string name="player_ui_danmaku_on">弹 开</string>
+    <string name="player_ui_danmaku_off">弹 关</string>
+    <string name="player_ui_episodes">选集</string>
+    <string name="player_ui_cd_back">返回</string>
+    <string name="player_ui_cd_subtitle">字幕</string>
+    <string name="player_ui_cd_more">更多</string>
+    <string name="player_ui_cd_play">播放</string>
+    <string name="player_ui_cd_pause">暂停</string>
+    <string name="player_ui_cd_next">下一集</string>
+    <string name="player_ui_cd_fullscreen">全屏</string>
+    <string name="player_ui_cd_exit_fullscreen">退出全屏</string>
+    <string name="player_ui_cd_comments">评论</string>
+    <string name="player_ui_cd_settings">设置</string>
+
+    <!-- 触摸端侧边面板 -->
+    <string name="player_ui_panel_quality">画质</string>
+    <string name="player_ui_section_codec">编码</string>
+    <string name="player_ui_section_audio">音质</string>
+    <string name="player_ui_panel_speed">播放速度</string>
+    <string name="player_ui_panel_danmaku">弹幕设置</string>
+    <string name="player_ui_danmaku_type_rolling">滚动</string>
+    <string name="player_ui_danmaku_type_top">顶部</string>
+    <string name="player_ui_danmaku_type_bottom">底部</string>
+    <string name="player_ui_danmaku_opacity">不透明度</string>
+    <string name="player_ui_danmaku_area">显示区域</string>
+    <string name="player_ui_danmaku_size">字号</string>
+    <string name="player_ui_danmaku_mask">智能防挡（人像蒙版）</string>
+    <string name="player_ui_panel_subtitle">字幕设置</string>
+    <string name="player_ui_subtitle_empty">暂无字幕</string>
+    <string name="player_ui_subtitle_size">字号</string>
+    <string name="player_ui_subtitle_background">背景不透明度</string>
+    <string name="player_ui_subtitle_padding">底部边距</string>
+    <string name="player_ui_panel_more">更多设置</string>
+    <string name="player_ui_section_play_mode">播放模式</string>
+    <string name="player_ui_section_aspect_ratio">画面比例</string>
+
+    <!-- 电视端菜单 -->
+    <string name="player_ui_menu_picture">画面</string>
+    <string name="player_ui_menu_danmaku">弹幕</string>
+    <string name="player_ui_menu_subtitle">字幕</string>
+    <string name="player_ui_menu_others">其他</string>
+    <string name="player_ui_section_resolution">分辨率</string>
+    <string name="player_ui_section_speed">倍速</string>
+    <string name="player_ui_section_danmaku_switch">弹幕</string>
+    <string name="player_ui_section_danmaku_type">类型</string>
+    <string name="player_ui_section_danmaku_mask">防遮挡</string>
+    <string name="player_ui_section_subtitle_track">字幕</string>
+
+    <!-- 提示 -->
+    <string name="player_ui_double_speed_tip">x2 倍速播放中</string>
+    <string name="player_ui_error_title">播放器正在抽风</string>
+    <string name="player_ui_error_face">_(:з」∠)_</string>
+    <string name="player_ui_error_message">错误信息：%1$s</string>
+    <string name="player_ui_pay_title">请先购买影片</string>
+    <string name="player_ui_pay_face">(・∀・)つ㊿</string>
+    <string name="player_ui_back_to_history_tv">上次看到 %1$s 点击确认键跳转</string>
+    <string name="player_ui_back_to_history_touch">上次看到 %1$s，点击跳转</string>
+
+    <!-- 遥控器操作提示（文案来自旧 app/tv RemoteControlPanelDemo） -->
+    <string name="player_ui_remote_tip_back">退出</string>
+    <string name="player_ui_remote_tip_bottom">按下 [CENTER] 键以继续</string>
+    <string name="player_ui_remote_tip_center">【短按】播放/暂停\n【长按】打开菜单</string>
+    <string name="player_ui_remote_tip_down">视频播放信息</string>
+    <string name="player_ui_remote_tip_lr">后退/前进</string>
+    <string name="player_ui_remote_tip_up">剧集/合集/分 P 列表</string>
+</resources>
