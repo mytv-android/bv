@@ -33,6 +33,7 @@ import dev.aaa1115910.biliapi.http.entity.season.FollowingSeasonAppData
 import dev.aaa1115910.biliapi.http.entity.season.FollowingSeasonWebData
 import dev.aaa1115910.biliapi.http.entity.season.SeasonFollowData
 import dev.aaa1115910.biliapi.http.entity.season.WebSeasonData
+import dev.aaa1115910.biliapi.http.entity.story.StoryResponseData
 import dev.aaa1115910.biliapi.http.entity.toview.ToViewData
 import dev.aaa1115910.biliapi.http.entity.user.AppSpaceVideoData
 import dev.aaa1115910.biliapi.http.entity.user.FollowAction
@@ -1797,6 +1798,98 @@ object BiliHttpApi {
         parameter("plat", plat)
         sessData?.let { header("Cookie", "SESSDATA=$it;") }
     }.body()
+
+    /**
+     * 获取竖屏视频流（App 刷刷 / story）
+     *
+     * 与 [getFeedIndex] 一样走 app.bilibili.com，由 encApiSign 自动加 App 签名。
+     *
+     * @param aid 上一页最后一个视频的 aid，首次为空或传起始视频 aid
+     * @param pull 首次 true，之后 false（接口只接受 1/0，传 true/false 会返回 -400）
+     * @param displayId 页码，从 1 递增
+     */
+    suspend fun getFeedStory(
+        aid: Long? = null,
+        fnval: Int = 272,
+        fnver: Int = 0,
+        fourk: Int = 1,
+        qn: Int = 80,
+        pull: Boolean = true,
+        displayId: Int = 1,
+        accessKey: String? = null
+    ): BiliResponse<StoryResponseData> =
+        client.get("https://app.bilibili.com/x/v2/feed/index/story") {
+            aid?.takeIf { it > 0 }?.let { parameter("aid", it) }
+            parameter("fnval", fnval)
+            parameter("fnver", fnver)
+            parameter("fourk", fourk)
+            parameter("qn", qn)
+            parameter("pull", if (pull) 1 else 0)
+            parameter("display_id", displayId)
+            accessKey?.let { parameter("access_key", it) }
+        }.body()
+
+    /**
+     * 将视频[avid]或[bvid]添加到稍后再看
+     *
+     * @param csrf bili_jct
+     * @param sessData SESSDATA
+     */
+    suspend fun addToView(
+        avid: Long? = null,
+        bvid: String? = null,
+        csrf: String,
+        sessData: String
+    ): BiliResponseWithoutData = client.post("/x/v2/history/toview/add") {
+        require(avid != null || bvid != null) { "avid and bvid cannot be null at the same time" }
+        setBody(
+            FormDataContent(
+                Parameters.build {
+                    avid?.let { append("aid", "$it") }
+                    bvid?.let { append("bvid", it) }
+                    append("csrf", csrf)
+                }
+            ))
+        header("Cookie", "SESSDATA=$sessData; bili_jct=$csrf;")
+    }.body()
+
+    /**
+     * 将视频[avid]从稍后再看中删除
+     *
+     * @param csrf bili_jct
+     * @param sessData SESSDATA
+     */
+    suspend fun delToView(
+        avid: Long,
+        csrf: String,
+        sessData: String
+    ): BiliResponseWithoutData = client.post("/x/v2/history/toview/del") {
+        setBody(
+            FormDataContent(
+                Parameters.build {
+                    append("aid", "$avid")
+                    append("csrf", csrf)
+                }
+            ))
+        header("Cookie", "SESSDATA=$sessData; bili_jct=$csrf;")
+    }.body()
+
+    /**
+     * 获取当前用户已为视频[avid]或[bvid]投出的硬币数量（0、1、2）
+     */
+    suspend fun getVideoSentCoinCount(
+        avid: Long? = null,
+        bvid: String? = null,
+        sessData: String
+    ): Int {
+        val response = client.get("/x/web-interface/archive/coins") {
+            require(avid != null || bvid != null) { "avid and bvid cannot be null at the same time" }
+            avid?.let { parameter("aid", it) }
+            bvid?.let { parameter("bvid", it) }
+            header("Cookie", "SESSDATA=$sessData;")
+        }.body<BiliResponse<CheckSentCoin>>()
+        return response.getResponseData().multiply
+    }
 }
 
 enum class SeasonIndexType(val id: Int) {

@@ -1,6 +1,5 @@
 package dev.aaa1115910.bv.viewmodel
 
-import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -39,6 +38,7 @@ import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
 import dev.aaa1115910.bv.player.entity.VideoCodec
 import dev.aaa1115910.bv.player.entity.VideoListItemData
+import dev.aaa1115910.bv.repository.PlayUrlResolver
 import dev.aaa1115910.bv.repository.VideoInfoRepository
 import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.fException
@@ -63,6 +63,7 @@ class VideoPlayerV3ViewModel(
     private val videoPlayRepository: VideoPlayRepository,
 ) : ViewModel() {
     private val logger = KotlinLogging.logger { }
+    private val playUrlResolver = PlayUrlResolver(videoPlayRepository)
 
     var videoPlayer: AbstractVideoPlayer? by mutableStateOf(null)
     var danmakuPlayer: DanmakuPlayer? by mutableStateOf(null)
@@ -192,27 +193,15 @@ class VideoPlayerV3ViewModel(
         logger.fInfo { "Set request state: ready" }
         logger.fInfo { "fromSeason: $fromSeason" }
         runCatching {
-            val playData = if (fromSeason) {
-                videoPlayRepository.getPgcPlayData(
-                    aid = avid,
-                    cid = cid,
-                    epid = epid,
-                    preferCodec = Prefs.defaultVideoCodec.toBiliApiCodeType(),
-                    preferApiType = Prefs.apiType,
-                    enableProxy = proxyArea != ProxyArea.MainLand,
-                    proxyArea = when (proxyArea) {
-                        ProxyArea.MainLand -> ""
-                        ProxyArea.HongKong -> "hk"
-                        ProxyArea.TaiWan -> "tw"
-                    }
-                )
-            } else {
-                videoPlayRepository.getPlayData(
-                    aid = avid,
-                    cid = cid,
-                    preferApiType = Prefs.apiType
-                )
-            }
+            val playData = playUrlResolver.fetchPlayData(
+                aid = avid,
+                cid = cid,
+                epid = epid,
+                isPgc = fromSeason,
+                preferApiType = Prefs.apiType,
+                preferCodec = Prefs.defaultVideoCodec,
+                proxyArea = proxyArea
+            )
 
             //检查是否需要购买，如果未购买，则正片返回的dash为null，非正片例如可以免费观看的预告片等则会返回数据，此时不做提示
             withContext(Dispatchers.Main) { needPay = playData.needPay }
@@ -223,64 +212,31 @@ class VideoPlayerV3ViewModel(
             //logger.info { "Play data: $playData" }
 
             //读取清晰度
-            val resolutionList = mutableListOf<Resolution>()
-            playData.dashVideos.forEach {
-                Resolution.fromCode(it.quality)?.let { resolution ->
-                    if (!resolutionList.contains(resolution)) resolutionList.add(resolution)
-                }
-            }
-
-            logger.fInfo { "Video available resolution: $resolutionList" }
+            val resolutionList = playUrlResolver.getAvailableQualities(playData)
             availableQuality.swapListWithMainContext(resolutionList)
 
             //读取音频
-            val audioList = mutableListOf<Audio>()
-            playData.dashAudios.forEach {
-                Audio.fromCode(it.codecId)?.let { audio ->
-                    if (!audioList.contains(audio)) audioList.add(audio)
-                }
-            }
-            playData.dolby?.let {
-                Audio.fromCode(it.codecId)?.let { audio ->
-                    audioList.add(audio)
-                }
-            }
-            playData.flac?.let {
-                Audio.fromCode(it.codecId)?.let { audio ->
-                    audioList.add(audio)
-                }
-            }
-
-            logger.fInfo { "Video available audio: $audioList" }
+            val audioList = playUrlResolver.getAvailableAudios(playData)
             availableAudio.swapListWithMainContext(audioList)
 
             //先确认最终所选清晰度
-            val existDefaultResolution =
-                availableQuality.find { it == Prefs.defaultQuality } != null
-
-            if (!existDefaultResolution) {
-                val tempList = resolutionList.sortedByDescending { it.code }
-                val currentQuality = tempList.firstOrNull { it.code < Prefs.defaultQuality.code }
-                    ?: tempList.last()
-                withContext(Dispatchers.Main) {
-                    this@VideoPlayerV3ViewModel.currentQuality = currentQuality
-                }
+            val selectedQuality = playUrlResolver.selectQuality(
+                available = resolutionList,
+                preferred = Prefs.defaultQuality,
+                current = currentQuality
+            )
+            withContext(Dispatchers.Main) {
+                this@VideoPlayerV3ViewModel.currentQuality = selectedQuality
             }
 
             //确认最终所选音质
-            val existDefaultAudio = availableAudio.contains(Prefs.defaultAudio)
-            if (!existDefaultAudio) {
-                val currentAudio = when {
-                    Prefs.defaultAudio == Audio.ADolbyAtoms && availableAudio.contains(Audio.AHiRes) -> Audio.AHiRes
-                    Prefs.defaultAudio == Audio.AHiRes && availableAudio.contains(Audio.ADolbyAtoms) -> Audio.ADolbyAtoms
-                    availableAudio.contains(Audio.A192K) -> Audio.A192K
-                    availableAudio.contains(Audio.A132K) -> Audio.A132K
-                    availableAudio.contains(Audio.A64K) -> Audio.A64K
-                    else -> availableAudio.first()
-                }
-                withContext(Dispatchers.Main) {
-                    this@VideoPlayerV3ViewModel.currentAudio = currentAudio
-                }
+            val selectedAudio = playUrlResolver.selectAudio(
+                available = audioList,
+                preferred = Prefs.defaultAudio,
+                current = currentAudio
+            )
+            withContext(Dispatchers.Main) {
+                this@VideoPlayerV3ViewModel.currentAudio = selectedAudio
             }
 
             //再确认最终所选视频编码
@@ -301,34 +257,17 @@ class VideoPlayerV3ViewModel(
     }
 
     private suspend fun updateAvailableCodec() {
-        if (Prefs.apiType == ApiType.App && playData!!.codec.isEmpty()) {
-            // 纠正当前实际播放的编码
-            val videoItem = playData!!.dashVideos
-                .find { it.quality == currentQuality.code }
-                ?: playData!!.dashVideos.first()
-            withContext(Dispatchers.Main) {
-                currentVideoCodec = VideoCodec.fromCodecId(videoItem.codecId)
-            }
-            return
-        }
-
-        val supportedCodec = playData!!.codec
-        val codecList =
-            supportedCodec[currentQuality.code]!!.mapNotNull { VideoCodec.fromCodecString(it) }
-
-        availableVideoCodec.swapListWithMainContext(codecList)
-        logger.fInfo { "Video available codec: ${availableVideoCodec.toList()}" }
-
-        logger.fInfo { "Default codec: $currentVideoCodec" }
-        val currentVideoCodec = if (codecList.contains(Prefs.defaultVideoCodec)) {
-            Prefs.defaultVideoCodec
-        } else {
-            codecList.minByOrNull { it.ordinal }!!
-        }
+        val codecSelection = playUrlResolver.selectCodec(
+            playData = playData!!,
+            quality = currentQuality,
+            preferred = Prefs.defaultVideoCodec,
+            apiType = Prefs.apiType
+        )
+        // App 接口没有编码列表时只纠正当前实际播放的编码，不更新可选编码
+        codecSelection.available?.let { availableVideoCodec.swapListWithMainContext(it) }
         withContext(Dispatchers.Main) {
-            this@VideoPlayerV3ViewModel.currentVideoCodec = currentVideoCodec
+            this@VideoPlayerV3ViewModel.currentVideoCodec = codecSelection.selected
         }
-        logger.fInfo { "Select codec: $currentVideoCodec" }
     }
 
     suspend fun playQuality(
@@ -357,53 +296,25 @@ class VideoPlayerV3ViewModel(
                     "视频编码：${codec.getDisplayName(BVApp.context)}"
         )
 
-        val videoItem = playData!!.dashVideos.find {
-            when (Prefs.apiType) {
-                ApiType.Web -> it.quality == qn && it.codecs!!.startsWith(codec.prefix)
-                ApiType.App -> {
-                    if (playData!!.codec.isEmpty()) it.quality == qn
-                    else it.quality == qn && it.codecs!!.startsWith(codec.prefix)
-                }
-            }
-        }
-        var videoUrl = videoItem?.baseUrl ?: playData!!.dashVideos.first().baseUrl
-        val videoUrls = mutableListOf<String?>()
-        videoUrls.add(videoItem?.baseUrl)
-        videoUrls.addAll(videoItem?.backUrl ?: emptyList())
-
-        val audioItem = playData!!.dashAudios.find { it.codecId == audio.code }
-            ?: playData!!.dolby.takeIf { it?.codecId == audio.code }
-            ?: playData!!.flac.takeIf { it?.codecId == audio.code }
-            ?: playData!!.dashAudios.minByOrNull { it.codecId }
-        // App 播放源可能返回空的 dashAudios，此时允许仅播放视频，
-        // 否则 dashAudios.first() 会抛 NoSuchElementException 导致播放失败
-        var audioUrl: String? = audioItem?.baseUrl
-        val audioUrls = mutableListOf<String>()
-        audioItem?.baseUrl?.let { audioUrls.add(it) }
-        audioUrls.addAll(audioItem?.backUrl ?: emptyList())
-
-        logger.fInfo { "all video hosts: ${videoUrls.map { with(URI(it)) { "$scheme://$authority" } }}" }
-        logger.fInfo { "all audio hosts: ${audioUrls.map { with(URI(it)) { "$scheme://$authority" } }}" }
-
-        //replace cdn
-        if (Prefs.enableProxy && proxyArea != ProxyArea.MainLand) {
-            videoUrl = videoUrl.replaceUrlDomainWithAliCdn()
-            audioUrl = audioUrl?.replaceUrlDomainWithAliCdn()
-        } else {
-            // 如果未通过网络代理获得播放地址，才判断是否应该替换为官方 cdn
-            videoUrl = selectOfficialCdnUrl(videoUrls.filterNotNull())
-            audioUrl = if (audioUrls.isNotEmpty()) selectOfficialCdnUrl(audioUrls) else null
-        }
+        val streams = playUrlResolver.selectStreams(
+            playData = playData!!,
+            qn = qn,
+            codec = codec,
+            audio = audio,
+            apiType = Prefs.apiType,
+            proxyArea = proxyArea
+        )
+        val videoUrl = streams.videoUrl
+        val audioUrl = streams.audioUrl
 
         addLogs("video host: ${with(URI(videoUrl)) { "$scheme://$authority" }}")
         addLogs("audio host: ${audioUrl?.let { with(URI(it)) { "$scheme://$authority" } } ?: "无音频流"}")
 
-        logger.fInfo { "Select audio: $audioItem" }
-        addLogs("音频编码：${(Audio.fromCode(audioItem?.codecId ?: 0))?.getDisplayName(BVApp.context) ?: "未知"}")
+        addLogs("音频编码：${(Audio.fromCode(streams.audio?.codecId ?: 0))?.getDisplayName(BVApp.context) ?: "未知"}")
 
         withContext(Dispatchers.Main) {
-            currentVideoHeight = videoItem?.height ?: 0
-            currentVideoWidth = videoItem?.width ?: 0
+            currentVideoHeight = streams.video?.height ?: 0
+            currentVideoWidth = streams.video?.width ?: 0
             logger.info { "Video url: $videoUrl" }
             logger.info { "Audio url: $audioUrl" }
             videoPlayer!!.playUrl(videoUrl, audioUrl)
@@ -564,41 +475,6 @@ class VideoPlayerV3ViewModel(
                 logger.fInfo { "Load subtitle $subtitleName success" }
                 addLogs("加载字幕 $subtitleName 成功，数量: ${currentSubtitleData.size}")
             }
-        }
-    }
-
-    private fun String.replaceUrlDomainWithAliCdn(): String {
-        val replaceDomainKeywords = listOf(
-            "mirroraliov",
-            "mirrorakam"
-        )
-        if (replaceDomainKeywords.none { this.contains(it) }) return this
-
-        return Uri.parse(this)
-            .buildUpon()
-            .authority("upos-sz-mirrorali.bilivideo.com")
-            .build()
-            .toString()
-    }
-
-    private fun selectOfficialCdnUrl(urls: List<String>): String {
-        if (!Prefs.preferOfficialCdn) {
-            logger.fInfo { "doesn't need to filter official cdn url, select the first url" }
-            return urls.first()
-        }
-        val filteredUrls = urls
-            .filter { !it.contains(".mcdn.bilivideo.") }
-            .filter { !it.contains(".szbdyd.com") }
-            .filter {
-                !Regex("^(https?://)?(\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}(:\\d{1,5})?)(/[a-zA-Z0-9_./-]*)?(\\?.*)?$")
-                    .matches(it)
-            }
-        if (filteredUrls.isEmpty()) {
-            logger.fInfo { "doesn't find any official cdn url, select the first url" }
-            return urls.first()
-        } else {
-            logger.fInfo { "filtered official cdn urls: $filteredUrls" }
-            return filteredUrls.first()
         }
     }
 

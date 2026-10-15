@@ -7,6 +7,8 @@ import dev.aaa1115910.biliapi.entity.home.RecommendData
 import dev.aaa1115910.biliapi.entity.home.RecommendPage
 import dev.aaa1115910.biliapi.entity.rank.PopularVideoData
 import dev.aaa1115910.biliapi.entity.rank.PopularVideoPage
+import dev.aaa1115910.biliapi.entity.story.RecommendStoryData
+import dev.aaa1115910.biliapi.entity.story.StoryItem
 import dev.aaa1115910.biliapi.entity.ugc.UgcItem
 import dev.aaa1115910.biliapi.http.BiliHttpApi
 import org.koin.core.annotation.Single
@@ -97,5 +99,42 @@ class RecommendVideoRepository(
             items = items,
             nextPage = nextPage
         )
+    }
+
+    /**
+     * 与 [getRecommendVideos] 相同的首页推荐流，但转换为刷刷使用的 [StoryItem]，保留 cid、UP 主 mid 等
+     * 播放和操作需要的字段。供 [StoryRepository] 在 story 接口不可用时回退使用。
+     *
+     * 推荐流不提供视频宽高，返回项的 dimension 均为 null（按横屏处理）。
+     */
+    suspend fun getRecommendStoryItems(
+        page: RecommendPage = RecommendPage(),
+        preferApiType: ApiType = ApiType.Web
+    ): RecommendStoryData {
+        return when (preferApiType) {
+            ApiType.Web -> {
+                val items = BiliHttpApi.getFeedRcmd(
+                    idx = page.nextWebIdx,
+                    sessData = authRepository.sessionData
+                ).getResponseData().item
+                RecommendStoryData(
+                    items = items.mapNotNull { StoryItem.fromWebRcmdItem(it) },
+                    nextPage = page.copy(nextWebIdx = page.nextWebIdx + 1)
+                )
+            }
+
+            ApiType.App -> {
+                val items = BiliHttpApi.getFeedIndex(
+                    idx = page.nextAppIdx,
+                    accessKey = authRepository.accessToken
+                ).getResponseData().items
+                RecommendStoryData(
+                    items = items.mapNotNull { StoryItem.fromAppRcmdItem(it) },
+                    nextPage = page.copy(
+                        nextAppIdx = items.firstOrNull()?.idx?.plus(1) ?: page.nextAppIdx
+                    )
+                )
+            }
+        }
     }
 }
