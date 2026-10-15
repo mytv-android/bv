@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="home_tab_recommend">推荐</string>
+    <string name="home_tab_popular">热门</string>
+    <string name="home_tab_region">分区</string>
+    <string name="home_tab_following">关注</string>
+    <string name="home_search">搜索</string>
+    <string name="home_search_placeholder_tablet">搜索视频、番剧、UP 主</string>
+    <string name="home_avatar">我的</string>
+    <string name="home_featured">今日精选</string>
+    <string name="home_featured_region">今日精选 · %1$s</string>
+    <string name="home_continue_watching">继续观看</string>
+    <string name="home_all">全部</string>
+    <string name="home_for_you">为你推荐</string>
+    <string name="home_more_rows_hint">按 ↓ 查看更多行</string>
+    <string name="home_play">播放</string>
+    <string name="home_watch_later">稍后再看</string>
+    <string name="home_like">点赞</string>
+    <string name="home_play_count">%1$s播放</string>
+    <string name="home_toview_added">已添加到稍后再看</string>
+    <string name="home_toview_failed">添加稍后再看失败：%1$s</string>
+    <string name="home_like_done">已点赞</string>
+    <string name="home_unlike_done">已取消点赞</string>
+    <string name="home_like_failed">操作失败：%1$s</string>
+    <string name="home_login_required">请先登录</string>
+    <string name="home_no_more">没有更多了</string>
+</resources>
