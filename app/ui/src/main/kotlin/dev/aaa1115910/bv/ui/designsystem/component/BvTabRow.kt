@@ -101,7 +101,7 @@ fun BvTabRow(
                 Modifier
                     .align(Alignment.BottomStart)
                     .offset(x = horizontalPadding + indicatorX)
-                    .width(indicatorW)
+                    .width(indicatorW.coerceAtLeast(0.dp))
                     .height(3.dp)
                     .background(
                         MaterialTheme.colorScheme.primary,

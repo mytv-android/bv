@@ -111,7 +111,8 @@ fun TvRail(
             .onFocusChanged { open = it.hasFocus; onFocusChanged(it.hasFocus) }
             .focusRestorer(selectedRequester)
             .focusGroup()
-            .padding(vertical = 27.dp, horizontal = hPad),
+            // 弹簧会过冲，内边距不能为负
+            .padding(vertical = 27.dp, horizontal = hPad.coerceAtLeast(0.dp)),
         horizontalAlignment = if (open) Alignment.Start else Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
