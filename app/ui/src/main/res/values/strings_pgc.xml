@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 影视（第 9.6 节） -->
+    <string name="pgc_title">影视</string>
+    <string name="pgc_tab_anime">番剧</string>
+    <string name="pgc_tab_guochuang">国创</string>
+    <string name="pgc_tab_movie">电影</string>
+    <string name="pgc_tab_tv">电视剧</string>
+    <string name="pgc_tab_documentary">纪录片</string>
+    <string name="pgc_tab_variety">综艺</string>
+    <string name="pgc_timeline">新番时间表</string>
+    <string name="pgc_timeline_full">完整 ›</string>
+    <string name="pgc_timeline_chip">时间表</string>
+    <string name="pgc_index">索引</string>
+    <string name="pgc_my_following">我的追番</string>
+    <string name="pgc_follow">追番</string>
+    <string name="pgc_followed">已追番</string>
+    <string name="pgc_today_update">今天更新</string>
+    <string name="pgc_update_at">%1$s 更新</string>
+    <string name="pgc_today_empty">今天没有更新</string>
+    <string name="pgc_day_empty">当天没有更新</string>
+    <string name="pgc_featured">本季热播</string>
+    <string name="pgc_featured_rating">本季热播 · %1$s 分</string>
+    <string name="pgc_featured_rating_tv">本季热播 · 评分 %1$s</string>
+    <string name="pgc_watch_episode">看第 %1$s 话</string>
+    <string name="pgc_watch">立即观看</string>
+    <string name="pgc_updated_to">更新至第 %1$s 话</string>
+    <string name="pgc_hot">热门%1$s</string>
+    <string name="pgc_empty">暂时没有内容</string>
+</resources>

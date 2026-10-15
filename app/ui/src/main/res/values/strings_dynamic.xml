@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 动态（第 9.7 节）与动态详情（第 9.11 节） -->
+    <string name="dynamic_title">动态</string>
+    <string name="dynamic_all">全部</string>
+    <string name="dynamic_filter_video">视频</string>
+    <string name="dynamic_filter_image">图文</string>
+    <string name="dynamic_meta">%1$s · %2$s</string>
+    <string name="dynamic_action_video">投稿了视频</string>
+    <string name="dynamic_action_dynamic">动态</string>
+    <string name="dynamic_action_forward">转发了动态</string>
+    <string name="dynamic_action_article">投稿了专栏</string>
+    <string name="dynamic_action_live">直播了</string>
+    <string name="dynamic_action_pgc">更新了剧集</string>
+    <string name="dynamic_forward">转发</string>
+    <string name="dynamic_comment_tab">评论 %1$s</string>
+    <string name="dynamic_forward_tab">转发</string>
+    <string name="dynamic_forward_count">共 %1$s 次转发</string>
+    <string name="dynamic_forward_unsupported">暂不支持查看转发列表</string>
+    <string name="dynamic_comments_empty">还没有评论</string>
+    <string name="dynamic_login_required">登录后查看关注的 UP 主动态</string>
+    <string name="dynamic_login">登录</string>
+    <string name="dynamic_today">今天</string>
+    <string name="dynamic_yesterday">昨天</string>
+    <string name="dynamic_earlier">更早</string>
+    <string name="dynamic_detail_title">动态详情</string>
+    <string name="dynamic_source_missing">原动态不存在</string>
+    <string name="dynamic_images_count">%1$d 图</string>
+    <string name="dynamic_live">直播</string>
+    <string name="dynamic_article">专栏</string>
+    <string name="dynamic_empty">还没有动态</string>
+    <string name="dynamic_select_hint">选择一条动态查看详情</string>
+    <string name="dynamic_play">播放</string>
+    <string name="dynamic_time_ago">· %1$s</string>
+    <string name="dynamic_count_wan">%1$s万</string>
+    <string name="dynamic_count_yi">%1$s亿</string>
+    <string name="dynamic_more_images">+%1$d</string>
+    <string name="dynamic_at">@%1$s</string>
+    <string name="dynamic_load_failed">加载动态失败</string>
+</resources>

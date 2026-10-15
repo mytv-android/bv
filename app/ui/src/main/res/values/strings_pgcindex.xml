@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 番剧索引（第 9.11 节） -->
+    <string name="pgcindex_title">%1$s索引</string>
+    <string name="pgcindex_filter">筛选</string>
+    <string name="pgcindex_filter_title">索引筛选 · %1$s</string>
+    <string name="pgcindex_filter_done">完成</string>
+    <string name="pgcindex_empty">无可用数据</string>
+    <string name="pgcindex_open_filter">打开筛选</string>
+    <string name="pgcindex_order">排序方式</string>
+    <string name="pgcindex_order_type">排序顺序</string>
+    <string name="pgcindex_season_version">类型</string>
+    <string name="pgcindex_spoken_language">配音</string>
+    <string name="pgcindex_is_finish">状态</string>
+    <string name="pgcindex_season_status">付费</string>
+    <string name="pgcindex_area">地区</string>
+    <string name="pgcindex_copyright">版权</string>
+    <string name="pgcindex_season_month">季度</string>
+    <string name="pgcindex_producer">出品</string>
+    <string name="pgcindex_year">年份</string>
+    <string name="pgcindex_release_date">上映时间</string>
+    <string name="pgcindex_style">风格</string>
+</resources>
