@@ -19,6 +19,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
+import dev.aaa1115910.biliapi.repositories.ToViewRepository
 import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.designsystem.adaptive.NavKind
@@ -39,7 +41,9 @@ import dev.aaa1115910.bv.ui.designsystem.nav.TabletRail
 import dev.aaa1115910.bv.ui.designsystem.nav.TvRail
 import dev.aaa1115910.bv.ui.designsystem.nav.TvRailTarget
 import dev.aaa1115910.bv.viewmodel.UserViewModel
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
 
 /** 手机布局下一级页面滚动内容底部需要留出的导航栏高度（64dp + 系统导航栏 inset）。 */
 val LocalBottomBarPadding = compositionLocalOf { 0.dp }
@@ -51,9 +55,21 @@ val LocalBottomBarPadding = compositionLocalOf { 0.dp }
  * - TvRail：NavHost 铺满，一级页面与搜索页时 TvRail 叠在左侧。
  */
 @Composable
-fun AppShell(nav: NavHostController, onAddToView: (Long) -> Unit = {}) {
+fun AppShell(nav: NavHostController) {
     val profile = LocalDeviceProfile.current
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val toViewRepository: ToViewRepository = koinInject()
+    val onAddToView: (Long) -> Unit = { aid ->
+        scope.launch {
+            val ok = runCatching { toViewRepository.addToView(aid) }.isSuccess
+            Toast.makeText(
+                context,
+                if (ok) R.string.shell_toview_added else R.string.shell_toview_failed,
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
     val backStack by nav.currentBackStackEntryAsState()
     val destination = backStack?.destination
     val current = TopLevel.of(destination)
