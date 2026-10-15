@@ -51,26 +51,28 @@ fun ShortsScreen(nav: NavController, route: ShortsRoute) {
 
     val layout = if (!profile.isTv && configuration.smallestScreenWidthDp < 600) DeviceLayout.Phone else profile.layout
 
-    if (vm.items.isEmpty()) {
-        BvTheme(forceDark = true) {
-            ShortsStatus(
-                vm = vm,
-                started = started,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black),
-            )
+    // 平板右侧信息栏与对话框跟随全局明暗（视频区域的强制深色在 ShortsTablet 里处理）；手机、电视整页深色。
+    // 对话框必须与页面放在同一个主题作用域里：页面旁边再并列一个 BvTheme 会让页面整个不显示。
+    BvTheme(forceDark = layout != DeviceLayout.Tablet) {
+        if (vm.items.isEmpty()) {
+            BvTheme(forceDark = true) {
+                ShortsStatus(
+                    vm = vm,
+                    started = started,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black),
+                )
+            }
+        } else {
+            when (layout) {
+                DeviceLayout.Phone -> ShortsPhone(vm, pool, comments, actions)
+                DeviceLayout.Tablet -> ShortsTablet(vm, pool, comments, actions)
+                DeviceLayout.Tv -> ShortsTv(vm, pool, comments, actions)
+            }
         }
-    } else {
-        when (layout) {
-            DeviceLayout.Phone -> BvTheme(forceDark = true) { ShortsPhone(vm, pool, comments, actions) }
-            // 平板右侧信息栏跟随全局明暗，只有视频区域强制深色（在 ShortsTablet 里处理）
-            DeviceLayout.Tablet -> ShortsTablet(vm, pool, comments, actions)
-            DeviceLayout.Tv -> BvTheme(forceDark = true) { ShortsTv(vm, pool, comments, actions) }
-        }
+        ShortsActionDialogs(actions)
     }
-    // 手机、电视的对话框跟随刷刷的深色；平板跟随全局明暗
-    BvTheme(forceDark = layout != DeviceLayout.Tablet) { ShortsActionDialogs(actions) }
 }
 
 /** ShortsViewModel 的操作结果提示（点赞 / 取消点赞不提示，按钮本身有变化） */

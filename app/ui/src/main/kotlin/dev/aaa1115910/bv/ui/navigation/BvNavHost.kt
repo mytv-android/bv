@@ -9,6 +9,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -52,6 +54,16 @@ import kotlin.math.sign
  * 全部路由。页面切换：fadeIn(defaultEffectsSpec) + 按导航顺序方向的位移
  * （底部导航栏横向、导航轨纵向，沿用旧 MobileMainScreen 的做法）；非一级页面从右侧进入。
  */
+/**
+ * 每个页面的根节点：一个铺满的 Box。
+ * 页面在根部并列多个组合（例如页面 + 包在另一层 BvTheme / CoverTheme 里的对话框、底部抽屉）时，
+ * 直接放在 NavHost 的 AnimatedContent 里会导致前面的内容整个不显示；套一层 Box 后正常。
+ */
+@Composable
+private fun Screen(content: @Composable () -> Unit) {
+    Box(Modifier.fillMaxSize()) { content() }
+}
+
 @Composable
 fun BvNavHost(nav: NavHostController, modifier: Modifier = Modifier) {
     val horizontal = LocalDeviceProfile.current.navKind == NavKind.Bar
@@ -94,31 +106,31 @@ fun BvNavHost(nav: NavHostController, modifier: Modifier = Modifier) {
         popEnterTransition = popEnter,
         popExitTransition = popExit,
     ) {
-        composable<HomeRoute> { HomeScreen(nav) }
-        composable<ShortsRoute> { ShortsScreen(nav, it.toRoute()) }
-        composable<PgcRoute> { PgcScreen(nav) }
-        composable<DynamicRoute> { DynamicScreen(nav) }
-        composable<MeRoute> { MeScreen(nav) }
-        composable<SearchRoute> { SearchScreen(nav, it.toRoute()) }
-        composable<VideoRoute> { VideoDetailScreen(nav, it.toRoute()) }
-        composable<SeasonRoute> { SeasonScreen(nav, it.toRoute()) }
-        composable<PlayerRoute> { PlayerScreen(nav, it.toRoute()) }
-        composable<SpaceRoute> { SpaceScreen(nav, it.toRoute()) }
-        composable<TagRoute> { TagScreen(nav, it.toRoute()) }
-        composable<DynamicDetailRoute> { DynamicDetailScreen(nav, it.toRoute()) }
-        composable<PgcIndexRoute> { PgcIndexScreen(nav, it.toRoute()) }
-        composable<PgcTimelineRoute> { PgcTimelineScreen(nav) }
-        composable<HistoryRoute> { HistoryScreen(nav) }
-        composable<FavoriteRoute> { FavoriteScreen(nav) }
-        composable<ToViewRoute> { ToViewScreen(nav) }
-        composable<FollowingSeasonRoute> { FollowingSeasonScreen(nav) }
-        composable<FollowingRoute> { FollowingScreen(nav) }
-        composable<AccountsRoute> { AccountsScreen(nav) }
-        composable<UserLockRoute> { UserLockScreen(nav) }
-        composable<LoginRoute> { LoginScreen(nav) }
-        composable<SettingsRoute> { SettingsScreen(nav, it.toRoute()) }
-        composable<LogsRoute> { LogsScreen(nav) }
-        composable<MediaCodecRoute> { MediaCodecScreen(nav) }
-        composable<SpeedTestRoute> { SpeedTestScreen(nav) }
+        composable<HomeRoute> { Screen { HomeScreen(nav) } }
+        composable<ShortsRoute> { Screen { ShortsScreen(nav, it.toRoute()) } }
+        composable<PgcRoute> { Screen { PgcScreen(nav) } }
+        composable<DynamicRoute> { Screen { DynamicScreen(nav) } }
+        composable<MeRoute> { Screen { MeScreen(nav) } }
+        composable<SearchRoute> { Screen { SearchScreen(nav, it.toRoute()) } }
+        composable<VideoRoute> { Screen { VideoDetailScreen(nav, it.toRoute()) } }
+        composable<SeasonRoute> { Screen { SeasonScreen(nav, it.toRoute()) } }
+        composable<PlayerRoute> { Screen { PlayerScreen(nav, it.toRoute()) } }
+        composable<SpaceRoute> { Screen { SpaceScreen(nav, it.toRoute()) } }
+        composable<TagRoute> { Screen { TagScreen(nav, it.toRoute()) } }
+        composable<DynamicDetailRoute> { Screen { DynamicDetailScreen(nav, it.toRoute()) } }
+        composable<PgcIndexRoute> { Screen { PgcIndexScreen(nav, it.toRoute()) } }
+        composable<PgcTimelineRoute> { Screen { PgcTimelineScreen(nav) } }
+        composable<HistoryRoute> { Screen { HistoryScreen(nav) } }
+        composable<FavoriteRoute> { Screen { FavoriteScreen(nav) } }
+        composable<ToViewRoute> { Screen { ToViewScreen(nav) } }
+        composable<FollowingSeasonRoute> { Screen { FollowingSeasonScreen(nav) } }
+        composable<FollowingRoute> { Screen { FollowingScreen(nav) } }
+        composable<AccountsRoute> { Screen { AccountsScreen(nav) } }
+        composable<UserLockRoute> { Screen { UserLockScreen(nav) } }
+        composable<LoginRoute> { Screen { LoginScreen(nav) } }
+        composable<SettingsRoute> { Screen { SettingsScreen(nav, it.toRoute()) } }
+        composable<LogsRoute> { Screen { LogsScreen(nav) } }
+        composable<MediaCodecRoute> { Screen { MediaCodecScreen(nav) } }
+        composable<SpeedTestRoute> { Screen { SpeedTestScreen(nav) } }
     }
 }

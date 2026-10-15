@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
@@ -16,7 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.movableContentOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +54,7 @@ val LocalBottomBarPadding = compositionLocalOf { 0.dp }
  * - Bar：NavHost 铺满，一级页面时 PhoneNavBar 叠在底部；
  * - Rail / RailExpanded：TabletRail + NavHost，非一级页面隐藏导航轨（搜索页显示，不选中任何项）；
  * - TvRail：NavHost 铺满，一级页面与搜索页时 TvRail 叠在左侧。
+ * 三种情况共用同一棵树，只切换导航组件的显隐。
  */
 @Composable
 fun AppShell(nav: NavHostController) {
@@ -84,43 +85,33 @@ fun AppShell(nav: NavHostController) {
         }
     }
 
-    // 手机横竖屏切换会在 Bar / Rail 两种外壳之间切换：NavHost 用 movableContentOf 原地移动，
-    // 页面（含正在播放的播放器）不会被销毁重建（第 14.3 节「布局切换且正在播放的视频不中断」）
-    val navHost = remember(nav) {
-        movableContentOf { modifier: Modifier -> BvNavHost(nav, modifier) }
-    }
+    val isTv = profile.navKind == NavKind.TvRail
+    val showBar = profile.navKind == NavKind.Bar && current != null
+    val showTabletRail = (profile.navKind == NavKind.Rail || profile.navKind == NavKind.RailExpanded) &&
+        (current != null || onSearchPage)
+    val showTvRail = isTv && (current != null || onSearchPage)
+    val barPadding = 64.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
+    val userViewModel: UserViewModel = koinViewModel()
+    val railRequester = remember { FocusRequester() }
+    var railFocused by remember { mutableStateOf(false) }
+    var lastBack by remember { mutableLongStateOf(0L) }
 
     CompositionLocalProvider(
         LocalVideoCardActions provides actions,
         // 原型尺寸精确到 dp，不让 M3 把小按钮的布局撑到 48dp
         LocalMinimumInteractiveComponentSize provides Dp.Unspecified,
     ) {
-        when (profile.navKind) {
-            NavKind.Bar -> Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
-            ) {
-                val barPadding = 64.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-                CompositionLocalProvider(LocalBottomBarPadding provides if (current != null) barPadding else 0.dp) {
-                    navHost(Modifier.fillMaxSize())
-                }
-                if (current != null) {
-                    PhoneNavBar(
-                        current = current,
-                        onSelect = nav::navigateTopLevel,
-                        overVideo = current == TopLevel.Shorts,
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                    )
-                }
-            }
-
-            NavKind.Rail, NavKind.RailExpanded -> Row(
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface)
-            ) {
-                if (current != null || onSearchPage) {
+        // NavHost 在组合树里的位置在三种外壳之间保持不变：导航栏 / 导航轨只是在它旁边出现或消失。
+        // 这样手机横竖屏、折叠屏、分屏切换外壳时页面（含正在播放的播放器）不会被销毁重建（第 14.3 节）。
+        // 不用 movableContentOf：移动含 AndroidView / Pager 的页面会触发 Compose 的 LayoutNode 崩溃。
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+        ) {
+            Row(Modifier.fillMaxSize()) {
+                if (showTabletRail) {
                     TabletRail(
                         current = current,
                         expanded = profile.navKind == NavKind.RailExpanded,
@@ -129,56 +120,54 @@ fun AppShell(nav: NavHostController) {
                         onSettings = { nav.navigate(SettingsRoute()) },
                     )
                 }
-                navHost(Modifier.weight(1f))
-            }
-
-            NavKind.TvRail -> TvShell(nav, current, onSearchPage, context as? Activity)
-        }
-    }
-}
-
-@Composable
-private fun TvShell(nav: NavHostController, current: TopLevel?, onSearchPage: Boolean, activity: Activity?) {
-    val context = LocalContext.current
-    val userViewModel: UserViewModel = koinViewModel()
-    val railRequester = remember { FocusRequester() }
-    var railFocused by remember { mutableStateOf(false) }
-    var lastBack by remember { mutableLongStateOf(0L) }
-    val showRail = current != null || onSearchPage
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-    ) {
-        BvNavHost(nav, Modifier.fillMaxSize())
-        // 必须在 NavHost 之后注册，才能先于 NavHost 自己的返回处理
-        // 电视返回键（一级页面）：焦点不在导航轨 → 移到导航轨当前项；已在导航轨 → 3 秒内再按一次退出
-        BackHandler(enabled = current != null) {
-            if (!railFocused) {
-                runCatching { railRequester.requestFocus() }
-            } else {
-                val now = System.currentTimeMillis()
-                if (now - lastBack < 3000) {
-                    activity?.finish()
-                } else {
-                    lastBack = now
-                    Toast.makeText(context, R.string.shell_press_back_again_exit, Toast.LENGTH_SHORT).show()
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                ) {
+                    CompositionLocalProvider(LocalBottomBarPadding provides if (showBar) barPadding else 0.dp) {
+                        BvNavHost(nav, Modifier.fillMaxSize())
+                    }
                 }
             }
-        }
-        if (showRail) {
-            TvRail(
-                current = if (onSearchPage) TvRailTarget.Search else current?.let { TvRailTarget.Page(it) },
-                avatar = userViewModel.face.takeIf { it.isNotBlank() },
-                userName = userViewModel.username,
-                onSelect = nav::navigateTopLevel,
-                onSearch = { nav.navigate(SearchRoute()) { launchSingleTop = true } },
-                onSettings = { nav.navigate(SettingsRoute()) },
-                selectedRequester = railRequester,
-                onFocusChanged = { railFocused = it },
-                modifier = Modifier.align(Alignment.CenterStart),
-            )
+            if (isTv) {
+                // 必须在 NavHost 之后注册，才能先于 NavHost 自己的返回处理
+                // 电视返回键（一级页面）：焦点不在导航轨 → 移到导航轨当前项；已在导航轨 → 3 秒内再按一次退出
+                BackHandler(enabled = current != null) {
+                    if (!railFocused) {
+                        runCatching { railRequester.requestFocus() }
+                    } else {
+                        val now = System.currentTimeMillis()
+                        if (now - lastBack < 3000) {
+                            (context as? Activity)?.finish()
+                        } else {
+                            lastBack = now
+                            Toast.makeText(context, R.string.shell_press_back_again_exit, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+            if (showBar) current?.let { top ->
+                PhoneNavBar(
+                    current = top,
+                    onSelect = nav::navigateTopLevel,
+                    overVideo = top == TopLevel.Shorts,
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                )
+            }
+            if (showTvRail) {
+                TvRail(
+                    current = if (onSearchPage) TvRailTarget.Search else current?.let { TvRailTarget.Page(it) },
+                    avatar = userViewModel.face.takeIf { it.isNotBlank() },
+                    userName = userViewModel.username,
+                    onSelect = nav::navigateTopLevel,
+                    onSearch = { nav.navigate(SearchRoute()) { launchSingleTop = true } },
+                    onSettings = { nav.navigate(SettingsRoute()) },
+                    selectedRequester = railRequester,
+                    onFocusChanged = { railFocused = it },
+                    modifier = Modifier.align(Alignment.CenterStart),
+                )
+            }
         }
     }
 }
