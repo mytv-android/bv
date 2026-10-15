@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 登录（第 9.10 节）与 bugvideo://qrtoken 导入。注意：app/shared 已有 login_error / login_success 等名字，这里不要与之重名 -->
+    <string name="login_title">登录哔哩哔哩</string>
+    <string name="login_subtitle">登录后同步历史、收藏和追番，三台设备进度一致。</string>
+    <string name="login_phone">手机号</string>
+    <string name="login_code">验证码</string>
+    <string name="login_get_code">获取验证码</string>
+    <string name="login_resend_in">%1$d 秒后重发</string>
+    <string name="login_submit">登录</string>
+    <string name="login_or">或</string>
+    <string name="login_scan_on_other_device">在另一台设备上扫码</string>
+    <string name="login_import_from_tv">导入电视上已登录的账号</string>
+    <string name="login_scan_title">用哔哩哔哩 App 扫码登录</string>
+    <string name="login_scan_meta">二维码 3 分钟后刷新 · 已扫码请在手机上确认</string>
+    <string name="login_step_1">打开哔哩哔哩 App，点右上角扫一扫</string>
+    <string name="login_step_2">对准左侧二维码</string>
+    <string name="login_step_3">在手机上点「确认登录」</string>
+    <string name="login_use_sms">改用手机号和验证码</string>
+    <string name="login_use_qr">改用扫码登录</string>
+    <string name="login_switch_account">切换到已保存的账号</string>
+    <string name="login_send_sms_first">请先获取验证码</string>
+    <string name="login_done">登录成功</string>
+    <string name="login_qr_scanned">已扫码，请在手机上确认</string>
+    <string name="login_qr_failed">二维码已失效</string>
+    <string name="login_qr_retry">刷新二维码</string>
+    <string name="login_qr_dialog_title">扫码登录</string>
+    <string name="login_close">关闭</string>
+    <string name="login_got_it">知道了</string>
+    <string name="login_import_info_title">导入电视上已登录的账号</string>
+    <string name="login_import_info_body">在电视上的 BV 里打开账号管理，选中要导入的账号并显示它的用户凭证二维码，然后用这台手机的相机或扫码应用扫描该二维码，确认后即可导入。</string>
+    <string name="login_import_title">导入账号</string>
+    <string name="login_import_add">添加用户</string>
+    <string name="login_import_cancel">取消</string>
+    <string name="login_import_added">添加成功</string>
+    <string name="login_import_invalid">无法识别的登录凭证</string>
+    <string name="login_import_uid">UID %1$d</string>
+</resources>

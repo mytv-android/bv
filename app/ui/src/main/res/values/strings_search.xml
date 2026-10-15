@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 搜索（第 9.5 节）。注意：app/shared 已有 search_input_* / search_result_* 等名字，这里不要与之重名 -->
+    <string name="search_placeholder">搜索视频、番剧、UP 主</string>
+    <string name="search_back">返回</string>
+    <string name="search_category_all">综合</string>
+    <string name="search_category_video">视频</string>
+    <string name="search_category_bangumi">番剧</string>
+    <string name="search_category_ft">影视</string>
+    <string name="search_category_user">UP 主</string>
+    <string name="search_history">搜索历史</string>
+    <string name="search_history_clear">清除</string>
+    <string name="search_history_clear_title">清除搜索历史</string>
+    <string name="search_history_clear_message">确定清除全部搜索历史吗？此操作无法撤销。</string>
+    <string name="search_history_clear_confirm">清除</string>
+    <string name="search_cancel">取消</string>
+    <string name="search_hot">大家都在搜</string>
+    <string name="search_section_video">视频</string>
+    <string name="search_section_pgc">影视</string>
+    <string name="search_sort_action">%1$s ›</string>
+    <string name="search_order_default">综合排序</string>
+    <string name="search_order_click">按播放量</string>
+    <string name="search_order_pubdate">按发布时间</string>
+    <string name="search_order_danmaku">按弹幕数</string>
+    <string name="search_order_favorite">按收藏数</string>
+    <string name="search_order_comment">按评论数</string>
+    <string name="search_order_like">按点赞数</string>
+    <string name="search_duration_all">全部时长</string>
+    <string name="search_duration_lt10">10 分钟以下</string>
+    <string name="search_duration_10_30">10–30 分钟</string>
+    <string name="search_duration_30_60">30–60 分钟</string>
+    <string name="search_duration_gt60">60 分钟以上</string>
+    <string name="search_partition_all">全部分区</string>
+    <string name="search_filter_title">筛选</string>
+    <string name="search_filter_order">排序</string>
+    <string name="search_filter_duration">时长</string>
+    <string name="search_filter_partition">分区</string>
+    <string name="search_filter_child_partition">子分区</string>
+    <string name="search_filter_done">完成</string>
+    <string name="search_watch_now">立即观看</string>
+    <string name="search_pgc_meta_rating">%1$s · %2$s 分</string>
+    <string name="search_follow">关注</string>
+    <string name="search_following">已关注</string>
+    <string name="search_follow_done">已关注</string>
+    <string name="search_unfollow_done">已取消关注</string>
+    <string name="search_follow_failed">操作失败</string>
+    <string name="search_no_result">没有找到相关结果</string>
+    <string name="search_results_for">“%1$s”的结果</string>
+    <string name="search_tv_suggest">联想</string>
+    <string name="search_tv_history">搜索历史</string>
+    <string name="search_tv_hot">热搜</string>
+    <string name="search_tv_placeholder">输入拼音首字母</string>
+    <string name="search_tv_space">空格</string>
+    <string name="search_tv_delete">删除</string>
+    <string name="search_tv_clear">清空</string>
+    <string name="search_tv_voice">按住遥控器语音键说话</string>
+</resources>

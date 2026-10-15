@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 账号管理 / 用户锁（第 8.1、9.11 节） -->
+    <string name="accounts_unlock_choose_user">选择账号</string>
+    <string name="accounts_unlock_input_password">输入密码</string>
+    <string name="accounts_unlock_wrong_password">密码错误</string>
+    <string name="accounts_unlock_tip_dpad">方向键输入密码 · 确认键解锁 · 返回键删除</string>
+    <string name="accounts_unlock_tip_numeric">输入 4 位数字密码</string>
+    <string name="accounts_unlock_tip_direction">按方向键输入密码，点 ✓ 解锁</string>
+    <string name="accounts_unlock_delete">删除</string>
+    <string name="accounts_unlock_confirm">解锁</string>
+</resources>
