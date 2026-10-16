@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 用户锁设置（第 9.11 节；旧电视 UserLockSettingsScreen） -->
+    <string name="accounts_lock_title">用户锁</string>
+    <string name="accounts_lock_choose_user">选择要设置用户锁的账号</string>
+    <string name="accounts_lock_input_old">请输入旧密码</string>
+    <string name="accounts_lock_input_new">请输入新密码</string>
+    <string name="accounts_lock_input_again">请再次输入新密码</string>
+    <string name="accounts_lock_wrong">密码错误</string>
+    <string name="accounts_lock_different">密码不一致</string>
+    <string name="accounts_lock_removed">密码已移除</string>
+    <string name="accounts_lock_saved">用户锁已设置</string>
+    <string name="accounts_lock_save_failed">保存失败</string>
+    <string name="accounts_lock_remove">移除用户锁</string>
+    <string name="accounts_lock_tip_dpad">方向键输入密码 · 确认键确定 · 返回键删除</string>
+    <string name="accounts_lock_tip_dpad_remove">不输入直接按确认键将移除用户锁</string>
+    <string name="accounts_lock_tip_numeric">输入 %1$d 位数字密码</string>
+    <string name="accounts_lock_tip_direction">按方向键输入密码，点 ✓ 确定</string>
+    <string name="accounts_lock_no_user">登录后才能设置用户锁</string>
+    <string name="accounts_lock_login">登录</string>
+    <string name="accounts_lock_delete">删除</string>
+    <string name="accounts_lock_confirm">确定</string>
+</resources>

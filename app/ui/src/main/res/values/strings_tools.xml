@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 工具页：日志 / 解码器信息 / 网络测速（第 9.11 节） -->
+    <string name="tools_close">关闭</string>
+
+    <string name="tools_logs_title">日志</string>
+    <string name="tools_logs_save">手动保存日志</string>
+    <string name="tools_logs_save_desc">立即保存一份最近的运行日志</string>
+    <string name="tools_logs_saved">日志已保存</string>
+    <string name="tools_logs_empty">还没有日志</string>
+    <string name="tools_logs_manual">手动</string>
+    <string name="tools_logs_crash">崩溃</string>
+    <string name="tools_logs_item">%1$s · %2$d KB</string>
+    <string name="tools_logs_qr_title">扫码下载日志</string>
+    <string name="tools_logs_qr_hint">选择一个日志文件，用同一局域网内的设备扫码下载</string>
+
+    <string name="tools_codec_title">解码器信息</string>
+    <string name="tools_codec_empty">没有找到解码器</string>
+    <string name="tools_codec_hs_title">软硬解码</string>
+    <string name="tools_codec_hs_hardware">硬解</string>
+    <string name="tools_codec_hs_software">软解</string>
+    <string name="tools_codec_instances_title">最大并发编解码器实例数量</string>
+    <string name="tools_codec_color_formats_title">颜色格式</string>
+    <string name="tools_codec_audio_bitrate_title">音频码率范围</string>
+    <string name="tools_codec_video_max_bitrate_title">最大视频码率</string>
+    <string name="tools_codec_video_frame_range_title">视频帧率范围</string>
+    <string name="tools_codec_video_frame_supported_title">支持的视频帧率</string>
+    <string name="tools_codec_video_frame_achievable_title">可实现的视频帧率（可能无数据）</string>
+    <string name="tools_codec_frame_unsupported">不受支持</string>
+    <string name="tools_codec_res_360p">360P</string>
+    <string name="tools_codec_res_480p">480P</string>
+    <string name="tools_codec_res_720p">720P</string>
+    <string name="tools_codec_res_1080p">1080P</string>
+    <string name="tools_codec_res_1440p">2K</string>
+    <string name="tools_codec_res_2160p">4K</string>
+    <string name="tools_codec_res_4320p">8K</string>
+    <string name="tools_codec_res_unknown">未知</string>
+
+    <string name="tools_speed_title">网络测速</string>
+</resources>
