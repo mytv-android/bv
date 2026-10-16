@@ -10,6 +10,27 @@
 
 ---
 
+## 复测更新（2026-10-16 晚）
+
+被测版本：`alpha-r973`（`402b0304`，含 P0/P1 修复与 baseline profile）。
+
+| 项 | 状态 | 证据 |
+|---|---|---|
+| P0 详情 / 播放器被风控 `-352` | ✅ 已修（`getVideoDetail` 补 `Referer`） | 手机：详情页正常打开（简介/评论、UP 行、点赞投币收藏稍后分享、相关推荐）、内嵌播放器 + 弹幕、横屏全屏播放器顶栏（返回·标题·字幕·弹开·更多）与底栏（暂停·下一集·时间·1.0×·480P·退出全屏）与设计一致 —— `v1/v2/v3`；电视：详情页同设计稿（Eyebrow + 标题 + UP 行 + 播放/操作按钮行 + 合集/相关推荐）—— `tvD` |
+| P1 电视首页焦点死锁 | ✅ 已修（标签行按 ↓ 重新把焦点交给内容） | 修复前：在「热门」标签上按 ↓ 画面 **0 像素**变化；修复后：**93.7 万像素**变化，焦点进入网格，确认键可打开详情 —— `tvB/tvC/tvD` |
+| baseline profile | ✅ 已加入并验证生效 | 见下 |
+
+**baseline profile 的做法**（全程未本地编译）：取 CI 的 alpha APK 装到模拟器 → 按 首页（滚动、换标签）→ 分区 → 影视 → 我的 → 搜索 → 刷刷翻页 走一遍 CUJ → `adb shell cmd package dump-profiles` 采样 ART profile → 用 CI 的 `mapping.txt` 把 ART 文本 profile 还原成源符号 HRF（12,422 条，HS 标记）→ 落到 `app/src/main/baselineProfiles/baseline-prof.txt`，`app` 增加 `androidx.profileinstaller`。
+
+验证结果：
+- r973 的 APK 里确实带上 `assets/dexopt/baseline.prof`（18,180 B）+ `baseline.profm`（2,150 B）
+- 设备 logcat 出现 `ProfileInstaller: Installing profile for dev.aaa1115910.bv`；随后 `cmd package compile -m speed-profile` 使 `Dexopt state` 变为 `status=speed-profile`（ART 已按该 profile 编译）
+- 冷启动 A/B（r973 带 profile vs r972 不带，各 4 次 `am start -W`）：≈600ms vs ≈590ms，**模拟器上无可测差异**——该指标被网络/首屏数据主导，收益量化需要在真机上跑 Macrobenchmark
+
+P2/P3 各项（视频深链、电视热门用网格、轮播 eyebrow 缺分区名/评分、搜索框缺麦克风等）本轮未处理。
+
+---
+
 ## 结论摘要
 
 三端形态与设计稿整体一致：一个 `MainActivity`、`DeviceProfile` 驱动的手机 / 平板 / 电视三套布局、material-kolor 种子色实时换肤、Expressive 形状与弹簧、电视自建焦点系统（导航轨聚焦展开、枢轴滚动、焦点放大描边光晕）都已落地并且可交互。
