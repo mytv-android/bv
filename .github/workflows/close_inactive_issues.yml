@@ -7,7 +7,7 @@ jobs:
   close-issues:
     name: Close inactive issues
     runs-on: ubuntu-latest
-    if: github.repository == 'ldm0206/bv'
+    if: github.repository == 'mytv-android/bv'
     permissions:
       issues: write
     steps:

@@ -185,6 +185,8 @@ object BiliHttpApi {
     ): BiliResponse<VideoDetail> = client.get("/x/web-interface/wbi/view/detail") {
         parameter("aid", av)
         parameter("bvid", bv)
+        // 不带 referer 会被风控返回 -352（data 里只有 v_voucher），反序列化随即失败
+        header("referer", "https://www.bilibili.com")
         sessData?.let { header("Cookie", "SESSDATA=$sessData;") }
     }.body()
 

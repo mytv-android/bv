@@ -29,7 +29,7 @@ import java.io.File
 
 object GithubApi {
     private var endPoint = "api.github.com"
-    private const val OWNER = "ldm0206"
+    private const val OWNER = "mytv-android"
     private const val REPO = "bv"
     private lateinit var client: HttpClient
     private val json = Json {

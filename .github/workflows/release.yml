@@ -10,7 +10,7 @@ jobs:
   build-release:
     name: Build Release Apk
     runs-on: macos-latest
-    if: github.repository == 'ldm0206/bv'
+    if: github.repository == 'mytv-android/bv'
 
     steps:
       - name: Checkout

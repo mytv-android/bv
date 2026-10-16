@@ -72,8 +72,10 @@ import dev.aaa1115910.bv.ui.designsystem.component.LoadMoreIndicator
 import dev.aaa1115910.bv.ui.designsystem.component.PageMessage
 import dev.aaa1115910.bv.ui.designsystem.component.TvBackdrop
 import dev.aaa1115910.bv.ui.designsystem.component.VideoCard
+import dev.aaa1115910.bv.ui.designsystem.focus.BvKey
 import dev.aaa1115910.bv.ui.designsystem.focus.TvColumnPivot
 import dev.aaa1115910.bv.ui.designsystem.focus.TvRowPivot
+import dev.aaa1115910.bv.ui.designsystem.focus.onBvKey
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.ui.navigation.openVideo
 import kotlinx.coroutines.delay
@@ -178,7 +180,7 @@ internal fun HomeTv(nav: NavController, state: HomeState) {
                 LaunchedEffect(Unit) { state.ensureDynamic() }
                 if (!state.dynamic.isLogin) {
                     PageMessage(message = stringResource(R.string.home_login_required))
-                    LaunchedEffect(Unit) {
+                    LaunchedEffect(entryPending) {
                         if (entryPending) {
                             withFrameNanos { }
                             chipRequesters[ChipFollowing].tryFocus()
@@ -212,6 +214,7 @@ internal fun HomeTv(nav: NavController, state: HomeState) {
                     ChipFollowing -> state.refreshDynamic()
                 }
             },
+            onDown = { entryPending = true },
             alpha = { barAlpha },
             onFocusChanged = {
                 chipsFocused = it
@@ -239,6 +242,7 @@ private fun TvTopBar(
     requesters: List<FocusRequester>,
     onSelect: (Int) -> Unit,
     onReselect: (Int) -> Unit,
+    onDown: () -> Unit,
     alpha: () -> Float,
     onFocusChanged: (Boolean) -> Unit,
 ) {
@@ -259,6 +263,8 @@ private fun TvTopBar(
         Row(
             Modifier
                 .onFocusChanged { onFocusChanged(it.hasFocus) }
+                // ↓ 从标签进入内容：交给内容侧的焦点请求器，默认焦点搜索在网格里会丢焦点
+                .onBvKey { key -> if (key == BvKey.Down) { onDown(); true } else false }
                 .focusRestorer()
                 .focusGroup(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -357,8 +363,8 @@ private fun TvRecommendContent(
     }
     val current = featured[featuredIndex % featured.size]
 
-    // 初始焦点：「播放」；从详情返回时回到之前所在的行
-    LaunchedEffect(Unit) {
+    // 初始焦点：「播放」；从详情返回时回到之前所在的行；在标签行按 ↓ 时也重新进入内容
+    LaunchedEffect(entryPending) {
         if (!entryPending) return@LaunchedEffect
         withFrameNanos { }
         val row = savedRow
@@ -644,7 +650,7 @@ private fun TvRegionContent(
 ) {
     val rowRequesters = remember { List(HomeRegions.size) { FocusRequester() } }
     var savedRow by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(entryPending) {
         if (!entryPending) return@LaunchedEffect
         withFrameNanos { }
         val visible = listState.layoutInfo.visibleItemsInfo.any { it.index == savedRow }
@@ -684,7 +690,7 @@ private fun TvGridContent(
 ) {
     val gridRequester = remember { FocusRequester() }
     gridState.LoadMoreEffect { if (cards.isNotEmpty()) onLoadMore() }
-    LaunchedEffect(cards.isNotEmpty()) {
+    LaunchedEffect(entryPending, cards.isNotEmpty()) {
         if (!entryPending) return@LaunchedEffect
         if (cards.isEmpty() && loading) return@LaunchedEffect
         withFrameNanos { }
