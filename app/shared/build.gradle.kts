@@ -113,8 +113,6 @@ dependencies {
     api(androidx.compose.material3.adaptive.navigation)
     api(androidx.compose.material3.adaptive.navigation.suit)
     api(androidx.compose.material3.window.size)
-    api(androidx.compose.tv.foundation)
-    api(androidx.compose.tv.material)
     api(androidx.datastore.typed)
     api(androidx.datastore.preferences)
     api(androidx.lifecycle.runtime.ktx)

@@ -67,8 +67,6 @@ dependencies {
     implementation(androidx.compose.material)
     implementation(androidx.compose.material.icons)
     implementation(androidx.compose.material3)
-    implementation(androidx.compose.tv.foundation)
-    implementation(androidx.compose.tv.material)
     implementation(androidx.compose.ui)
     implementation(androidx.compose.ui.tooling.preview)
     implementation(androidx.compose.ui.util)

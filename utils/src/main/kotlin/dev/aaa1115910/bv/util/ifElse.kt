@@ -1,6 +1,6 @@
 package dev.aaa1115910.bv.util
 
-// Copied from https://cs.android.com/androidx/platform/frameworks/support/+/409d921b5a37ec6857489f327d9cc20141457ab2:tv/integration-tests/playground/src/main/java/androidx/tv/integration/playground/ifElse.kt
+// Copied from the AOSP Compose for TV integration-tests playground (Apache 2.0)
 
 /*
  * Copyright 2023 The Android Open Source Project

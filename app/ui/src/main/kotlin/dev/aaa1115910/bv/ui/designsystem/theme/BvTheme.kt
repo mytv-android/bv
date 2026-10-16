@@ -2,6 +2,7 @@
 
 package dev.aaa1115910.bv.ui.designsystem.theme
 
+import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -9,15 +10,19 @@ import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Density
+import androidx.core.view.WindowCompat
 import com.materialkolor.DynamicMaterialExpressiveTheme
 import com.materialkolor.dynamiccolor.ColorSpec
+import dev.aaa1115910.bv.component.FpsMonitor
 import dev.aaa1115910.bv.entity.DarkMode
 import dev.aaa1115910.bv.entity.ThemePrefs
 import dev.aaa1115910.bv.entity.ThemeSource
@@ -37,12 +42,16 @@ fun BvRoot(initialPrefs: ThemePrefs, content: @Composable () -> Unit) {
     val base = LocalDensity.current
     val tvDensity by Prefs.densityFlow.collectAsState(initial = context.resources.displayMetrics.widthPixels / 960f)
     val density = if (profile.isTv) Density(tvDensity, base.fontScale) else base
+    val showFps = remember { Prefs.showFps }
     CompositionLocalProvider(
         LocalDeviceProfile provides profile,
         LocalThemePrefs provides prefs,
         LocalDensity provides density,
     ) {
-        BvTheme(content = content)
+        BvTheme {
+            // 设置「关于」里的「显示 FPS」（沿用旧 BVTheme 的做法，启动时读一次）
+            if (showFps) FpsMonitor(content = content) else content()
+        }
     }
 }
 
@@ -65,6 +74,7 @@ fun BvTheme(forceDark: Boolean = false, content: @Composable () -> Unit) {
         prefs.source == ThemeSource.Content -> prefs.contentSeed ?: prefs.seed
         else -> prefs.seed
     }
+    if (!profile.isTv) SystemBarsAppearance(dark)
     CompositionLocalProvider(LocalBvDark provides dark) {
         DynamicMaterialExpressiveTheme(
             seedColor = seed,
@@ -77,5 +87,27 @@ fun BvTheme(forceDark: Boolean = false, content: @Composable () -> Unit) {
             animate = true,
             content = content,
         )
+    }
+}
+
+/**
+ * 状态栏 / 导航栏图标颜色跟随 App 自己的明暗（enableEdgeToEdge 默认只跟随系统深色模式）。
+ * 嵌套的 BvTheme(forceDark = true)（播放器、刷刷）离开时恢复外层的设置。
+ */
+@Composable
+private fun SystemBarsAppearance(dark: Boolean) {
+    val view = LocalView.current
+    if (view.isInEditMode) return
+    DisposableEffect(view, dark) {
+        val window = (view.context as? Activity)?.window
+        val controller = window?.let { WindowCompat.getInsetsController(it, view) }
+        val previousStatus = controller?.isAppearanceLightStatusBars
+        val previousNavigation = controller?.isAppearanceLightNavigationBars
+        controller?.isAppearanceLightStatusBars = !dark
+        controller?.isAppearanceLightNavigationBars = !dark
+        onDispose {
+            previousStatus?.let { controller.isAppearanceLightStatusBars = it }
+            previousNavigation?.let { controller.isAppearanceLightNavigationBars = it }
+        }
     }
 }

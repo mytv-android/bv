@@ -5,9 +5,6 @@ compose-constraintlayout = "1.1.1"
 compose-material-icons = "1.7.8"
 compose-material3 = "1.5.0-alpha03"
 compose-material3-adaptive = "1.1.0"
-#noinspection GradleDependency https://issuetracker.google.com/issues/361611808
-compose-tv = "1.1.0-alpha01"
-compose-tv-foundation = "1.0.0-alpha12"
 core = "1.16.0"
 core-splashscreen = "1.0.1"
 dataStore = "1.1.7"
@@ -23,10 +20,6 @@ activity-compose = { module = "androidx.activity:activity-compose", version.ref 
 
 # https://developer.android.com/jetpack/compose/layout
 compose-constraintlayout = { module = "androidx.constraintlayout:constraintlayout-compose", version.ref = "compose-constraintlayout" }
-
-# https://developer.android.com/jetpack/androidx/releases/tv
-compose-tv-foundation = { module = "androidx.tv:tv-foundation", version.ref = "compose-tv-foundation" }
-compose-tv-material = { module = "androidx.tv:tv-material", version.ref = "compose-tv" }
 
 # https://developer.android.com/jetpack/androidx/releases/compose-ui
 compose-ui = { module = "androidx.compose.ui:ui", version.ref = "compose" }

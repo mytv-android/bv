@@ -55,8 +55,6 @@ java {
 dependencies {
     implementation(androidx.activity.compose)
     implementation(androidx.compose.material)
-    implementation(androidx.compose.tv.foundation)
-    implementation(androidx.compose.tv.material)
     implementation(androidx.compose.ui)
     implementation(androidx.compose.ui.tooling.preview)
     implementation(androidx.compose.ui.util)

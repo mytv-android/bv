@@ -1,9 +1,0 @@
-<resources>
-
-    <style name="Theme.BV.Mobile.Splash" parent="Theme.SplashScreen">
-        <item name="postSplashScreenTheme">@style/Theme.BV.Mobile</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
-    </style>
-
-    <style name="Theme.BV.Mobile" parent="Theme.Material3.DayNight.NoActionBar" />
-</resources>
