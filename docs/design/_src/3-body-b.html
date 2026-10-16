@@ -1,0 +1,128 @@
+
+<section class="sec band" id="color">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">04 · 色彩系统</span>
+      <h2>颜色从种子色和封面里长出来</h2>
+      <p class="lede">用 <code>com.materialkolor:material-kolor</code> 生成整套 Material 颜色角色。全局主题来自用户选的种子色（或 Android 12+ 的壁纸色），详情页、播放器和刷刷再用当前视频封面的颜色局部覆盖一层。这一页上的所有颜色都由同一套算法（material-color-utilities，material-kolor 移植的就是它）在浏览器里实时算出来，改种子色或风格就能看到效果。</p>
+    </div>
+    <div class="ctrl" style="margin-bottom:28px">
+      <div class="ctrl-row"><span class="ctrl-label">风格</span>
+        <div class="seg" id="styleSeg" role="group" aria-label="PaletteStyle">
+          <button type="button" data-style="TonalSpot" aria-pressed="false">TonalSpot</button><button type="button" data-style="Vibrant" aria-pressed="true">Vibrant</button><button type="button" data-style="Expressive" aria-pressed="false">Expressive</button><button type="button" data-style="Fidelity" aria-pressed="false">Fidelity</button><button type="button" data-style="Content" aria-pressed="false">Content</button><button type="button" data-style="Rainbow" aria-pressed="false">Rainbow</button><button type="button" data-style="FruitSalad" aria-pressed="false">FruitSalad</button><button type="button" data-style="Monochrome" aria-pressed="false">Monochrome</button>
+        </div>
+      </div>
+      <div class="ctrl-row"><span class="ctrl-label">对比度</span>
+        <div class="seg" id="contrastSeg" role="group" aria-label="对比度">
+          <button type="button" data-contrast="0" aria-pressed="true">标准</button><button type="button" data-contrast="0.5" aria-pressed="false">中</button><button type="button" data-contrast="1" aria-pressed="false">高</button>
+        </div>
+      </div>
+    </div>
+    <div class="split" style="margin-bottom:40px">
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>当前生成的颜色角色</h3>
+        <div id="palette"></div>
+      </div>
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>封面取色：点一张封面</h3>
+        <p class="muted" style="font-size:15px">流程和 App 里一样：把封面缩到小图，<code>QuantizerCelebi</code> 量化，<code>Score</code> 排序，取前几名作为候选种子；第一名生成局部主题。</p>
+        <div id="coverPick" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px"></div>
+        <div id="coverResult" style="display:grid;gap:12px"></div>
+      </div>
+    </div>
+    <div class="grid-4" id="colorRules" style="margin-bottom:36px"></div>
+<pre class="code"><span class="c">// 全局主题：用户种子色 / 壁纸色，PaletteStyle 和对比度来自设置</span>
+<span class="k">@OptIn</span>(ExperimentalMaterial3ExpressiveApi::<span class="k">class</span>)
+<span class="k">@Composable fun</span> BvTheme(prefs: ThemePrefs = LocalThemePrefs.current, content: <span class="k">@Composable</span> () -> Unit) {
+    <span class="k">val</span> dark = prefs.darkMode.resolve(isSystemInDarkTheme())
+    <span class="k">val</span> seed = <span class="k">if</span> (prefs.source == ThemeSource.Wallpaper) wallpaperSeedOr(prefs.seed) <span class="k">else</span> prefs.seed
+    DynamicMaterialExpressiveTheme(
+        seedColor = seed,
+        isDark = dark,
+        isAmoled = prefs.pureBlack,                       <span class="c">// 影院纯黑</span>
+        style = prefs.paletteStyle,                       <span class="c">// 默认 PaletteStyle.Vibrant：保留品牌色相、饱和度高</span>
+        contrastLevel = prefs.contrast,
+        specVersion = ColorSpec.SpecVersion.SPEC_2025,
+        motionScheme = MotionScheme.expressive(),
+        typography = bvTypography(LocalDeviceProfile.current),
+        animate = <span class="k">true</span>,
+        content = content,
+    )
+}
+
+<span class="c">// 局部主题：详情 / 播放器 / 刷刷。封面颜色在后台线程算，按 URL 缓存</span>
+<span class="k">@Composable fun</span> CoverTheme(cover: String?, content: <span class="k">@Composable</span> () -> Unit) {
+    <span class="k">val</span> seed <span class="k">by</span> rememberCoverSeed(cover)              <span class="c">// null 时沿用全局 primary</span>
+    DynamicMaterialExpressiveTheme(
+        seedColor = seed ?: MaterialTheme.colorScheme.primary,
+        isDark = <span class="k">true</span>, style = PaletteStyle.Fidelity, animate = <span class="k">true</span>, content = content,
+    )
+}
+
+<span class="k">suspend fun</span> CoverSeedCache.get(url: String): Color? = cache.getOrPut(url) {
+    <span class="k">val</span> bitmap = imageLoader.execute(
+        ImageRequest.Builder(context).data(url).size(<span class="s">112</span>).allowHardware(<span class="k">false</span>).build()
+    ).drawable?.toBitmap()?.asImageBitmap() ?: <span class="k">return null</span>
+    withContext(Dispatchers.Default) { bitmap.themeColors(fallback = Color.Unspecified).firstOrNull() }
+}</pre>
+  </div>
+</section>
+
+<section class="sec" id="expressive">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">05 · 组件与动效</span>
+      <h2>Expressive 用在状态变化上，不用来装饰</h2>
+      <p class="lede">形状变形、弹簧动画和强调字重只在按下、聚焦、选中、加载这些状态变化时出现。静止画面保持干净，让封面和视频做主角。</p>
+    </div>
+    <div class="split" style="margin-bottom:40px">
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>形状（MaterialShapes）</h3>
+        <div id="shapes" class="grid-4" style="gap:12px"></div>
+      </div>
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>加载与焦点</h3>
+        <div class="card" style="grid-template-columns:auto minmax(0,1fr);align-items:center;gap:20px">
+          <svg id="loader" viewBox="-60 -60 120 120" width="96" height="96" role="img" aria-label="LoadingIndicator 形状变形演示"><path fill="currentColor" style="color:var(--primary)"></path></svg>
+          <p><b style="color:var(--on-surface)">LoadingIndicator</b>：七种形状边转边变。用于首屏加载、下拉刷新（<code>PullToRefreshBox</code> + <code>LoadingIndicator</code>）、播放器缓冲，替换现在的线性进度条。</p>
+        </div>
+        <div class="card" style="gap:14px">
+          <p><b style="color:var(--on-surface)">焦点</b>：放大 1.08、3dp primary 描边 + 同色光晕、圆角 16→22dp。动画曲线由页面脚本按 <code>MotionScheme.expressive()</code> 的弹簧参数实时生成。把鼠标移到卡片上，或按 Tab 键试试。</p>
+          <div id="focusDemo" class="scr cinema" style="border-radius:20px;padding:20px 18px 24px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-bottom:28px">
+      <table>
+        <thead><tr><th>动效令牌</th><th>弹簧参数</th><th>用在哪里</th></tr></thead>
+        <tbody id="motionRows"></tbody>
+      </table>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Expressive 组件</th><th>BV 中的位置</th><th>说明</th></tr></thead>
+        <tbody id="compRows"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="sec band" id="screens">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">06 · 界面</span>
+      <h2>每个界面，三种形态</h2>
+      <p class="lede">同一份代码、同一个 ViewModel，按 <code>DeviceProfile</code> 换布局。选一个界面，再切换设备。电视画面可以点一下，然后用方向键移动焦点。</p>
+    </div>
+    <div style="display:grid;gap:14px;margin-bottom:24px">
+      <div class="seg" id="screenSeg" role="group" aria-label="界面" style="overflow-x:auto;flex-wrap:nowrap;max-width:100%"></div>
+      <div class="seg" id="deviceSeg" role="group" aria-label="设备">
+        <button type="button" data-dev="phone" aria-pressed="false">手机</button><button type="button" data-dev="tablet" aria-pressed="false">平板</button><button type="button" data-dev="tv" aria-pressed="true">电视</button>
+      </div>
+    </div>
+    <div class="split" style="grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)">
+      <figure class="dv" style="justify-items:stretch"><div class="fit" id="screenStage"></div><figcaption id="screenCap"></figcaption></figure>
+      <aside id="screenRules" style="display:grid;gap:16px;min-width:0"></aside>
+    </div>
+  </div>
+</section>

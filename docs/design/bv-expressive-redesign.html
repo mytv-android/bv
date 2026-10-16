@@ -1,0 +1,1793 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>BV Expressive 重设计</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Roboto+Flex:opsz,wdth,wght@8..144,25..151,100..1000&family=Roboto+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: long-form proposal. A cinematic always-dark hero band, then a centered 1240px column.
+   Mockup stages sit on surface-container bands; device frames are drawn at real dp and scaled to fit.
+   Every color is a Material color role generated from one seed by material-color-utilities
+   (the algorithm material-kolor ports to Kotlin). --l-* = light scheme, --d-* = dark scheme. */
+:root {
+  --font-display: "Roboto Flex", "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-body: "Noto Sans SC", "Roboto Flex", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-mono: "Roboto Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+
+  --spring-fast: cubic-bezier(.34, 1.5, .64, 1);
+  --spring-fast-dur: 420ms;
+  --spring-default: cubic-bezier(.3, 1.25, .5, 1);
+  --spring-default-dur: 560ms;
+  --effects: cubic-bezier(.2, 0, 0, 1);
+
+  /* light scheme — seed #FB7299, TonalSpot (replaced at runtime) */
+  --l-primary: #8f4a5e; --l-on-primary: #ffffff; --l-primary-container: #ffd9e1; --l-on-primary-container: #723346;
+  --l-secondary: #74565e; --l-on-secondary: #ffffff; --l-secondary-container: #ffd9e1; --l-on-secondary-container: #5a3f47;
+  --l-tertiary: #7c5635; --l-on-tertiary: #ffffff; --l-tertiary-container: #ffdcc2; --l-on-tertiary-container: #623f20;
+  --l-surface: #fff8f8; --l-on-surface: #22191b; --l-on-surface-variant: #514346;
+  --l-surface-container-lowest: #ffffff; --l-surface-container-low: #fff0f2; --l-surface-container: #faeaec;
+  --l-surface-container-high: #f4e4e6; --l-surface-container-highest: #eedee1;
+  --l-outline: #837377; --l-outline-variant: #d5c2c5;
+  --l-inverse-surface: #372e30; --l-inverse-on-surface: #fdedef; --l-inverse-primary: #ffb1c5;
+
+  /* dark scheme */
+  --d-primary: #ffb1c5; --d-on-primary: #551d30; --d-primary-container: #723346; --d-on-primary-container: #ffd9e1;
+  --d-secondary: #e2bdc5; --d-on-secondary: #422930; --d-secondary-container: #5a3f47; --d-on-secondary-container: #ffd9e1;
+  --d-tertiary: #efbd94; --d-on-tertiary: #48290b; --d-tertiary-container: #623f20; --d-on-tertiary-container: #ffdcc2;
+  --d-surface: #191113; --d-on-surface: #efdfe1; --d-on-surface-variant: #d5c2c5;
+  --d-surface-container-lowest: #140c0e; --d-surface-container-low: #22191b; --d-surface-container: #261d1f;
+  --d-surface-container-high: #312829; --d-surface-container-highest: #3c3234;
+  --d-outline: #9e8c90; --d-outline-variant: #514346;
+  --d-inverse-surface: #efdfe1; --d-inverse-on-surface: #372e30; --d-inverse-primary: #8f4a5e;
+}
+
+/* active roles: light by default. .scope elements re-resolve, so a scoped seed (cover color) works. */
+:root, .scope {
+  --primary: var(--l-primary); --on-primary: var(--l-on-primary); --primary-container: var(--l-primary-container); --on-primary-container: var(--l-on-primary-container);
+  --secondary: var(--l-secondary); --on-secondary: var(--l-on-secondary); --secondary-container: var(--l-secondary-container); --on-secondary-container: var(--l-on-secondary-container);
+  --tertiary: var(--l-tertiary); --on-tertiary: var(--l-on-tertiary); --tertiary-container: var(--l-tertiary-container); --on-tertiary-container: var(--l-on-tertiary-container);
+  --surface: var(--l-surface); --on-surface: var(--l-on-surface); --on-surface-variant: var(--l-on-surface-variant);
+  --surface-container-lowest: var(--l-surface-container-lowest); --surface-container-low: var(--l-surface-container-low); --surface-container: var(--l-surface-container);
+  --surface-container-high: var(--l-surface-container-high); --surface-container-highest: var(--l-surface-container-highest);
+  --outline: var(--l-outline); --outline-variant: var(--l-outline-variant);
+  --inverse-surface: var(--l-inverse-surface); --inverse-on-surface: var(--l-inverse-on-surface); --inverse-primary: var(--l-inverse-primary);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]), :root:not([data-theme="light"]) .scope {
+    --primary: var(--d-primary); --on-primary: var(--d-on-primary); --primary-container: var(--d-primary-container); --on-primary-container: var(--d-on-primary-container);
+    --secondary: var(--d-secondary); --on-secondary: var(--d-on-secondary); --secondary-container: var(--d-secondary-container); --on-secondary-container: var(--d-on-secondary-container);
+    --tertiary: var(--d-tertiary); --on-tertiary: var(--d-on-tertiary); --tertiary-container: var(--d-tertiary-container); --on-tertiary-container: var(--d-on-tertiary-container);
+    --surface: var(--d-surface); --on-surface: var(--d-on-surface); --on-surface-variant: var(--d-on-surface-variant);
+    --surface-container-lowest: var(--d-surface-container-lowest); --surface-container-low: var(--d-surface-container-low); --surface-container: var(--d-surface-container);
+    --surface-container-high: var(--d-surface-container-high); --surface-container-highest: var(--d-surface-container-highest);
+    --outline: var(--d-outline); --outline-variant: var(--d-outline-variant);
+    --inverse-surface: var(--d-inverse-surface); --inverse-on-surface: var(--d-inverse-on-surface); --inverse-primary: var(--d-inverse-primary);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"], :root[data-theme="dark"] .scope, .cinema {
+  --primary: var(--d-primary); --on-primary: var(--d-on-primary); --primary-container: var(--d-primary-container); --on-primary-container: var(--d-on-primary-container);
+  --secondary: var(--d-secondary); --on-secondary: var(--d-on-secondary); --secondary-container: var(--d-secondary-container); --on-secondary-container: var(--d-on-secondary-container);
+  --tertiary: var(--d-tertiary); --on-tertiary: var(--d-on-tertiary); --tertiary-container: var(--d-tertiary-container); --on-tertiary-container: var(--d-on-tertiary-container);
+  --surface: var(--d-surface); --on-surface: var(--d-on-surface); --on-surface-variant: var(--d-on-surface-variant);
+  --surface-container-lowest: var(--d-surface-container-lowest); --surface-container-low: var(--d-surface-container-low); --surface-container: var(--d-surface-container);
+  --surface-container-high: var(--d-surface-container-high); --surface-container-highest: var(--d-surface-container-highest);
+  --outline: var(--d-outline); --outline-variant: var(--d-outline-variant);
+  --inverse-surface: var(--d-inverse-surface); --inverse-on-surface: var(--d-inverse-on-surface); --inverse-primary: var(--d-inverse-primary);
+  color-scheme: dark;
+}
+
+/* ---------- page ---------- */
+html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  margin: 0; background: var(--surface); color: var(--on-surface);
+  font: 400 16px/1.75 var(--font-body);
+  -webkit-font-smoothing: antialiased; overflow-x: hidden;
+  transition: background-color .6s var(--effects), color .6s var(--effects);
+}
+.wrap { max-width: 1240px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+h1, h2, h3, h4 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: clamp(28px, 3.6vw, 44px); line-height: 1.15; font-weight: 800; font-variation-settings: "wdth" 112, "opsz" 48; }
+h3 { font-size: 20px; line-height: 1.35; font-weight: 700; }
+h4 { font-size: 15px; font-weight: 700; }
+p { margin: 0; }
+a { color: var(--primary); text-underline-offset: 3px; }
+code, .mono { font-family: var(--font-mono); font-size: .86em; }
+:not(pre) > code { background: var(--surface-container-high); padding: .1em .38em; border-radius: 6px; color: var(--on-surface); overflow-wrap: anywhere; }
+:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; border-radius: 8px; }
+.eyebrow { font: 600 12px/1.4 var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--primary); font-variation-settings: "wdth" 120; }
+.lede { font-size: 18px; line-height: 1.75; color: var(--on-surface-variant); max-width: 68ch; }
+.muted { color: var(--on-surface-variant); }
+.num { font-family: var(--font-display); font-variant-numeric: tabular-nums; }
+
+/* sticky section index */
+.toc {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 30;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border-bottom: 1px solid var(--outline-variant);
+}
+.toc .wrap { display: flex; align-items: center; gap: 16px; padding-block: 10px; }
+.toc .brand { font: 800 15px var(--font-display); white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.toc .brand i { width: 22px; height: 22px; background: var(--primary); clip-path: var(--shape-cookie9, circle(50%)); display: inline-block; }
+.toc nav { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; min-width: 0; }
+.toc nav::-webkit-scrollbar { display: none; }
+.toc nav a { white-space: nowrap; text-decoration: none; color: var(--on-surface-variant); font-size: 14px; font-weight: 500; padding: 6px 12px; border-radius: 999px; transition: background .3s, color .3s; }
+.toc nav a:hover { background: var(--surface-container-high); color: var(--on-surface); }
+.toc nav a.on { background: var(--secondary-container); color: var(--on-secondary-container); }
+
+section.sec { padding-block: clamp(56px, 8vw, 104px); }
+section.sec + section.sec { border-top: 1px solid var(--outline-variant); }
+.sec-head { display: grid; gap: 14px; margin-bottom: 40px; max-width: 860px; }
+.band { background: var(--surface-container-low); }
+
+/* hero */
+.hero { position: relative; overflow: hidden; background: var(--surface-container-lowest); color: var(--on-surface); isolation: isolate; }
+.hero .glow { position: absolute; inset: -20% -10% auto -10%; height: 140%; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(40% 50% at 70% 40%, color-mix(in srgb, var(--primary) 34%, transparent), transparent 70%),
+    radial-gradient(35% 45% at 20% 70%, color-mix(in srgb, var(--tertiary) 26%, transparent), transparent 70%),
+    radial-gradient(30% 40% at 90% 85%, color-mix(in srgb, var(--secondary) 22%, transparent), transparent 70%);
+  filter: blur(10px); transition: background 1s var(--effects); }
+.hero .wrap { padding-block: clamp(40px, 6vw, 72px) clamp(32px, 5vw, 56px); display: grid; gap: 32px; }
+.hero h1 { font-size: clamp(40px, 7vw, 92px); line-height: 1.02; font-weight: 850; font-variation-settings: "wdth" 125, "opsz" 96; letter-spacing: -0.02em; }
+.hero h1 em { font-style: normal; color: var(--primary); }
+.hero .sub { font-size: clamp(16px, 1.6vw, 19px); color: var(--on-surface-variant); max-width: 62ch; line-height: 1.8; }
+.hero-top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 32px; align-items: end; }
+@media (max-width: 900px) { .hero-top { grid-template-columns: minmax(0, 1fr); } }
+
+/* seed / theme controls */
+.ctrl { display: grid; gap: 14px; padding: 18px; border-radius: 28px; background: var(--surface-container); min-width: 0; }
+.ctrl-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.ctrl-label { font: 600 12px var(--font-display); letter-spacing: .1em; text-transform: uppercase; color: var(--on-surface-variant); min-width: 64px; }
+.swatch { width: 40px; height: 40px; border: 0; padding: 0; cursor: pointer; background: var(--c); border-radius: 50%; transition: border-radius .5s var(--spring-default), transform .4s var(--spring-fast); }
+.swatch:hover { transform: scale(1.08); }
+.swatch[aria-pressed="true"] { border-radius: 30%; transform: rotate(45deg) scale(1.05); box-shadow: 0 0 0 3px var(--surface-container), 0 0 0 5px var(--on-surface); }
+.swatch.cover { background-size: cover; background-position: center; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 2px; }
+.seg button {
+  font: 500 13px var(--font-body); border: 0; cursor: pointer; padding: 8px 14px; color: var(--on-surface);
+  background: var(--surface-container-highest); border-radius: 6px;
+  transition: border-radius .45s var(--spring-default), background .3s, color .3s;
+}
+.seg button:first-child { border-radius: 999px 6px 6px 999px; }
+.seg button:last-child { border-radius: 6px 999px 999px 6px; }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--on-primary); border-radius: 999px; }
+.seg button:hover:not([aria-pressed="true"]) { background: var(--surface-container-high); }
+.status-chip { font: 500 12px var(--font-mono); color: var(--on-surface-variant); }
+
+/* device stage */
+.stage { position: relative; display: grid; grid-template-columns: 2.25fr 1.35fr .62fr; gap: clamp(10px, 2vw, 24px); align-items: end; }
+@media (max-width: 720px) { .stage { grid-template-columns: 1fr 1fr; } .stage .dv-tv { grid-column: 1 / -1; } }
+.dv { min-width: 0; display: grid; gap: 10px; justify-items: center; }
+.dv figcaption { font: 500 12px var(--font-display); letter-spacing: .08em; color: var(--on-surface-variant); text-transform: uppercase; display: flex; gap: 8px; align-items: center; }
+.dv figcaption b { color: var(--on-surface); letter-spacing: 0; text-transform: none; font-weight: 600; }
+.dv { margin: 0; }
+.fit { width: 100%; position: relative; }
+.frame { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.frame.phone { border-radius: 44px; padding: 10px; background: #0d0d0f; box-shadow: 0 30px 60px -30px rgb(0 0 0 / .6), inset 0 0 0 2px #2a2a2e; }
+.frame.tablet { border-radius: 30px; padding: 16px; background: #0d0d0f; box-shadow: 0 30px 60px -30px rgb(0 0 0 / .6), inset 0 0 0 2px #2a2a2e; }
+.frame.tv { border-radius: 10px; padding: 8px; background: #050506; box-shadow: 0 40px 80px -40px rgb(0 0 0 / .8), inset 0 0 0 1px #2a2a2e; }
+.frame .viewport { position: relative; overflow: hidden; }
+.frame.phone .viewport { border-radius: 34px; }
+.frame.tablet .viewport { border-radius: 16px; }
+.frame.tv .viewport { border-radius: 3px; }
+.tv-stand { width: 22%; height: 10px; margin: 0 auto; background: linear-gradient(var(--outline), var(--outline-variant)); border-radius: 0 0 8px 8px; opacity: .7; }
+
+/* generic content blocks */
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 960px) { .grid-3, .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 640px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface-container); border-radius: 24px; padding: 22px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.card p, .card li { font-size: 15px; line-height: 1.7; color: var(--on-surface-variant); }
+.card h3 { display: flex; gap: 10px; align-items: center; }
+.card .ico { width: 40px; height: 40px; display: grid; place-items: center; background: var(--primary-container); color: var(--on-primary-container); clip-path: var(--shape-cookie9, circle(50%)); flex: none; }
+.card .ico svg { width: 22px; height: 22px; fill: currentColor; }
+.card.t .ico { background: var(--tertiary-container); color: var(--on-tertiary-container); clip-path: var(--shape-clover, circle(50%)); }
+.card.s .ico { background: var(--secondary-container); color: var(--on-secondary-container); clip-path: var(--shape-sunny, circle(50%)); }
+ul.clean { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+.stat { display: grid; gap: 2px; }
+.stat b { font: 800 clamp(34px, 4vw, 52px)/1 var(--font-display); font-variation-settings: "wdth" 115; color: var(--primary); font-variant-numeric: tabular-nums; }
+.stat span { font-size: 14px; color: var(--on-surface-variant); }
+
+.tbl-wrap { overflow-x: auto; border-radius: 20px; background: var(--surface-container-lowest); border: 1px solid var(--outline-variant); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 640px; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--outline-variant); vertical-align: top; line-height: 1.6; }
+th { font: 600 12px var(--font-display); letter-spacing: .08em; text-transform: uppercase; color: var(--on-surface-variant); background: var(--surface-container); position: sticky; top: 0; }
+tr:last-child td { border-bottom: 0; }
+td code { white-space: nowrap; }
+.yes { color: var(--primary); font-weight: 700; }
+.no { color: var(--on-surface-variant); opacity: .7; }
+.pill { display: inline-block; font: 600 11px/1.6 var(--font-display); padding: 1px 8px; border-radius: 999px; background: var(--secondary-container); color: var(--on-secondary-container); white-space: nowrap; }
+.pill.t { background: var(--tertiary-container); color: var(--on-tertiary-container); }
+.pill.p { background: var(--primary); color: var(--on-primary); }
+.pill.o { background: transparent; box-shadow: inset 0 0 0 1px var(--outline); color: var(--on-surface-variant); }
+
+pre.code { margin: 0; padding: 18px 20px; border-radius: 20px; background: var(--inverse-surface); color: var(--inverse-on-surface); font: 13px/1.65 var(--font-mono); overflow-x: auto; tab-size: 4; }
+pre.code .k { color: var(--inverse-primary); }
+pre.code .c { opacity: .6; }
+pre.code .s { color: color-mix(in srgb, var(--inverse-primary) 50%, var(--inverse-on-surface)); }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px; align-items: start; }
+@media (max-width: 900px) { .split { grid-template-columns: minmax(0, 1fr); } }
+.card.cur { background: var(--secondary-container); }
+.card.cur li, .card.cur h3 { color: var(--on-secondary-container); }
+.card, .ctrl, pre.code, .band, th, td, .pill, .tbl-wrap, .toc, .seg button { transition: background-color .6s var(--effects), color .6s var(--effects), border-radius .45s var(--spring-default); }
+kbd { font: 600 12px var(--font-mono); padding: 1px 6px; border-radius: 6px; background: var(--surface-container-highest); box-shadow: inset 0 -1px 0 var(--outline-variant); }
+</style>
+<style>
+/* ---------- mockups: sizes are dp; the frame is scaled as a whole ---------- */
+.scr { position: relative; overflow: hidden; background: var(--surface); color: var(--on-surface); font: 400 14px/1.35 var(--font-body); -webkit-font-smoothing: antialiased; transition: background-color .6s var(--effects); }
+.scr *, .scr *::before, .scr *::after { box-sizing: border-box; }
+.scr svg.i { width: 24px; height: 24px; fill: currentColor; flex: none; display: block; }
+.scr img { display: block; width: 100%; height: 100%; object-fit: cover; max-width: none; }
+.m-col { display: flex; flex-direction: column; min-width: 0; }
+.m-row { display: flex; gap: 12px; min-width: 0; }
+.m-fill { flex: 1; min-width: 0; }
+.m-abs { position: absolute; }
+.m-clip { overflow: hidden; }
+.m-sb { height: 28px; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; font: 600 13px var(--font-display); }
+.m-sb i { display: inline-block; width: 22px; height: 11px; border-radius: 3px; box-shadow: inset 0 0 0 1.5px currentColor; position: relative; }
+.m-sb i::after { content: ""; position: absolute; inset: 2.5px 6px 2.5px 2.5px; background: currentColor; border-radius: 1px; }
+.m-h { font: 700 15px var(--font-display); display: flex; align-items: center; justify-content: space-between; }
+.m-h small { font: 500 12px var(--font-body); color: var(--primary); }
+.m-t2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.m-t1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-meta { font-size: 11px; color: var(--on-surface-variant); display: flex; gap: 8px; align-items: center; white-space: nowrap; overflow: hidden; }
+.m-meta .i { width: 14px; height: 14px; }
+
+/* shapes */
+.m-av { width: 32px; height: 32px; flex: none; display: grid; place-items: center; font: 700 13px var(--font-body); background: var(--tertiary-container); color: var(--on-tertiary-container); border-radius: 50%; clip-path: var(--shape-cookie9, circle(50%)); }
+.m-av.lg { width: 72px; height: 72px; font-size: 28px; }
+.m-av.p { background: var(--primary-container); color: var(--on-primary-container); }
+.m-av.s { background: var(--secondary-container); color: var(--on-secondary-container); clip-path: var(--shape-sunny, circle(50%)); }
+
+/* video card */
+.m-vc { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.m-cv { position: relative; aspect-ratio: 16 / 10; border-radius: 16px; overflow: hidden; background: var(--surface-container-high); }
+.m-cv.poster { aspect-ratio: 3 / 4; }
+.m-cv .dur, .m-cv .badge { position: absolute; font: 600 10.5px var(--font-display); padding: 2px 6px; border-radius: 8px; background: rgb(0 0 0 / .55); color: #fff; font-variant-numeric: tabular-nums; }
+.m-cv .dur { right: 6px; bottom: 6px; }
+.m-cv .badge { left: 6px; top: 6px; background: var(--primary); color: var(--on-primary); }
+.m-cv .stat { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 8px 6px; font: 500 10.5px var(--font-display); color: #fff; background: linear-gradient(transparent, rgb(0 0 0 / .6)); display: flex; gap: 8px; }
+.m-cv .prog { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--primary); }
+.m-vc .tt { font-size: 13px; font-weight: 500; line-height: 1.4; }
+.m-vc.lg .tt { font-size: 14px; }
+
+/* chips + tabs */
+.m-chips { display: flex; gap: 8px; overflow: hidden; }
+.m-chip { flex: none; font: 500 13px var(--font-body); padding: 6px 14px; border-radius: 10px; box-shadow: inset 0 0 0 1px var(--outline-variant); color: var(--on-surface-variant); white-space: nowrap; }
+.m-chip.on { background: var(--secondary-container); color: var(--on-secondary-container); box-shadow: none; border-radius: 999px; }
+.m-tabs { display: flex; gap: 22px; padding: 0 16px; border-bottom: 1px solid var(--outline-variant); }
+.m-tab { font: 500 14px var(--font-body); padding: 10px 0 9px; color: var(--on-surface-variant); position: relative; white-space: nowrap; }
+.m-tab.on { color: var(--primary); font-weight: 700; }
+.m-tab.on::after { content: ""; position: absolute; left: 20%; right: 20%; bottom: -1px; height: 3px; border-radius: 3px 3px 0 0; background: var(--primary); }
+
+/* buttons */
+.m-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 20px; border-radius: 999px; font: 600 14px var(--font-body); white-space: nowrap; flex: none; }
+.m-btn .i { width: 20px; height: 20px; }
+.m-btn.fill { background: var(--primary); color: var(--on-primary); }
+.m-btn.t { background: var(--secondary-container); color: var(--on-secondary-container); }
+.m-btn.o { box-shadow: inset 0 0 0 1px var(--outline); color: var(--on-surface-variant); }
+.m-btn.lg { height: 52px; padding: 0 28px; font-size: 16px; }
+.m-btn.sq { border-radius: 16px; }
+.m-ib { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; flex: none; color: var(--on-surface-variant); }
+.m-ib.t { background: var(--surface-container-highest); color: var(--on-surface); }
+.m-ib.fill { background: var(--primary); color: var(--on-primary); }
+/* connected button group (M3 Expressive ButtonGroup) */
+.m-bg { display: flex; gap: 2px; }
+.m-bg > div { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 4px 8px; background: var(--surface-container-high); border-radius: 8px; font: 500 11px var(--font-display); color: var(--on-surface-variant); }
+.m-bg > div:first-child { border-radius: 20px 8px 8px 20px; }
+.m-bg > div:last-child { border-radius: 8px 20px 20px 8px; }
+.m-bg > div.on { background: var(--primary); color: var(--on-primary); border-radius: 20px; }
+.m-bg .i { width: 20px; height: 20px; }
+
+/* search */
+.m-search { display: flex; align-items: center; gap: 10px; height: 48px; padding: 0 6px 0 16px; border-radius: 999px; background: var(--surface-container-high); color: var(--on-surface-variant); min-width: 0; }
+.m-search span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 14px; }
+
+/* phone navigation bar (ShortNavigationBar) */
+.m-nbar { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; display: flex; padding: 8px 4px 20px; background: var(--surface-container); }
+.m-nbar > div { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; font: 500 11px var(--font-body); color: var(--on-surface-variant); }
+.m-nbar .pi { width: 56px; height: 32px; border-radius: 999px; display: grid; place-items: center; }
+.m-nbar .on { color: var(--on-surface); font-weight: 700; }
+.m-nbar .on .pi { background: var(--secondary-container); color: var(--on-secondary-container); }
+.m-nbar.dark { background: rgb(0 0 0 / .72); }
+
+/* wide navigation rail */
+.m-rail { flex: none; width: 96px; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 0; background: var(--surface); }
+.m-rail .fab { width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center; background: var(--primary-container); color: var(--on-primary-container); margin: 8px 0 16px; }
+.m-rail .it { display: flex; flex-direction: column; align-items: center; gap: 4px; font: 500 12px var(--font-body); color: var(--on-surface-variant); padding: 2px 0 8px; }
+.m-rail .it .pi { width: 56px; height: 32px; border-radius: 999px; display: grid; place-items: center; }
+.m-rail .it.on { color: var(--on-surface); font-weight: 700; }
+.m-rail .it.on .pi { background: var(--secondary-container); color: var(--on-secondary-container); }
+.m-rail .sp { flex: 1; }
+.m-rail.wide { width: 220px; align-items: stretch; padding: 16px 12px; }
+.m-rail.wide .fab { width: auto; height: 56px; display: flex; gap: 10px; padding: 0 18px; justify-content: flex-start; font: 600 15px var(--font-body); margin: 8px 0 16px; }
+.m-rail.wide .it { flex-direction: row; gap: 12px; height: 52px; padding: 0 16px; border-radius: 999px; font-size: 15px; }
+.m-rail.wide .it .pi { width: auto; height: auto; background: none !important; }
+.m-rail.wide .it.on { background: var(--secondary-container); color: var(--on-secondary-container); }
+
+/* TV: cinematic, 960x540 dp, overscan-safe 48/27 */
+.scr.tv { font-size: 14px; }
+.m-tvrail { position: absolute; left: 0; top: 0; bottom: 0; width: 76px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 27px 0; z-index: 3; }
+.m-tvrail .it { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; color: var(--on-surface-variant); }
+.m-tvrail .it.on { background: var(--secondary-container); color: var(--on-secondary-container); }
+.m-tvrail .sp { flex: 1; }
+.m-backdrop { position: absolute; inset: 0 0 auto auto; width: 74%; height: 76%; }
+.m-backdrop::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, var(--surface) 0%, color-mix(in srgb, var(--surface) 70%, transparent) 30%, transparent 62%), linear-gradient(0deg, var(--surface) 2%, transparent 48%); }
+.m-ambient { position: absolute; inset: -10%; filter: blur(48px) saturate(1.4); opacity: .55; transform: scale(1.1); }
+.m-scrim-b { position: absolute; inset: 0; background: linear-gradient(0deg, rgb(0 0 0 / .78), transparent 40%), linear-gradient(180deg, rgb(0 0 0 / .45), transparent 22%); }
+.m-display { font: 800 34px/1.08 var(--font-display); font-variation-settings: "wdth" 118, "opsz" 72; letter-spacing: -0.01em; }
+.m-eyebrow { font: 600 11px var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--primary); font-variation-settings: "wdth" 120; }
+
+/* focus (TV / keyboard): scale + outline + glow, shape morph 16 -> 22 */
+.f { transition: transform var(--spring-fast-dur) var(--spring-fast), box-shadow .25s var(--effects), border-radius var(--spring-default-dur) var(--spring-default); }
+.m-vc.f { transition: transform var(--spring-fast-dur) var(--spring-fast); }
+.f.fx { position: relative; z-index: 2; }
+.m-vc.f.fx { transform: scale(1.08); }
+.m-vc.f.fx .m-cv { box-shadow: 0 0 0 3px var(--primary), 0 14px 30px -10px color-mix(in srgb, var(--primary) 70%, transparent); border-radius: 22px; transition: border-radius var(--spring-default-dur) var(--spring-default), box-shadow .25s var(--effects); }
+.m-vc.f .m-cv { transition: border-radius var(--spring-default-dur) var(--spring-default), box-shadow .25s var(--effects); }
+.m-vc.f.fx .tt { color: var(--on-surface); }
+.m-btn.f.fx, .m-ib.f.fx, .m-chip.f.fx, .it.f.fx, .m-li.f.fx, .m-key.f.fx { transform: scale(1.1); box-shadow: 0 0 0 3px var(--primary), 0 8px 22px -8px color-mix(in srgb, var(--primary) 80%, transparent); }
+.m-btn.f.fx.t, .m-btn.f.fx.o, .m-ib.f.fx { background: var(--inverse-surface); color: var(--inverse-on-surface); }
+.f.g.fx { transform: scale(1.05); box-shadow: 0 0 0 3px var(--primary), 0 16px 40px -12px color-mix(in srgb, var(--primary) 80%, transparent); }
+.it.f.fx { background: var(--inverse-surface); color: var(--inverse-on-surface); }
+.m-tvhint { position: absolute; right: 48px; bottom: 14px; font: 500 10px var(--font-display); color: var(--on-surface-variant); letter-spacing: .06em; opacity: .8; }
+.scr.tv:focus { outline: none; }
+.scr.tv:focus-visible { box-shadow: inset 0 0 0 2px var(--primary); }
+
+/* lists */
+.m-li { display: flex; align-items: center; gap: 14px; padding: 10px 16px; min-width: 0; border-radius: 16px; }
+.m-li .ic { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 12px; flex: none; }
+.m-li .ic .i { width: 22px; height: 22px; }
+.m-li .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.m-li .tx b { font-weight: 600; font-size: 14px; }
+.m-li .tx span { font-size: 12px; color: var(--on-surface-variant); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-li.on { background: var(--secondary-container); color: var(--on-secondary-container); }
+.m-li.on .tx span { color: inherit; opacity: .8; }
+
+/* switch + slider */
+.m-sw { width: 52px; height: 32px; border-radius: 999px; background: var(--surface-container-highest); box-shadow: inset 0 0 0 2px var(--outline); position: relative; flex: none; }
+.m-sw::after { content: ""; position: absolute; left: 8px; top: 8px; width: 16px; height: 16px; border-radius: 50%; background: var(--outline); }
+.m-sw.on { background: var(--primary); box-shadow: none; }
+.m-sw.on::after { left: 24px; top: 4px; width: 24px; height: 24px; background: var(--on-primary); }
+.m-sl { position: relative; height: 16px; display: flex; align-items: center; gap: 6px; }
+.m-sl .a { height: 16px; border-radius: 8px 3px 3px 8px; background: var(--primary); }
+.m-sl .h { width: 4px; height: 36px; border-radius: 2px; background: var(--primary); flex: none; }
+.m-sl .b { flex: 1; height: 16px; border-radius: 3px 8px 8px 3px; background: var(--secondary-container); }
+
+/* player + shorts */
+.m-video { position: relative; background: #000; overflow: hidden; }
+.m-video img { opacity: .96; }
+.m-wavy { display: block; width: 100%; height: 12px; overflow: visible; }
+.m-wavy path { fill: none; stroke-linecap: round; }
+.m-dm { position: absolute; white-space: nowrap; font: 600 15px var(--font-body); color: #fff; text-shadow: 0 1px 2px rgb(0 0 0 / .8); }
+.m-acts { display: flex; flex-direction: column; gap: 16px; align-items: center; }
+.m-acts > div { display: flex; flex-direction: column; align-items: center; gap: 3px; font: 600 11px var(--font-display); color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / .6); }
+.m-acts .b { width: 46px; height: 46px; display: grid; place-items: center; border-radius: 50%; background: rgb(255 255 255 / .16); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); color: #fff; }
+.m-acts .b.on { background: var(--primary); color: var(--on-primary); border-radius: 16px; }
+.m-acts .b .i { width: 24px; height: 24px; }
+.m-ftb { display: inline-flex; gap: 4px; padding: 6px; border-radius: 999px; background: var(--surface-container-high); box-shadow: 0 10px 30px -12px rgb(0 0 0 / .5); align-items: center; }
+.m-ftb.v { flex-direction: column; }
+.m-key { height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--surface-container-high); font: 600 14px var(--font-display); }
+.m-feed { position: absolute; inset: 0; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; overscroll-behavior: contain; }
+.m-feed::-webkit-scrollbar { display: none; }
+.m-slide { position: relative; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; background: #000; }
+.m-qr { display: grid; grid-template-columns: repeat(21, 1fr); gap: 1.5px; padding: 14px; background: #fff; border-radius: 24px; }
+.m-qr i { aspect-ratio: 1; border-radius: 40%; background: #1b1b1f; }
+.m-qr i.o { background: transparent; }
+/* TV rail expands when focus enters */
+.m-tvrail { transition: width var(--spring-default-dur) var(--spring-default), background-color .3s var(--effects), padding .3s var(--effects); }
+.m-tvrail .lb { display: none; white-space: nowrap; font: 600 14px var(--font-body); }
+.m-tvrail.open { width: 196px; align-items: stretch; padding: 27px 14px; background: var(--surface-container); box-shadow: 24px 0 48px -24px rgb(0 0 0 / .7); }
+.m-tvrail.open .it { width: auto; display: flex; gap: 14px; padding: 0 14px; justify-content: flex-start; }
+.m-tvrail.open .lb { display: inline; }
+.m-tvrail.open .m-av { margin-left: 4px; }
+.tvrow { position: relative; scroll-behavior: auto; }
+.scr * { transition: background-color .6s var(--effects), color .6s var(--effects); }
+.m-heart { position: absolute; width: 96px; height: 96px; z-index: 5; pointer-events: none; color: var(--primary); animation: m-pop .9s var(--spring-fast) forwards; }
+.m-heart svg { width: 100%; height: 100%; fill: currentColor; filter: drop-shadow(0 6px 16px rgb(0 0 0 / .4)); }
+@keyframes m-pop { 0% { transform: scale(0) rotate(-12deg); opacity: 0; } 30% { transform: scale(1.15) rotate(6deg); opacity: 1; } 70% { transform: scale(1) rotate(0); opacity: 1; } 100% { transform: translateY(-60px) scale(.9); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .m-heart { animation-duration: .01s; } .f, .m-tvrail { transition: none !important; } }
+</style>
+
+<div class="toc">
+  <div class="wrap">
+    <div class="brand"><i aria-hidden="true"></i>BV Expressive</div>
+    <nav aria-label="章节">
+      <a href="#now">现状</a>
+      <a href="#principles">原则</a>
+      <a href="#adaptive">自适应</a>
+      <a href="#color">色彩</a>
+      <a href="#expressive">组件与动效</a>
+      <a href="#screens">界面</a>
+      <a href="#shorts">刷刷</a>
+      <a href="#tv">电视焦点</a>
+      <a href="#arch">工程落地</a>
+    </nav>
+  </div>
+</div>
+
+<header class="hero cinema" id="top">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="hero-top">
+      <div style="display:grid;gap:18px;min-width:0">
+        <span class="eyebrow">重设计方案 · Material 3 Expressive · 2026.10</span>
+        <h1>一个入口，<br><em>三块屏幕</em>，<br>一间影院。</h1>
+        <p class="sub">把现在分开的手机版和电视版合成一个自适应应用：按窗口尺寸决定布局，按输入方式决定交互，按观看距离决定字号。颜色由 material-kolor 从种子色和视频封面实时生成，另外新增一个可以一直往下刷的竖屏入口「刷刷」。</p>
+      </div>
+      <div class="ctrl" aria-label="主题演示">
+        <div class="ctrl-row"><span class="ctrl-label">种子色</span><div class="ctrl-row" id="seeds" style="gap:8px"></div></div>
+        <div class="ctrl-row"><span class="ctrl-label">页面</span>
+          <div class="seg" id="modeSeg" role="group" aria-label="页面明暗">
+            <button type="button" data-mode="auto" aria-pressed="true">跟随系统</button><button type="button" data-mode="light" aria-pressed="false">浅色</button><button type="button" data-mode="dark" aria-pressed="false">深色</button>
+          </div>
+        </div>
+        <p class="status-chip" id="engineStatus">配色引擎加载中…</p>
+      </div>
+    </div>
+    <div class="stage" id="heroStage">
+      <figure class="dv dv-tv"><div class="fit" data-device="tv" data-screen="home"></div><div class="tv-stand" aria-hidden="true"></div><figcaption>电视 <b>960 × 540 dp · 遥控器</b></figcaption></figure>
+      <figure class="dv"><div class="fit" data-device="tablet" data-screen="home"></div><figcaption>平板 <b>1200 × 800 dp</b></figcaption></figure>
+      <figure class="dv"><div class="fit" data-device="phone" data-screen="home"></div><figcaption>手机 <b>360 dp</b></figcaption></figure>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="sec" id="now">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">01 · 现状</span>
+      <h2>两套界面、两个入口，功能各缺一半</h2>
+      <p class="lede">数据层已经共享（ViewModel、Prefs、Room、播放器实体都在 <code>app/shared</code> 和 <code>player/shared</code>），重复的只是界面层。手机版和电视版各自实现了一部分功能，用户换一块屏幕就少一半东西。</p>
+    </div>
+    <div class="grid-4" style="margin-bottom:36px">
+      <div class="stat"><b>2</b><span>个启动 Activity：<code>LAUNCHER</code> 和 <code>LEANBACK_LAUNCHER</code>，没有任何运行时设备判断</span></div>
+      <div class="stat"><b>35</b><span>个 Activity（手机 12 + 电视 23），彼此用 Intent 跳转，没有统一导航</span></div>
+      <div class="stat"><b>83</b><span>个文件引用 <code>androidx.tv.material3</code>，共 296 处 import；<code>tv-foundation</code> 已经没人用</span></div>
+      <div class="stat"><b>0</b><span>个竖屏 / 连续刷视频入口，bili-api 里也还没有 story 接口</span></div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>功能</th><th>手机版</th><th>电视版</th><th>重设计后（三端一致）</th></tr></thead>
+        <tbody>
+          <tr><td>推荐 / 热门</td><td class="yes">有</td><td class="yes">有</td><td>首页标签页，平板和电视加大图轮播</td></tr>
+          <tr><td>番剧 · 国创 · 电影 · 电视剧 · 纪录片 · 综艺</td><td class="no">无</td><td class="yes">有</td><td>新的一级入口「影视」，含时间表、索引、追番</td></tr>
+          <tr><td>31 个 UGC 分区</td><td class="no">占位页</td><td class="yes">有</td><td>首页「分区」标签，分区色经过 harmonize 处理</td></tr>
+          <tr><td>动态列表 / 动态详情 + 评论</td><td class="yes">有 / 有</td><td class="yes">有 / <span class="no">无</span></td><td>大屏用列表-详情双栏</td></tr>
+          <tr><td>视频评论</td><td class="yes">有</td><td class="no">无</td><td>手机用底部抽屉，平板侧栏，电视右侧面板</td></tr>
+          <tr><td>搜索结果分类</td><td>只有视频</td><td>视频 / 番剧 / 影视 / UP 主</td><td>四类全做，电视加屏幕键盘</td></tr>
+          <tr><td>稍后再看 · Tag 页 · UP 主关注</td><td class="no">无（按钮无效）</td><td class="yes">有</td><td>收进「我的」和详情页操作组</td></tr>
+          <tr><td>字幕显示 · 播放心跳 · 画面比例</td><td class="no">无</td><td class="yes">有</td><td>统一播放器控制层，三端共用菜单数据</td></tr>
+          <tr><td>点赞 / 投币</td><td class="no">无</td><td class="no">无</td><td>接口已有（<code>sendVideoLike</code> / <code>sendVideoCoin</code>），接入操作组</td></tr>
+          <tr><td>用户锁 · 测速 · 解码器信息 · 日志</td><td class="no">无</td><td class="yes">有</td><td>设置里统一提供</td></tr>
+          <tr><td>竖屏连续刷</td><td class="no">无</td><td class="no">无</td><td>新增一级入口「刷刷」</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="sec band" id="principles">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">02 · 设计原则</span>
+      <h2>五条原则，后面的每个决定都能追溯到这里</h2>
+    </div>
+    <div class="grid-3" id="principleCards"></div>
+  </div>
+</section>
+
+<section class="sec" id="adaptive">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">03 · 自适应框架</span>
+      <h2>三个维度决定一块屏幕长什么样</h2>
+      <p class="lede">电视在 1080p、xhdpi 下的逻辑宽度只有 960dp，单看 <code>WindowSizeClass</code> 会被当成横屏平板。所以除了尺寸，还要单独判断输入方式和观看距离。三个维度互相独立，组合起来覆盖手机、折叠屏、平板、带键盘的平板、电视和投屏。</p>
+    </div>
+    <div class="grid-3" style="margin-bottom:36px" id="axisCards"></div>
+    <div class="tbl-wrap" style="margin-bottom:36px">
+      <table>
+        <thead><tr><th>宽度级别</th><th>典型设备</th><th>导航</th><th>首页内容</th><th>视频详情</th><th>播放</th></tr></thead>
+        <tbody>
+          <tr><td><b>Compact</b><br><span class="mono muted">&lt; 600dp</span></td><td>手机竖屏</td><td><code>ShortNavigationBar</code> 底部 5 项</td><td>2 列网格</td><td>单栏：播放器 + 简介/评论标签</td><td>竖屏内嵌，横屏全屏</td></tr>
+          <tr><td><b>Medium</b><br><span class="mono muted">600–839dp</span></td><td>折叠屏展开、平板竖屏</td><td><code>WideNavigationRail</code> 收起</td><td>3 列</td><td>单栏，评论用底部抽屉</td><td>同上</td></tr>
+          <tr><td><b>Expanded</b><br><span class="mono muted">840–1199dp</span></td><td>平板横屏</td><td>Rail 收起 + 搜索 FAB</td><td>居中大图轮播 + 4 列</td><td>双栏 <code>SupportingPaneScaffold</code></td><td>大尺寸内嵌，可切全屏</td></tr>
+          <tr><td><b>Large / XL</b><br><span class="mono muted">≥ 1200dp</span></td><td>大平板、桌面窗口、ChromeOS</td><td>Rail 展开（220dp）</td><td>5–6 列</td><td>双栏，右栏同时放评论和相关</td><td>同上，支持鼠标悬停预览</td></tr>
+          <tr><td><b>Far（电视）</b><br><span class="mono muted">任意宽度，常见 960dp</span></td><td>电视、盒子、投影</td><td>电视导航轨：收起成图标，获得焦点时展开</td><td>全幅背景 + 横向内容行</td><td>沉浸式背景，选集和相关做成行</td><td>全屏，遥控器控制层 + 右侧菜单</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="split">
+      <div style="display:grid;gap:12px;min-width:0">
+        <h3>统一入口：一个 Activity，两个启动类别</h3>
+        <p class="muted" style="font-size:15px">手机桌面和电视桌面都启动同一个 <code>MainActivity</code>。去掉电视版的强制横屏，横竖屏交给传感器；<code>configChanges</code> 接管尺寸变化，折叠、分屏、拖动窗口时不重建 Activity，播放不中断。</p>
+<pre class="code"><span class="c">&lt;!-- app/src/main/AndroidManifest.xml --&gt;</span>
+&lt;uses-feature android:name=<span class="s">"android.software.leanback"</span> android:required=<span class="s">"false"</span>/&gt;
+&lt;uses-feature android:name=<span class="s">"android.hardware.touchscreen"</span> android:required=<span class="s">"false"</span>/&gt;
+
+&lt;application android:banner=<span class="s">"@drawable/tv_banner"</span> ...&gt;
+  &lt;activity android:name=<span class="s">".MainActivity"</span>
+      android:exported=<span class="s">"true"</span>
+      android:resizeableActivity=<span class="s">"true"</span>
+      android:configChanges=<span class="s">"orientation|screenSize|screenLayout|
+          smallestScreenSize|keyboard|keyboardHidden|navigation|density"</span>&gt;
+    &lt;intent-filter&gt;
+      &lt;action android:name=<span class="s">"android.intent.action.MAIN"</span>/&gt;
+      &lt;category android:name=<span class="s">"android.intent.category.LAUNCHER"</span>/&gt;
+      &lt;category android:name=<span class="s">"android.intent.category.LEANBACK_LAUNCHER"</span>/&gt;
+    &lt;/intent-filter&gt;
+    <span class="c">&lt;!-- bugvideo://qrtoken、b23.tv、bilibili.com/video 深链也收进来 --&gt;</span>
+  &lt;/activity&gt;
+&lt;/application&gt;</pre>
+      </div>
+      <div style="display:grid;gap:12px;min-width:0">
+        <h3>DeviceProfile：三个维度合成一个 CompositionLocal</h3>
+        <p class="muted" style="font-size:15px">所有界面只读 <code>LocalDeviceProfile</code>，不再各自调用 <code>calculateWindowSizeClass</code>（现在手机端混用了两套 API）。输入方式随最后一次输入事件实时切换：平板接上蓝牙键盘按方向键，焦点框马上出现。</p>
+<pre class="code"><span class="k">enum class</span> InputMode { Touch, DPad, Pointer }
+<span class="k">enum class</span> Distance { Near, Far }
+
+<span class="k">@Immutable data class</span> DeviceProfile(
+    <span class="k">val</span> width: WidthClass,    <span class="c">// Compact … ExtraLarge</span>
+    <span class="k">val</span> input: InputMode,
+    <span class="k">val</span> distance: Distance,
+) {
+    <span class="k">val</span> isTv <span class="k">get</span>() = distance == Distance.Far
+    <span class="k">val</span> navigation <span class="k">get</span>() = <span class="k">when</span> {
+        isTv -> NavKind.TvRail
+        width >= WidthClass.Large -> NavKind.RailExpanded
+        width >= WidthClass.Medium -> NavKind.Rail
+        <span class="k">else</span> -> NavKind.Bar
+    }
+}
+
+<span class="k">@Composable fun</span> rememberDeviceProfile(): DeviceProfile {
+    <span class="k">val</span> size = currentWindowAdaptiveInfo().windowSizeClass
+    <span class="k">val</span> far = rememberIsTelevision()   <span class="c">// UiModeManager + FEATURE_LEANBACK</span>
+    <span class="k">val</span> input = rememberLastInputMode() <span class="c">// KeyEvent / MotionEvent 的 source</span>
+    <span class="k">return</span> remember(size, far, input) {
+        DeviceProfile(size.toWidthClass(), input, <span class="k">if</span> (far) Far <span class="k">else</span> Near)
+    }
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec band" id="color">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">04 · 色彩系统</span>
+      <h2>颜色从种子色和封面里长出来</h2>
+      <p class="lede">用 <code>com.materialkolor:material-kolor</code> 生成整套 Material 颜色角色。全局主题来自用户选的种子色（或 Android 12+ 的壁纸色），详情页、播放器和刷刷再用当前视频封面的颜色局部覆盖一层。这一页上的所有颜色都由同一套算法（material-color-utilities，material-kolor 移植的就是它）在浏览器里实时算出来，改种子色或风格就能看到效果。</p>
+    </div>
+    <div class="ctrl" style="margin-bottom:28px">
+      <div class="ctrl-row"><span class="ctrl-label">风格</span>
+        <div class="seg" id="styleSeg" role="group" aria-label="PaletteStyle">
+          <button type="button" data-style="TonalSpot" aria-pressed="false">TonalSpot</button><button type="button" data-style="Vibrant" aria-pressed="true">Vibrant</button><button type="button" data-style="Expressive" aria-pressed="false">Expressive</button><button type="button" data-style="Fidelity" aria-pressed="false">Fidelity</button><button type="button" data-style="Content" aria-pressed="false">Content</button><button type="button" data-style="Rainbow" aria-pressed="false">Rainbow</button><button type="button" data-style="FruitSalad" aria-pressed="false">FruitSalad</button><button type="button" data-style="Monochrome" aria-pressed="false">Monochrome</button>
+        </div>
+      </div>
+      <div class="ctrl-row"><span class="ctrl-label">对比度</span>
+        <div class="seg" id="contrastSeg" role="group" aria-label="对比度">
+          <button type="button" data-contrast="0" aria-pressed="true">标准</button><button type="button" data-contrast="0.5" aria-pressed="false">中</button><button type="button" data-contrast="1" aria-pressed="false">高</button>
+        </div>
+      </div>
+    </div>
+    <div class="split" style="margin-bottom:40px">
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>当前生成的颜色角色</h3>
+        <div id="palette"></div>
+      </div>
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>封面取色：点一张封面</h3>
+        <p class="muted" style="font-size:15px">流程和 App 里一样：把封面缩到小图，<code>QuantizerCelebi</code> 量化，<code>Score</code> 排序，取前几名作为候选种子；第一名生成局部主题。</p>
+        <div id="coverPick" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px"></div>
+        <div id="coverResult" style="display:grid;gap:12px"></div>
+      </div>
+    </div>
+    <div class="grid-4" id="colorRules" style="margin-bottom:36px"></div>
+<pre class="code"><span class="c">// 全局主题：用户种子色 / 壁纸色，PaletteStyle 和对比度来自设置</span>
+<span class="k">@OptIn</span>(ExperimentalMaterial3ExpressiveApi::<span class="k">class</span>)
+<span class="k">@Composable fun</span> BvTheme(prefs: ThemePrefs = LocalThemePrefs.current, content: <span class="k">@Composable</span> () -> Unit) {
+    <span class="k">val</span> dark = prefs.darkMode.resolve(isSystemInDarkTheme())
+    <span class="k">val</span> seed = <span class="k">if</span> (prefs.source == ThemeSource.Wallpaper) wallpaperSeedOr(prefs.seed) <span class="k">else</span> prefs.seed
+    DynamicMaterialExpressiveTheme(
+        seedColor = seed,
+        isDark = dark,
+        isAmoled = prefs.pureBlack,                       <span class="c">// 影院纯黑</span>
+        style = prefs.paletteStyle,                       <span class="c">// 默认 PaletteStyle.Vibrant：保留品牌色相、饱和度高</span>
+        contrastLevel = prefs.contrast,
+        specVersion = ColorSpec.SpecVersion.SPEC_2025,
+        motionScheme = MotionScheme.expressive(),
+        typography = bvTypography(LocalDeviceProfile.current),
+        animate = <span class="k">true</span>,
+        content = content,
+    )
+}
+
+<span class="c">// 局部主题：详情 / 播放器 / 刷刷。封面颜色在后台线程算，按 URL 缓存</span>
+<span class="k">@Composable fun</span> CoverTheme(cover: String?, content: <span class="k">@Composable</span> () -> Unit) {
+    <span class="k">val</span> seed <span class="k">by</span> rememberCoverSeed(cover)              <span class="c">// null 时沿用全局 primary</span>
+    DynamicMaterialExpressiveTheme(
+        seedColor = seed ?: MaterialTheme.colorScheme.primary,
+        isDark = <span class="k">true</span>, style = PaletteStyle.Fidelity, animate = <span class="k">true</span>, content = content,
+    )
+}
+
+<span class="k">suspend fun</span> CoverSeedCache.get(url: String): Color? = cache.getOrPut(url) {
+    <span class="k">val</span> bitmap = imageLoader.execute(
+        ImageRequest.Builder(context).data(url).size(<span class="s">112</span>).allowHardware(<span class="k">false</span>).build()
+    ).drawable?.toBitmap()?.asImageBitmap() ?: <span class="k">return null</span>
+    withContext(Dispatchers.Default) { bitmap.themeColors(fallback = Color.Unspecified).firstOrNull() }
+}</pre>
+  </div>
+</section>
+
+<section class="sec" id="expressive">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">05 · 组件与动效</span>
+      <h2>Expressive 用在状态变化上，不用来装饰</h2>
+      <p class="lede">形状变形、弹簧动画和强调字重只在按下、聚焦、选中、加载这些状态变化时出现。静止画面保持干净，让封面和视频做主角。</p>
+    </div>
+    <div class="split" style="margin-bottom:40px">
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>形状（MaterialShapes）</h3>
+        <div id="shapes" class="grid-4" style="gap:12px"></div>
+      </div>
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>加载与焦点</h3>
+        <div class="card" style="grid-template-columns:auto minmax(0,1fr);align-items:center;gap:20px">
+          <svg id="loader" viewBox="-60 -60 120 120" width="96" height="96" role="img" aria-label="LoadingIndicator 形状变形演示"><path fill="currentColor" style="color:var(--primary)"></path></svg>
+          <p><b style="color:var(--on-surface)">LoadingIndicator</b>：七种形状边转边变。用于首屏加载、下拉刷新（<code>PullToRefreshBox</code> + <code>LoadingIndicator</code>）、播放器缓冲，替换现在的线性进度条。</p>
+        </div>
+        <div class="card" style="gap:14px">
+          <p><b style="color:var(--on-surface)">焦点</b>：放大 1.08、3dp primary 描边 + 同色光晕、圆角 16→22dp。动画曲线由页面脚本按 <code>MotionScheme.expressive()</code> 的弹簧参数实时生成。把鼠标移到卡片上，或按 Tab 键试试。</p>
+          <div id="focusDemo" class="scr cinema" style="border-radius:20px;padding:20px 18px 24px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px"></div>
+        </div>
+      </div>
+    </div>
+    <div class="tbl-wrap" style="margin-bottom:28px">
+      <table>
+        <thead><tr><th>动效令牌</th><th>弹簧参数</th><th>用在哪里</th></tr></thead>
+        <tbody id="motionRows"></tbody>
+      </table>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Expressive 组件</th><th>BV 中的位置</th><th>说明</th></tr></thead>
+        <tbody id="compRows"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="sec band" id="screens">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">06 · 界面</span>
+      <h2>每个界面，三种形态</h2>
+      <p class="lede">同一份代码、同一个 ViewModel，按 <code>DeviceProfile</code> 换布局。选一个界面，再切换设备。电视画面可以点一下，然后用方向键移动焦点。</p>
+    </div>
+    <div style="display:grid;gap:14px;margin-bottom:24px">
+      <div class="seg" id="screenSeg" role="group" aria-label="界面" style="overflow-x:auto;flex-wrap:nowrap;max-width:100%"></div>
+      <div class="seg" id="deviceSeg" role="group" aria-label="设备">
+        <button type="button" data-dev="phone" aria-pressed="false">手机</button><button type="button" data-dev="tablet" aria-pressed="false">平板</button><button type="button" data-dev="tv" aria-pressed="true">电视</button>
+      </div>
+    </div>
+    <div class="split" style="grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)">
+      <figure class="dv" style="justify-items:stretch"><div class="fit" id="screenStage"></div><figcaption id="screenCap"></figcaption></figure>
+      <aside id="screenRules" style="display:grid;gap:16px;min-width:0"></aside>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="shorts">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">07 · 新入口「刷刷」</span>
+      <h2>一直往下刷，刷到的每条都带着自己的颜色</h2>
+      <p class="lede">「刷刷」是新的一级入口：全屏竖向翻页，一次一条，自动播放。每条视频的操作按钮、进度条和背后的氛围光都用它封面的颜色重新生成。左边的手机画面可以直接滚动。</p>
+    </div>
+    <div class="split" style="grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr);margin-bottom:40px">
+      <figure class="dv"><div class="fit" id="shortsPhone" data-maxh="700"></div><figcaption>手机 · <b>上下滑动试试</b></figcaption></figure>
+      <div style="display:grid;gap:20px;min-width:0;align-content:start">
+        <figure class="dv"><div class="fit" data-device="tv" data-screen="shorts"></div><figcaption>电视 · <b>↑↓ 换条，← → 快退快进，确认键暂停</b></figcaption></figure>
+        <div class="tbl-wrap">
+          <table style="min-width:560px">
+            <thead><tr><th>操作</th><th>手机 / 平板</th><th>电视遥控器</th><th>键盘鼠标</th></tr></thead>
+            <tbody>
+              <tr><td>下一条 / 上一条</td><td>上滑 / 下滑</td><td>↓ ↑，频道 − / +</td><td>↓ ↑，滚轮</td></tr>
+              <tr><td>暂停 / 继续</td><td>单击画面</td><td>确认键</td><td>空格</td></tr>
+              <tr><td>点赞</td><td>双击画面（爱心形状弹出）</td><td>长按确认键</td><td><kbd>L</kbd></td></tr>
+              <tr><td>倍速</td><td>长按 2×，松手恢复</td><td>按住 → 键</td><td>按住 → 键</td></tr>
+              <tr><td>快进 / 快退</td><td>拖动波浪进度条</td><td>← → 每次 5 秒，连按加速</td><td>← →</td></tr>
+              <tr><td>评论</td><td>底部抽屉（平板为右侧栏）</td><td>菜单键，右侧面板</td><td><kbd>C</kbd></td></tr>
+              <tr><td>去 UP 主页 / 完整详情</td><td>左滑 / 点标题</td><td>→ 移到操作栏选择</td><td>点击</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="grid-3" id="shortsCards"></div>
+  </div>
+</section>
+
+<section class="sec band" id="tv">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">08 · 电视端去掉 androidx.tv</span>
+      <h2>焦点系统自己做，组件全部回到 material3</h2>
+      <p class="lede">现在只用到 <code>tv-material</code>，<code>tv-foundation</code> 已经零引用，列表本来就是普通的 <code>LazyRow</code> / <code>LazyColumn</code>。替换的核心是一个统一的焦点修饰符和一套焦点进出规则；组件本身大多是同名机械替换。</p>
+    </div>
+    <div class="split" style="margin-bottom:36px">
+      <div class="tbl-wrap">
+        <table style="min-width:520px">
+          <thead><tr><th>androidx.tv.material3</th><th>import 次数</th><th>替换为</th></tr></thead>
+          <tbody>
+            <tr><td><code>Text</code> <code>Icon</code> <code>MaterialTheme</code> 等</td><td class="num">157</td><td>material3 同名 API，改 import 即可</td></tr>
+            <tr><td><code>Surface</code> <code>ClickableSurfaceDefaults</code> <code>Border</code> <code>Glow</code></td><td class="num">53</td><td><code>BvSurface</code> = material3 <code>Surface</code> + <code>Modifier.bvFocus()</code></td></tr>
+            <tr><td><code>Button</code> <code>OutlinedButton</code> <code>IconButton</code></td><td class="num">29</td><td>material3 按钮 + <code>bvFocus()</code>，电视用大尺寸按钮</td></tr>
+            <tr><td><code>TabRow</code> <code>Tab</code></td><td class="num">11</td><td><code>PrimaryTabRow</code>，聚焦即选中</td></tr>
+            <tr><td><code>ListItem</code> <code>DenseListItem</code></td><td class="num">11</td><td>material3 <code>ListItem</code> + <code>bvFocus()</code></td></tr>
+            <tr><td><code>NavigationDrawer</code> 系列</td><td class="num">8</td><td><code>WideNavigationRail</code>：收起 ↔ 模态展开</td></tr>
+            <tr><td><code>Typography</code> <code>darkColorScheme</code></td><td class="num">6</td><td>删除，由 <code>BvTheme</code> 统一提供</td></tr>
+            <tr><td><code>Switch</code> <code>Checkbox</code> <code>RadioButton</code> <code>Chip</code> <code>Card</code></td><td class="num">15</td><td>material3 同名组件 + <code>bvFocus()</code></td></tr>
+            <tr><td><code>CarouselDefaults.IndicatorRow</code></td><td class="num">1</td><td>自绘指示器（现有轮播本来就是自定义的）</td></tr>
+          </tbody>
+        </table>
+      </div>
+<pre class="code"><span class="c">// designsystem/focus/BvFocus.kt（示意；正式实现用 Modifier.Node）</span>
+<span class="k">fun</span> Modifier.bvFocus(
+    shape: CornerBasedShape = RoundedCornerShape(<span class="s">16</span>.dp),
+    focusedShape: CornerBasedShape = RoundedCornerShape(<span class="s">22</span>.dp),
+    scale: Float = <span class="s">1.08f</span>,
+) = composed {
+    <span class="k">val</span> profile = LocalDeviceProfile.current
+    <span class="k">var</span> focused <span class="k">by</span> remember { mutableStateOf(<span class="k">false</span>) }
+    <span class="c">// 触摸模式下不放大不描边，只有方向键 / 键盘导航时才显示</span>
+    <span class="k">val</span> visible = focused &amp;&amp; profile.input != InputMode.Touch
+    <span class="k">val</span> motion = MaterialTheme.motionScheme
+    <span class="k">val</span> s <span class="k">by</span> animateFloatAsState(<span class="k">if</span> (visible) scale <span class="k">else</span> <span class="s">1f</span>, motion.fastSpatialSpec())
+    <span class="k">val</span> morph <span class="k">by</span> animateFloatAsState(<span class="k">if</span> (visible) <span class="s">1f</span> <span class="k">else</span> <span class="s">0f</span>, motion.defaultSpatialSpec())
+    <span class="k">val</span> ring = MaterialTheme.colorScheme.primary
+    <span class="k">this</span>
+        .onFocusChanged { focused = it.isFocused }
+        .graphicsLayer { scaleX = s; scaleY = s }
+        .focusRing(visible, ring, lerp(shape, focusedShape, morph))
+        .focusable()
+}
+
+<span class="c">// 行和网格：记住上次焦点，枢轴滚动</span>
+LazyRow(
+    modifier = Modifier.focusRestorer().focusGroup(),
+    flingBehavior = ...,
+) { ... }
+CompositionLocalProvider(LocalBringIntoViewSpec provides PivotSpec(<span class="s">0.15f</span>)) { ... }</pre>
+    </div>
+    <div class="grid-3" id="tvCards"></div>
+  </div>
+</section>
+
+<section class="sec" id="arch">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">09 · 工程落地</span>
+      <h2>四个界面模块合成两个，35 个 Activity 合成一个</h2>
+      <p class="lede"><code>app/ui</code> 目录已经存在但没有加入 <code>settings.gradle.kts</code>，正好用来放合并后的界面层。ViewModel、Prefs、Room 留在 <code>app/shared</code> 不动。</p>
+    </div>
+    <div class="split" style="margin-bottom:40px">
+      <div style="display:grid;gap:14px;min-width:0"><h3>模块调整</h3><div id="modules"></div></div>
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>依赖变化</h3>
+        <div class="tbl-wrap">
+          <table style="min-width:460px">
+            <thead><tr><th></th><th>依赖</th><th>原因</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pill p">新增</span></td><td><code>com.materialkolor:material-kolor:5.0.x</code></td><td>种子色生成配色、封面取色、harmonize</td></tr>
+              <tr><td><span class="pill p">新增</span></td><td><code>androidx.navigation3</code> + <code>adaptive-navigation3</code></td><td>单 Activity 导航，大屏列表-详情场景</td></tr>
+              <tr><td><span class="pill">升级</span></td><td>material3 <span class="mono">1.5.0-alpha03 → 1.5.0-beta01</span></td><td>ButtonGroup、FloatingToolbar、SplitButton、FAB Menu、Flexible TopAppBar 已转正</td></tr>
+              <tr><td><span class="pill">升级</span></td><td>Compose 改用 BOM 统一版本；adaptive <span class="mono">1.1 → 1.2</span></td><td>与 material3 1.5 对齐</td></tr>
+              <tr><td><span class="pill">升级</span></td><td>media3 <span class="mono">1.8.0-rc01 → 1.8 正式版</span></td><td>刷刷用 <code>DefaultPreloadManager</code></td></tr>
+              <tr><td><span class="pill o">移除</span></td><td><code>androidx.tv:tv-material</code>、<code>tv-foundation</code></td><td>用户要求；焦点系统自建</td></tr>
+              <tr><td><span class="pill o">移除</span></td><td>accompanist <code>systemuicontroller</code>、M2 <code>pullRefresh</code></td><td>换成 <code>enableEdgeToEdge()</code> 和 <code>PullToRefreshBox</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <h3 style="margin-bottom:14px">路由迁移</h3>
+    <div class="tbl-wrap" style="margin-bottom:40px">
+      <table>
+        <thead><tr><th>现在的 Activity</th><th>新路由</th><th>说明</th></tr></thead>
+        <tbody id="routeRows"></tbody>
+      </table>
+    </div>
+    <div class="split">
+      <div style="display:grid;gap:14px;min-width:0"><h3>实施顺序 <span class="muted" style="font-size:14px;font-weight:400">（工期为单人粗估）</span></h3><div id="phases" style="display:grid;gap:12px"></div></div>
+      <div style="display:grid;gap:14px;min-width:0"><h3>风险与对策</h3><div id="risks" style="display:grid;gap:12px"></div></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="band">
+  <div class="wrap" style="padding-block:36px;display:grid;gap:8px">
+    <p class="muted" style="font-size:14px">本页颜色由 <code>@material/material-color-utilities</code> 在浏览器中实时计算；App 里由 material-kolor 计算，两者算法同源，但 SPEC_2025 与本页使用的 2021 规范在个别色调上会有差别。封面图是脚本生成的示意画面，视频标题和数据均为示例。</p>
+    <p class="muted" style="font-size:14px">盘点依据：<code>app/mobile</code>、<code>app/tv</code>、<code>app/shared</code>、<code>player/*</code>、<code>bili-api</code> 当前 develop 分支代码。</p>
+  </div>
+</footer>
+<script>
+'use strict';
+/* ---------- icons (Material Symbols paths, 24dp grid) ---------- */
+const ICONS = {
+  home: 'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  search: 'M15.5 14h-.79l-.28-.27A6.47 6.47 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z',
+  person: 'M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z',
+  play: 'M8 5v14l11-7z',
+  pause: 'M6 19h4V5H6v14zm8-14v14h4V5h-4z',
+  like: 'M1 21h4V9H1v12zm22-11c0-1.1-.9-2-2-2h-6.31l.95-4.57.03-.32c0-.41-.17-.79-.44-1.06L14.17 1 7.59 7.59C7.22 7.95 7 8.45 7 9v10c0 1.1.9 2 2 2h9c.83 0 1.54-.5 1.84-1.22l3.02-7.05c.09-.23.14-.47.14-.73v-2z',
+  star: 'M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z',
+  heart: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
+  comment: 'M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z',
+  share: 'M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11A2.99 2.99 0 0 0 21 5c0-1.66-1.34-3-3-3s-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81A2.99 2.99 0 0 0 3 12a2.99 2.99 0 0 0 5.04 2.19l7.12 4.16c-.05.21-.08.43-.08.65a2.92 2.92 0 1 0 2.92-2.92z',
+  settings: 'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z',
+  history: 'M13 3a9 9 0 0 0-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42A8.95 8.95 0 0 0 13 21a9 9 0 0 0 0-18zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z',
+  dynamic: 'M20 8H4V6h16v2zm-2-6H6v2h12V2zm4 10v8c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2v-8c0-1.1.9-2 2-2h16c1.1 0 2 .9 2 2zm-6 4l-6-3.27v6.53L16 16z',
+  movie: 'M18 4l2 4h-3l-2-4h-2l2 4h-3l-2-4H8l2 4H7L5 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V4h-4z',
+  shorts: 'M8 2h8a3 3 0 0 1 3 3v14a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H8zm2 4.5l5 3.5-5 3.5v-7z',
+  menu: 'M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z',
+  back: 'M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z',
+  more: 'M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z',
+  next: 'M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z',
+  full: 'M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z',
+  cc: 'M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zM4 12h4v2H4v-2zm10 6H4v-2h10v2zm6 0h-4v-2h4v2zm0-4H10v-2h10v2z',
+  later: 'M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z',
+  mic: 'M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z',
+  qr: 'M3 11h8V3H3v8zm2-6h4v4H5V5zM3 21h8v-8H3v8zm2-6h4v4H5v-4zM13 3v8h8V3h-8zm6 6h-4V5h4v4zm0 10h2v2h-2zm-6-6h2v2h-2zm2 2h2v2h-2zm-2 2h2v2h-2zm2 2h2v2h-2zm2-2h2v2h-2zm0-4h2v2h-2zm2 2h2v2h-2z',
+  tv: 'M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z',
+  phone: 'M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z',
+  tablet: 'M21 4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 1.99-.9 1.99-2L23 6c0-1.1-.9-2-2-2zm-2 14H5V6h14v12z',
+  tune: 'M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z',
+  palette: 'M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
+  up: 'M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z',
+  down: 'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z',
+  check: 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
+  add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
+  explore: 'M12 10.9c-.61 0-1.1.49-1.1 1.1s.49 1.1 1.1 1.1c.61 0 1.1-.49 1.1-1.1s-.49-1.1-1.1-1.1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2.19 12.19L6 18l3.81-8.19L18 6l-3.81 8.19z',
+  coin: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 1 1 0 16 8 8 0 0 1 0-16zm-1 3v1.1A3 3 0 0 0 8.5 11c0 1.7 1.4 2.3 2.8 2.7 1.2.3 1.7.6 1.7 1.2 0 .6-.6 1-1.5 1-1 0-1.6-.5-1.7-1.2H8.2c.1 1.4 1.1 2.4 2.8 2.7V18h2v-.6c1.6-.3 2.6-1.3 2.6-2.6 0-1.8-1.5-2.4-2.9-2.8-1.1-.3-1.6-.5-1.6-1.1 0-.5.5-.9 1.3-.9.8 0 1.3.4 1.4 1h1.7c-.1-1.3-1-2.3-2.5-2.6V7h-2z',
+  shield: 'M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z',
+  storage: 'M2 20h20v-4H2v4zm2-3h2v2H4v-2zM2 4v4h20V4H2zm4 3H4V5h2v2zm-4 7h20v-4H2v4zm2-3h2v2H4v-2z',
+  wifi: 'M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.24 4.24 0 0 0-6 0zm-4-4l2 2a7.07 7.07 0 0 1 10 0l2-2C15.14 9.14 8.87 9.14 5 13z',
+  info: 'M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z',
+};
+const ic = (n, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[n]}"/></svg>`;
+
+/* ---------- example content ---------- */
+const VIDS = [
+  { t: '【4K HDR】冰岛 14 天环岛自驾，追到了今年最强的一场极光', up: '旅行的阿树', v: '186.4万', dm: '1.2万', d: '18:42', c: 0, tag: '纪录' },
+  { t: '撒哈拉的一夜：躺在沙丘上看银河是什么体验', up: '沙漠里的鱼', v: '52.1万', dm: '3412', d: '12:07', c: 1, tag: '旅行' },
+  { t: '赛博山城：凌晨三点的洪崖洞航拍', up: '山城飞手', v: '98.7万', dm: '8906', d: '06:31', c: 2, tag: '航拍' },
+  { t: '深海 200 米｜自由潜水员眼中的蓝洞', up: '蓝调潜水日志', v: '33.9万', dm: '2077', d: '21:15', c: 3, tag: '运动' },
+  { t: '雨林延时摄影：一株兰花开放的 30 天', up: '植物观察所', v: '21.3万', dm: '1309', d: '08:50', c: 4, tag: '知识' },
+  { t: '零下 30 度的雪原上，我们搭了一座冰屋', up: '北境日记', v: '64.0万', dm: '5520', d: '15:28', c: 5, tag: '户外' },
+  { t: '夜访火山口：离熔岩湖只有 300 米', up: '地球表面观察员', v: '120.5万', dm: '9881', d: '11:46', c: 6, tag: '科普' },
+  { t: '麦浪翻滚的七月，跟着收割机跑完一整天', up: '种地的小王', v: '17.6万', dm: '740', d: '09:12', c: 7, tag: '三农' },
+];
+const PGCS = [
+  { t: '葬送的芙莉莲 第二季', s: '番剧 · 更新至第 8 话', r: '9.8', c: 8 },
+  { t: '地球脉动 III', s: '纪录片 · 全 8 集', r: '9.9', c: 3 },
+  { t: '沙丘：第二部', s: '电影 · 2024', r: '9.4', c: 1 },
+  { t: '间谍过家家 第三季', s: '番剧 · 已完结', r: '9.6', c: 9 },
+  { t: '中国奇谭', s: '国创 · 全 8 集', r: '9.5', c: 4 },
+  { t: '风味人间 4', s: '纪录片 · 全 8 集', r: '9.6', c: 7 },
+];
+const SHORTS = [
+  { t: '凌晨四点，城市还没醒，我已经跑完 10 公里', up: '夜跑的猫', like: '12.3万', cm: '2341', fav: '8902', tags: '#夜跑 #城市', c: 10 },
+  { t: '樱花雨里的一分钟，手机竖着拍才对', up: '春天收集者', like: '8.7万', cm: '1105', fav: '6023', tags: '#樱花 #氛围感', c: 11 },
+  { t: '极光在头顶炸开的那一秒', up: '旅行的阿树', like: '31.6万', cm: '5872', fav: '2.1万', tags: '#极光 #冰岛', c: 0 },
+  { t: '火山脚下煮泡面，汤是硫磺味的', up: '地球表面观察员', like: '6.2万', cm: '987', fav: '3311', tags: '#火山 #露营', c: 6 },
+  { t: '潜入蓝洞的最后 10 米', up: '蓝调潜水日志', like: '9.9万', cm: '1648', fav: '7450', tags: '#自由潜 #深海', c: 3 },
+];
+
+/* ---------- procedural cover art ---------- */
+const PAL = [
+  { sky: ['#06142e', '#0d3b4f'], sun: '#bff7ff', aur: '#3cf2a6', layers: ['#0e2a3c', '#071521'], stars: 1 },
+  { sky: ['#2b1055', '#ff7e5f'], sun: '#ffd27f', layers: ['#c2563a', '#8a3324'], dune: 1 },
+  { sky: ['#12002e', '#6b1f86'], sun: '#ff3fa4', layers: ['#1d0f3b', '#0c0620'], city: 1, stars: 1 },
+  { sky: ['#01223f', '#1f8fe0'], sun: '#a9e4ff', layers: ['#0563a8', '#013a6b'], sea: 1, rays: 1 },
+  { sky: ['#0b3d2e', '#8fd694'], sun: '#f2ffd9', layers: ['#2b7a4b', '#145232'], fog: 1 },
+  { sky: ['#8fb8f0', '#eaf4ff'], sun: '#ffffff', layers: ['#d3e4f6', '#a9c4e0'] },
+  { sky: ['#1a0505', '#7a1c0b'], sun: '#ff6a00', layers: ['#3a0d06', '#140302'], lava: 1, stars: 1 },
+  { sky: ['#5aa7e0', '#f6d98b'], sun: '#fff3c4', layers: ['#e2b04a', '#b9822a'], dune: 1 },
+  { sky: ['#9fc4ee', '#efe6ff'], sun: '#fffdf2', layers: ['#7f9fd3', '#5b78b0'], fog: 1 },
+  { sky: ['#1f2a44', '#e05a6b'], sun: '#ffe1a8', layers: ['#2d3a5c', '#151c30'], city: 1 },
+  { sky: ['#06222a', '#11727a'], sun: '#ffb86b', layers: ['#0b3b44', '#03161b'], city: 1, stars: 1 },
+  { sky: ['#ffc2d4', '#fff1f5'], sun: '#ffffff', layers: ['#f59ab8', '#d9668f'], petals: 1 },
+];
+function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const coverCache = new Map();
+function drawCover(ctx, w, h, idx) {
+  const p = PAL[idx % PAL.length], r = rng(idx * 97 + 13);
+  let g = ctx.createLinearGradient(0, 0, 0, h); g.addColorStop(0, p.sky[0]); g.addColorStop(1, p.sky[1]);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  if (p.stars) { ctx.fillStyle = 'rgba(255,255,255,.8)'; for (let i = 0; i < 70; i++) { const s = r() * 1.4 + .3; ctx.globalAlpha = r() * .8 + .2; ctx.fillRect(r() * w, r() * h * .55, s, s); } ctx.globalAlpha = 1; }
+  if (p.aur) { for (let k = 0; k < 3; k++) { ctx.beginPath(); const y0 = h * (.18 + k * .09); ctx.moveTo(0, y0); for (let x = 0; x <= w; x += 8) ctx.lineTo(x, y0 + Math.sin(x / w * 5 + k) * h * .06); ctx.lineWidth = h * (.08 - k * .015); ctx.strokeStyle = p.aur; ctx.globalAlpha = .38 - k * .08; ctx.filter = 'blur(6px)'; ctx.stroke(); } ctx.filter = 'none'; ctx.globalAlpha = 1; }
+  const sx = w * (.25 + r() * .5), sy = h * (.3 + r() * .15), sr = Math.min(w, h) * (.09 + r() * .06);
+  g = ctx.createRadialGradient(sx, sy, 0, sx, sy, sr * 4); g.addColorStop(0, p.sun); g.addColorStop(.25, p.sun + '88'); g.addColorStop(1, p.sun + '00');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.fillStyle = p.sun; ctx.beginPath(); ctx.arc(sx, sy, sr, 0, 7); ctx.fill();
+  if (p.rays) { ctx.globalAlpha = .18; ctx.fillStyle = p.sun; for (let i = 0; i < 5; i++) { ctx.beginPath(); const x = w * (.1 + i * .2); ctx.moveTo(x, 0); ctx.lineTo(x + w * .05, 0); ctx.lineTo(x + w * .2, h); ctx.lineTo(x + w * .1, h); ctx.fill(); } ctx.globalAlpha = 1; }
+  p.layers.forEach((col, li) => {
+    const base = h * (.55 + li * .17);
+    ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(0, h);
+    if (p.city) { let x = 0; while (x < w) { const bw = w * (.04 + r() * .07), bh = h * (.12 + r() * .3) * (li ? .8 : 1.2); ctx.lineTo(x, base - bh); ctx.lineTo(x + bw, base - bh); x += bw; } ctx.lineTo(w, h); ctx.fill();
+      ctx.fillStyle = li ? '#ffd166' : '#4cc9f0'; for (let i = 0; i < 60; i++) { ctx.globalAlpha = .5 + r() * .5; ctx.fillRect(r() * w, base - r() * h * .3, 2, 3); } ctx.globalAlpha = 1; return; }
+    const f1 = 2 + r() * 3, f2 = 5 + r() * 6, ph = r() * 6, amp = h * (p.dune || p.sea ? .05 : .12);
+    for (let x = 0; x <= w; x += 4) ctx.lineTo(x, base - amp * (Math.sin(x / w * f1 + ph) * .7 + Math.sin(x / w * f2 + ph * 2) * .3) - (p.sea ? 0 : amp * .6));
+    ctx.lineTo(w, h); ctx.fill();
+  });
+  if (p.lava) { g = ctx.createRadialGradient(w * .5, h, 0, w * .5, h, h * .7); g.addColorStop(0, 'rgba(255,120,0,.85)'); g.addColorStop(1, 'rgba(255,60,0,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+  if (p.fog) { g = ctx.createLinearGradient(0, h * .45, 0, h * .8); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(.5, 'rgba(255,255,255,.35)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+  if (p.petals) { for (let i = 0; i < 40; i++) { ctx.fillStyle = r() > .5 ? '#ff8fb1' : '#ffe0ea'; ctx.globalAlpha = .7; ctx.beginPath(); ctx.ellipse(r() * w, r() * h, 3 + r() * 3, 2 + r() * 2, r() * 3, 0, 7); ctx.fill(); } ctx.globalAlpha = 1; }
+  g = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .35, w / 2, h / 2, Math.max(w, h) * .75); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,.35)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+}
+const SIZES = { L: [320, 200], P: [216, 384], S: [240, 320], W: [640, 300] };
+function cover(idx, kind = 'L') {
+  const key = idx + kind;
+  if (coverCache.has(key)) return coverCache.get(key);
+  const [w, h] = SIZES[kind], cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  drawCover(cv.getContext('2d'), w, h, idx);
+  const url = cv.toDataURL('image/jpeg', .86); coverCache.set(key, url); return url;
+}
+const img = (idx, kind) => `<img src="${cover(idx, kind)}" alt="">`;
+
+/* ---------- MaterialShapes approximations: polar radius functions ---------- */
+const N_PTS = 144;
+const SHAPES = {
+  Circle: () => 1,
+  Cookie9Sided: t => .9 + .1 * Math.cos(9 * t),
+  Cookie4Sided: t => .82 + .18 * Math.pow(Math.abs(Math.cos(2 * t)), .6),
+  Sunny: t => .86 + .14 * Math.cos(8 * t),
+  Clover4Leaf: t => .58 + .42 * Math.pow(Math.abs(Math.cos(2 * t)), .5),
+  SoftBurst: t => .8 + .2 * Math.pow((Math.cos(10 * t) + 1) / 2, 1.6),
+  Pentagon: t => { const n = 5, a = ((t + Math.PI / 2) % (2 * Math.PI / n) + 2 * Math.PI / n) % (2 * Math.PI / n) - Math.PI / n; return .78 * (Math.cos(Math.PI / n) / Math.cos(a)) * .82 + .18; },
+  Pill: t => { const a = 1, b = .62, p = 3; return Math.pow(Math.pow(Math.abs(Math.cos(t) / a), p) + Math.pow(Math.abs(Math.sin(t) / b), p), -1 / p); },
+  Flower: t => .74 + .26 * Math.pow(Math.abs(Math.cos(4 * t)), .9),
+  Gem: t => { const n = 6, a = ((t % (2 * Math.PI / n)) + 2 * Math.PI / n) % (2 * Math.PI / n) - Math.PI / n; return .8 * Math.cos(Math.PI / n) / Math.cos(a) + .2; },
+};
+function shapeRadii(name) {
+  const f = SHAPES[name], out = []; let max = 0;
+  for (let i = 0; i < N_PTS; i++) { const v = f(i / N_PTS * 2 * Math.PI); out.push(v); max = Math.max(max, v); }
+  return out.map(v => v / max);
+}
+function radiiToPath(rad, R, rot = 0) {
+  let d = '';
+  rad.forEach((v, i) => { const t = i / N_PTS * 2 * Math.PI + rot; d += (i ? 'L' : 'M') + (Math.cos(t) * v * R).toFixed(2) + ' ' + (Math.sin(t) * v * R).toFixed(2); });
+  return d + 'Z';
+}
+function radiiToPolygon(rad) {
+  return 'polygon(' + rad.map((v, i) => { const t = i / N_PTS * 2 * Math.PI - Math.PI / 2; return (50 + Math.cos(t) * v * 50).toFixed(2) + '% ' + (50 + Math.sin(t) * v * 50).toFixed(2) + '%'; }).join(',') + ')';
+}
+(function installShapeVars() {
+  const rs = document.documentElement.style;
+  rs.setProperty('--shape-cookie9', radiiToPolygon(shapeRadii('Cookie9Sided')));
+  rs.setProperty('--shape-sunny', radiiToPolygon(shapeRadii('Sunny')));
+  rs.setProperty('--shape-clover', radiiToPolygon(shapeRadii('Clover4Leaf')));
+})();
+
+/* ---------- spring easing: same parameters as MotionScheme.expressive() ---------- */
+function springLinear(damping, stiffness) {
+  const w0 = Math.sqrt(stiffness), z = damping;
+  const settle = Math.min(2.5, -Math.log(0.002) / (z * w0));
+  const x = t => {
+    if (z < 1) { const wd = w0 * Math.sqrt(1 - z * z); return 1 - Math.exp(-z * w0 * t) * (Math.cos(wd * t) + (z * w0 / wd) * Math.sin(wd * t)); }
+    return 1 - Math.exp(-w0 * t) * (1 + w0 * t);
+  };
+  const pts = []; const n = 48;
+  for (let i = 0; i <= n; i++) { const t = i / n; pts.push(`${x(t * settle).toFixed(4)} ${(t * 100).toFixed(1)}%`); }
+  pts[n] = '1 100%';
+  return { easing: `linear(${pts.join(',')})`, ms: Math.round(settle * 1000) };
+}
+const MOTION = [
+  { name: 'fastSpatial', z: .6, k: 800, use: '焦点放大、按钮按压变形、点赞弹出' },
+  { name: 'defaultSpatial', z: .8, k: 380, use: '卡片圆角变形、导航轨展开、底部抽屉' },
+  { name: 'slowSpatial', z: .8, k: 200, use: '卡片 → 播放器的共享元素转场、刷刷翻页回弹' },
+  { name: 'fastEffects', z: 1, k: 3800, use: '焦点描边出现、按钮颜色切换' },
+  { name: 'defaultEffects', z: 1, k: 1600, use: '控制层淡入淡出、标签切换' },
+  { name: 'slowEffects', z: 1, k: 800, use: '主题色切换、氛围光渐变' },
+];
+(function installSprings() {
+  if (!window.CSS || !CSS.supports('transition-timing-function', 'linear(0, 1)')) return;
+  const rs = document.documentElement.style;
+  const fast = springLinear(.6, 800), def = springLinear(.8, 380);
+  rs.setProperty('--spring-fast', fast.easing); rs.setProperty('--spring-fast-dur', fast.ms + 'ms');
+  rs.setProperty('--spring-default', def.easing); rs.setProperty('--spring-default-dur', def.ms + 'ms');
+})();
+</script>
+<script>
+'use strict';
+/* ---------- mockup building blocks (dp units) ---------- */
+const DEV = { phone: [360, 780], phoneL: [780, 360], tablet: [1200, 800], tv: [960, 540] };
+const NAV = [['home', '首页'], ['shorts', '刷刷'], ['movie', '影视'], ['dynamic', '动态'], ['person', '我的']];
+const sb = light => `<div class="m-sb" style="${light ? 'color:#fff' : ''}"><span class="num">9:41</span><span style="display:flex;gap:6px;align-items:center;font-size:11px">5G <i></i></span></div>`;
+const fAttr = o => o && o.f ? ' data-f' : '';
+function vcard(v, o = {}) {
+  return `<div class="m-vc${o.f ? ' f' : ''}${o.lg ? ' lg' : ''}"${fAttr(o)} style="${o.w ? `width:${o.w}px;flex:none;` : ''}">
+    <div class="m-cv">${img(v.c)}${o.stat ? `<span class="stat">▶ ${v.v}　弹 ${v.dm}</span>` : ''}<span class="dur">${v.d}</span>${o.prog ? `<span class="prog" style="width:${o.prog}%"></span>` : ''}</div>
+    <div class="tt m-t2">${v.t}</div>${o.noMeta ? '' : `<div class="m-meta"><span class="m-t1">${v.up}</span><span>${v.v}播放</span></div>`}</div>`;
+}
+function poster(p, o = {}) {
+  return `<div class="m-vc${o.f ? ' f' : ''}"${fAttr(o)} style="${o.w ? `width:${o.w}px;flex:none;` : ''}"><div class="m-cv poster">${img(p.c, 'S')}<span class="badge">${p.r}</span></div><div class="tt m-t1">${p.t}</div><div class="m-meta">${p.s}</div></div>`;
+}
+const listRow = v => `<div style="display:flex;gap:10px;min-width:0"><div class="m-cv" style="width:128px;flex:none;border-radius:12px">${img(v.c)}<span class="dur">${v.d}</span></div><div class="m-col" style="gap:6px;min-width:0"><div class="m-t2" style="font-size:13px;font-weight:500">${v.t}</div><div class="m-meta">${v.up} · ${v.v}播放</div></div></div>`;
+const nbar = (active, dark) => `<div class="m-nbar${dark ? ' dark' : ''}"${dark ? ' style="color:#fff"' : ''}>${NAV.map(([i, l]) => `<div class="${l === active ? 'on' : ''}"${dark && l !== active ? ' style="color:rgb(255 255 255 / .7)"' : ''}><span class="pi">${ic(i)}</span>${l}</div>`).join('')}</div>`;
+const rail = (active, wide) => `<div class="m-rail${wide ? ' wide' : ''}">${wide ? '' : `<div class="it"><span class="pi">${ic('menu')}</span></div>`}<div class="fab">${ic('search')}${wide ? '搜索' : ''}</div>${NAV.map(([i, l]) => `<div class="it${l === active ? ' on' : ''}"><span class="pi">${ic(i)}</span>${l}</div>`).join('')}<div class="sp"></div><div class="it"><span class="pi">${ic('settings')}</span>设置</div></div>`;
+const tvrail = active => `<div class="m-tvrail"><div class="m-av p" style="width:36px;height:36px">阿</div><div style="height:10px"></div>${[['search', '搜索'], ...NAV].map(([i, l]) => `<div class="it f${l === active ? ' on' : ''}" data-f title="${l}">${ic(i)}<span class="lb">${l}</span></div>`).join('')}<div class="sp"></div><div class="it f" data-f title="设置">${ic('settings')}<span class="lb">设置</span></div></div>`;
+const tvTop = (chips, active) => `<div class="m-abs" style="left:96px;top:24px;right:48px;display:flex;justify-content:space-between;align-items:center;z-index:2"><div class="m-chips" style="overflow:visible">${chips.map(c => `<span class="m-chip f${c === active ? ' on' : ''}" data-f>${c}</span>`).join('')}</div><div class="num" style="font:600 15px var(--font-display);color:var(--on-surface-variant)">20:46</div></div>`;
+const tvhint = t => `<div class="m-tvhint">${t || '方向键移动焦点 · 确认键打开'}</div>`;
+function wavy(frac, w, col = 'var(--primary)', rest = 'rgb(255 255 255 / .35)') {
+  const x1 = frac * w; let d = 'M0 6';
+  for (let x = 2; x <= x1; x += 2) d += `L${x} ${(6 + Math.sin(x / 18 * 2 * Math.PI) * 2.6).toFixed(2)}`;
+  return `<svg class="m-wavy" viewBox="0 0 ${w} 12" style="width:${w}px"><path d="${d}" stroke="${col}" stroke-width="3.5"/><path d="M${(x1 + 8).toFixed(0)} 6H${w - 4}" stroke="${rest}" stroke-width="3.5"/><circle cx="${w - 2}" cy="6" r="2" fill="${col}"/></svg>`;
+}
+const comment = (n, name, txt, like) => `<div style="display:flex;gap:10px;min-width:0"><div class="m-av s" style="width:30px;height:30px;font-size:12px">${n}</div><div class="m-col" style="gap:3px;min-width:0"><b style="font-size:12px;color:var(--on-surface-variant)">${name}</b><div style="font-size:13px;line-height:1.5">${txt}</div><div class="m-meta">${ic('like')} ${like}　回复</div></div></div>`;
+const COMMENTS = [['鹿', '鹿鸣呦呦', '22:47 那一段极光直接炸开，耳机里风声都起鸡皮疙瘩了', '3.1万'], ['青', '青山不改', '请问 UP 用的什么相机？夜景噪点控制得太好了', '8721'], ['橘', '橘子汽水', '去年九月去的，一次都没看到，今年再冲', '4402'], ['K', 'Kp指数观察员', '那天 Kp 到了 7，冰岛全境可见，运气真的好', '1980']];
+
+/* ---------- HOME ---------- */
+function homePhone() {
+  return sb() + `<div style="display:flex;gap:10px;align-items:center;padding:6px 16px 10px"><div class="m-av p" style="width:40px;height:40px">阿</div><div class="m-search m-fill">${ic('search')}<span>冰岛极光 4K</span><span class="m-ib" style="width:36px;height:36px">${ic('mic')}</span></div></div>
+  <div class="m-tabs"><div class="m-tab on">推荐</div><div class="m-tab">热门</div><div class="m-tab">分区</div></div>
+  <div style="padding:14px 16px 0;display:flex;gap:8px"><div style="flex:1;position:relative;height:196px;border-radius:28px;overflow:hidden">${img(0, 'W')}<div class="m-scrim-b"></div><div class="m-abs" style="left:16px;bottom:14px;right:16px;color:#fff"><div class="m-eyebrow" style="color:#fff;opacity:.85">今日精选</div><div class="m-t2" style="font:800 18px/1.25 var(--font-display);margin-top:4px">冰岛 14 天环岛自驾，追到了今年最强的一场极光</div></div></div><div style="width:52px;height:196px;border-radius:20px;overflow:hidden;flex:none">${img(6, 'P')}</div></div>
+  <div class="m-h" style="padding:16px 16px 0">继续观看 <small>全部</small></div>
+  <div class="m-row" style="padding:10px 16px 0;gap:10px;overflow:hidden">${vcard(VIDS[2], { w: 150, prog: 62, noMeta: true })}${vcard(VIDS[3], { w: 150, prog: 30, noMeta: true })}${vcard(VIDS[5], { w: 150, prog: 80, noMeta: true })}</div>
+  <div class="m-h" style="padding:14px 16px 0">为你推荐</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:10px 16px">${[4, 6, 1, 7].map(i => vcard(VIDS[i])).join('')}</div>` + nbar('首页');
+}
+function homeTablet() {
+  return `<div style="display:flex;height:100%">${rail('首页')}<div class="m-fill m-col" style="padding:20px 28px 0 8px;gap:18px;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:16px"><div class="m-search" style="width:440px;flex:none">${ic('search')}<span>搜索视频、番剧、UP 主</span><span class="m-ib">${ic('mic')}</span></div><div class="m-chips m-fill"><span class="m-chip on">推荐</span><span class="m-chip">热门</span><span class="m-chip">分区</span><span class="m-chip">动画</span><span class="m-chip">知识</span><span class="m-chip">美食</span><span class="m-chip">户外</span></div><div class="m-av p" style="width:40px;height:40px">阿</div></div>
+    <div style="display:flex;gap:12px;height:300px;flex:none"><div style="width:110px;border-radius:28px;overflow:hidden;flex:none">${img(6, 'P')}</div>
+      <div class="m-fill" style="position:relative;border-radius:28px;overflow:hidden">${img(0, 'W')}<div class="m-scrim-b"></div><div class="m-abs" style="left:28px;bottom:24px;right:28px;color:#fff;display:flex;flex-direction:column;gap:8px"><div class="m-eyebrow" style="color:#fff;opacity:.85">今日精选 · 纪录</div><div style="font:800 34px/1.1 var(--font-display);font-variation-settings:'wdth' 115">冰岛 14 天环岛，追到今年最强极光</div><div style="font-size:13px;opacity:.85">旅行的阿树 · 186.4万播放 · 4K HDR · 18:42</div><div style="display:flex;gap:10px;margin-top:6px"><span class="m-btn fill">${ic('play')}播放</span><span class="m-btn t">${ic('later')}稍后再看</span></div></div></div>
+      <div style="width:110px;border-radius:28px;overflow:hidden;flex:none">${img(1, 'P')}</div></div>
+    <div class="m-h">继续观看 <small>全部</small></div>
+    <div class="m-row" style="gap:16px;overflow:hidden;flex:none">${[2, 3, 5, 4, 7].map((i, k) => vcard(VIDS[i], { w: 196, prog: [62, 30, 80, 45, 15][k], noMeta: true })).join('')}</div>
+    <div class="m-h">为你推荐</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px">${[4, 6, 1, 7, 3].map(i => vcard(VIDS[i])).join('')}</div>
+  </div></div>`;
+}
+function homeTv() {
+  return `<div class="m-backdrop">${img(0, 'W')}</div>${tvrail('首页')}${tvTop(['推荐', '热门', '分区', '关注'], '推荐')}
+  <div class="m-abs" style="left:96px;top:74px;width:430px;display:flex;flex-direction:column;gap:8px;z-index:2">
+    <div class="m-eyebrow">今日精选 · 纪录</div><div class="m-display">冰岛 14 天环岛，<br>追到今年最强极光</div>
+    <div class="m-meta" style="font-size:12px;gap:10px;color:var(--on-surface)"><span class="m-chip on" style="padding:1px 8px;font-size:11px">4K HDR</span>186.4万播放 · 18:42 · 旅行的阿树</div>
+    <div class="m-t2" style="font-size:13px;line-height:1.6;color:var(--on-surface-variant)">从雷克雅未克出发，沿 1 号公路逆时针绕岛一圈。黑沙滩、冰河湖、蓝冰洞，最后在东部峡湾等到了 Kp 7 的极光。</div>
+    <div style="display:flex;gap:12px;margin-top:6px"><div class="m-btn fill lg f" data-f data-start>${ic('play')}播放</div><div class="m-btn t lg f" data-f>${ic('later')}稍后再看</div><div class="m-ib t f" data-f style="width:52px;height:52px">${ic('like')}</div></div>
+  </div>
+  <div class="m-abs" style="left:96px;right:0;top:340px;z-index:2"><div class="m-h" style="padding-right:48px;font-size:15px">为你推荐 <small style="color:var(--on-surface-variant)">按 ↓ 查看更多行</small></div>
+    <div class="m-row tvrow" style="gap:18px;overflow:hidden;padding:12px 48px 16px 6px">${[1, 2, 3, 4, 5, 6, 7].map(i => vcard(VIDS[i], { w: 180, f: 1, noMeta: true })).join('')}</div></div>` + tvhint();
+}
+
+/* ---------- SHORTS ---------- */
+function shortSlide(s, landscape) {
+  const media = landscape
+    ? `<div class="m-ambient">${img(s.c, 'P')}</div><div class="m-abs" style="left:0;right:0;top:50%;transform:translateY(-60%);aspect-ratio:16/9">${img(s.c, 'W')}</div><div class="m-abs" style="left:0;right:0;top:calc(50% + 70px);text-align:center;font-size:11px;color:rgb(255 255 255 / .7)">横屏视频：居中 + 封面氛围光，横过来自动全屏</div>`
+    : img(s.c, 'P');
+  return `<div class="m-slide scope cinema" data-seed-cover="${s.c}">${media}<div class="m-scrim-b"></div>
+    <div class="m-abs" style="top:30px;left:16px;right:12px;display:flex;justify-content:space-between;align-items:center;color:#fff"><b style="font:800 20px var(--font-display)">刷刷</b><span class="m-ib" style="color:#fff">${ic('search')}</span></div>
+    <div class="m-acts m-abs" style="right:10px;bottom:150px"><div><div class="m-av p" style="width:46px;height:46px">${s.up[0]}</div></div><div><span class="b">${ic('like')}</span>${s.like}</div><div><span class="b">${ic('coin')}</span>投币</div><div><span class="b">${ic('star')}</span>${s.fav}</div><div><span class="b">${ic('comment')}</span>${s.cm}</div><div><span class="b">${ic('share')}</span>分享</div></div>
+    <div class="m-abs" style="left:16px;right:76px;bottom:112px;color:#fff;display:flex;flex-direction:column;gap:6px"><b style="font-size:15px">@${s.up}</b><div class="m-t2" style="font-size:14px;line-height:1.45">${s.t}</div><div style="font-size:12px;opacity:.85">${s.tags}</div></div>
+    <div class="m-abs" style="left:16px;right:16px;bottom:90px">${wavy(.42, 328)}</div></div>`;
+}
+function shortsPhone() {
+  return `<div class="m-feed">${SHORTS.map((s, i) => shortSlide(s, i === 2)).join('')}</div><div class="m-abs" style="top:0;left:0;right:0;z-index:3">${sb(1)}</div>` + nbar('刷刷', 1);
+}
+function shortsTablet() {
+  const s = SHORTS[0];
+  return `<div style="display:flex;height:100%">${rail('刷刷')}<div class="m-fill" style="position:relative;overflow:hidden;background:#000"><div class="m-ambient">${img(s.c, 'P')}</div>
+    <div class="m-abs scope cinema" data-seed-cover="${s.c}" style="left:50%;top:20px;height:760px;width:428px;margin-left:-214px;border-radius:28px;overflow:hidden">${img(s.c, 'P')}<div class="m-scrim-b"></div><div class="m-abs" style="left:20px;right:20px;bottom:30px;color:#fff;display:flex;flex-direction:column;gap:8px"><b>@${s.up}</b><div style="font-size:15px">${s.t}</div><div style="font-size:12px;opacity:.85">${s.tags}</div>${wavy(.42, 388)}</div></div>
+    <div class="m-ftb v m-abs scope cinema" data-seed-cover="${s.c}" style="left:calc(50% + 232px);bottom:40px"><span class="m-ib" style="background:var(--primary);color:var(--on-primary)">${ic('like')}</span><span class="m-ib">${ic('coin')}</span><span class="m-ib">${ic('star')}</span><span class="m-ib">${ic('share')}</span></div>
+    <div class="m-ftb v m-abs" style="left:calc(50% - 290px);top:50%;transform:translateY(-50%)"><span class="m-ib">${ic('up')}</span><span class="m-ib">${ic('down')}</span></div></div>
+    <div style="width:380px;flex:none;background:var(--surface-container-low);padding:24px 20px;display:flex;flex-direction:column;gap:16px;overflow:hidden">
+      <div style="display:flex;gap:12px;align-items:center"><div class="m-av p" style="width:44px;height:44px">夜</div><div class="m-col m-fill"><b>${s.up}</b><span class="m-meta">粉丝 23.4万 · 312 个视频</span></div><span class="m-btn fill" style="height:36px;padding:0 16px">${ic('add')}关注</span></div>
+      <div style="font:700 17px/1.4 var(--font-body)">${s.t}</div><div class="m-meta">${s.like} 点赞 · ${s.cm} 评论 · 今天 05:12</div>
+      <div class="m-tabs" style="padding:0"><div class="m-tab on">评论 ${s.cm}</div><div class="m-tab">相关</div></div>
+      ${COMMENTS.map(c => comment(...c)).join('')}</div></div>`;
+}
+function shortsTv() {
+  const s = SHORTS[0];
+  return `<div class="m-ambient">${img(s.c, 'P')}</div><div class="m-abs" style="inset:0;background:color-mix(in srgb, var(--surface) 50%, transparent)"></div>${tvrail('刷刷')}
+  <div class="m-abs" style="left:110px;top:60px;display:flex;flex-direction:column;gap:10px;z-index:2">${[11, 10, 0, 6].map((c, i) => `<div style="width:54px;height:96px;border-radius:12px;overflow:hidden;${i === 1 ? 'box-shadow:0 0 0 3px var(--primary)' : 'opacity:.55'}">${img(c, 'P')}</div>`).join('')}</div>
+  <div class="m-abs scope cinema f g" data-f data-start data-seed-cover="${s.c}" style="left:300px;top:27px;width:273px;height:486px;border-radius:24px;overflow:hidden;z-index:2">${img(s.c, 'P')}<div class="m-scrim-b"></div><div class="m-abs" style="left:14px;right:14px;bottom:14px">${wavy(.42, 245)}</div></div>
+  <div class="m-abs scope cinema" data-seed-cover="${s.c}" style="left:600px;top:60px;width:312px;display:flex;flex-direction:column;gap:12px;z-index:2">
+    <div style="display:flex;gap:10px;align-items:center"><div class="m-av p" style="width:40px;height:40px">夜</div><div class="m-col m-fill"><b>${s.up}</b><span class="m-meta">粉丝 23.4万</span></div><span class="m-btn t f" data-f style="height:34px;padding:0 14px">${ic('add')}关注</span></div>
+    <div style="font:800 22px/1.25 var(--font-display)">${s.t}</div><div class="m-meta" style="font-size:12px">${s.tags}　${s.like} 点赞</div>
+    <div style="display:flex;gap:8px">${[['like', 1], ['coin'], ['star'], ['comment'], ['info']].map(([n, on]) => `<span class="m-ib f${on ? '' : ' t'}" data-f style="${on ? 'background:var(--primary);color:var(--on-primary);border-radius:16px' : ''}">${ic(n)}</span>`).join('')}</div>
+    <div style="display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:20px;background:color-mix(in srgb, var(--surface-container) 80%, transparent)">${COMMENTS.slice(0, 2).map(c => comment(...c)).join('')}</div>
+  </div>` + tvhint('↑↓ 换一条 · 确认键暂停 · 菜单键评论');
+}
+
+/* ---------- VIDEO DETAIL ---------- */
+const ACTIONS = [['like', '3.2万', 1], ['coin', '8961'], ['star', '1.4万'], ['later', '稍后'], ['share', '分享']];
+const btnGroup = () => `<div class="m-bg">${ACTIONS.map(([i, l, on]) => `<div class="${on ? 'on' : ''}">${ic(i)}${l}</div>`).join('')}</div>`;
+const EPS = ['P1 雷克雅未克', 'P2 黑沙滩', 'P3 冰河湖', 'P4 蓝冰洞', 'P5 东部峡湾'];
+function detailPhone() {
+  const v = VIDS[0];
+  return `<div class="scope" data-seed-cover="0" style="height:100%;background:var(--surface)"><div style="background:#000;color:#fff">${sb(1)}</div>
+  <div class="m-video" style="height:203px">${img(0)}<div class="m-scrim-b"></div><span class="m-abs m-ib" style="left:4px;top:2px;color:#fff">${ic('back')}</span><span class="m-abs m-ib" style="right:4px;top:2px;color:#fff">${ic('more')}</span><div class="m-abs" style="left:12px;right:12px;bottom:8px;display:flex;align-items:center;gap:10px;color:#fff"><span style="width:20px">${ic('pause')}</span><div class="m-fill">${wavy(.33, 230, 'var(--inverse-primary)')}</div><span class="num" style="font-size:11px">06:12</span><span style="width:20px">${ic('full')}</span></div></div>
+  <div class="m-tabs"><div class="m-tab on">简介</div><div class="m-tab">评论 2341</div><div class="m-fill"></div><span class="m-chip" style="margin:5px 0;padding:4px 12px;font-size:12px">发弹幕</span></div>
+  <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;gap:10px;align-items:center"><div class="m-av p" style="width:40px;height:40px">阿</div><div class="m-col m-fill"><b style="font-size:14px">${v.up}</b><span class="m-meta">粉丝 58.2万</span></div><span class="m-btn fill" style="height:36px;padding:0 16px">${ic('add')}关注</span></div>
+    <div style="font:700 16px/1.45 var(--font-body)" class="m-t2">${v.t}</div>
+    <div class="m-meta">${v.v}播放 · ${v.dm}弹幕 · 10-02 · BV1xK4y1C7Ae</div>
+    ${btnGroup()}
+    <div class="m-h">选集 <small>5P ›</small></div><div class="m-chips">${EPS.map((e, i) => `<span class="m-chip${i === 0 ? ' on' : ''}">${e}</span>`).join('')}</div>
+    <div class="m-h">相关推荐</div>${[3, 5, 6].map(i => listRow(VIDS[i])).join('')}
+  </div></div>`;
+}
+function detailTablet() {
+  const v = VIDS[0];
+  return `<div class="scope" data-seed-cover="0" style="height:100%;display:flex;gap:24px;padding:20px 24px;background:var(--surface)">
+    <div class="m-col" style="width:720px;flex:none;gap:14px"><div style="display:flex;align-items:center;gap:8px"><span class="m-ib">${ic('back')}</span><b style="font-size:15px">视频详情</b></div>
+      <div class="m-video" style="height:405px;border-radius:28px">${img(0, 'W')}<div class="m-scrim-b"></div><div class="m-abs" style="left:20px;right:20px;bottom:14px;display:flex;align-items:center;gap:12px;color:#fff"><span>${ic('pause')}</span><div class="m-fill">${wavy(.33, 560, 'var(--inverse-primary)')}</div><span class="num" style="font-size:12px">06:12 / 18:42</span><span>${ic('full')}</span></div></div>
+      <div style="font:800 22px/1.3 var(--font-display)">${v.t}</div>
+      <div style="display:flex;gap:12px;align-items:center"><div class="m-av p" style="width:44px;height:44px">阿</div><div class="m-col"><b>${v.up}</b><span class="m-meta">粉丝 58.2万 · ${v.v}播放 · 10-02</span></div><span class="m-btn fill" style="height:36px;margin-left:8px">${ic('add')}关注</span><div class="m-fill"></div><div style="width:330px">${btnGroup()}</div></div>
+      <div class="m-chips">${EPS.map((e, i) => `<span class="m-chip${i === 0 ? ' on' : ''}">${e}</span>`).join('')}</div></div>
+    <div class="m-col m-fill" style="background:var(--surface-container-low);border-radius:28px;padding:16px 18px;gap:14px;overflow:hidden"><div class="m-tabs" style="padding:0"><div class="m-tab on">评论 2341</div><div class="m-tab">相关推荐</div></div><div class="m-chips"><span class="m-chip on">最热</span><span class="m-chip">最新</span></div>${COMMENTS.map(c => comment(...c)).join('')}${listRow(VIDS[3])}</div></div>`;
+}
+function detailTv() {
+  const v = VIDS[0];
+  return `<div class="scope cinema" data-seed-cover="0" style="position:absolute;inset:0;background:var(--surface)"><div class="m-ambient">${img(0, 'W')}</div><div class="m-backdrop" style="height:70%">${img(0, 'W')}</div>
+  <div class="m-abs" style="left:48px;top:30px;width:520px;display:flex;flex-direction:column;gap:10px;z-index:2">
+    <div class="m-eyebrow">纪录 · 旅行 · 5P</div><div class="m-display m-t2" style="font-size:26px">${v.t}</div>
+    <div style="display:flex;gap:10px;align-items:center"><div class="m-av p" style="width:32px;height:32px">阿</div><b style="font-size:13px">${v.up}</b><span class="m-meta">粉丝 58.2万 · ${v.v}播放 · 3.2万点赞 · 8961 投币</span></div>
+    <div class="m-t2" style="font-size:13px;line-height:1.6;color:var(--on-surface-variant)">从雷克雅未克出发，沿 1 号公路逆时针绕岛一圈。全程 4K HDR 拍摄，第 5P 是东部峡湾等到的 Kp 7 极光。</div>
+    <div style="display:flex;gap:10px;margin-top:4px;align-items:center"><div class="m-btn fill lg f" data-f data-start>${ic('play')}继续 P2 · 06:12</div>${[['like', 1], ['coin'], ['star'], ['later'], ['person']].map(([n, on]) => `<span class="m-ib f t" data-f style="width:48px;height:48px;${on ? 'background:var(--primary);color:var(--on-primary);border-radius:16px' : ''}">${ic(n)}</span>`).join('')}</div>
+  </div>
+  <div class="m-abs" style="left:48px;right:0;top:300px;z-index:2"><div class="m-h" style="font-size:15px">选集</div><div class="m-row tvrow" style="gap:14px;overflow:hidden;padding:10px 48px 12px 4px">${EPS.map((e, i) => `<div class="m-vc f" data-f style="width:170px;flex:none"><div class="m-cv">${img([0, 1, 5, 3, 0][i])}<span class="dur">${['03:40', '04:12', '03:55', '04:31', '02:24'][i]}</span>${i === 1 ? '<span class="prog" style="width:33%"></span>' : ''}</div><div class="tt m-t1">${e}</div></div>`).join('')}</div>
+  <div class="m-h" style="font-size:15px;margin-top:2px">相关推荐</div></div></div>` + tvhint();
+}
+
+/* ---------- PLAYER ---------- */
+const danmaku = [['那一段极光直接炸开', 40, 60], ['前方高能', 90, 300], ['这是 KP7 吗', 140, 120], ['UP 主的相机是什么', 60, 480], ['好想去冰岛', 180, 420]];
+const dmHtml = sc => danmaku.map(([t, y, x]) => `<span class="m-dm" style="top:${y * sc}px;left:${x * sc}px">${t}</span>`).join('');
+function playerPhone() {
+  return `<div class="scope cinema" data-seed-cover="0" style="position:absolute;inset:0;background:#000"><div class="m-video" style="position:absolute;inset:0">${img(0, 'W')}</div><div class="m-scrim-b"></div>${dmHtml(1)}
+  <div class="m-abs" style="top:12px;left:16px;right:16px;display:flex;align-items:center;gap:10px;color:#fff"><span>${ic('back')}</span><b class="m-fill m-t1" style="font-size:14px">P2 黑沙滩 · 冰岛 14 天环岛自驾</b><span>${ic('cc')}</span><span class="m-chip on" style="padding:3px 10px;font-size:12px">弹 开</span><span>${ic('more')}</span></div>
+  <div class="m-abs" style="left:50%;top:50%;width:72px;height:72px;margin:-46px 0 0 -36px;border-radius:24px;background:var(--primary-container);color:var(--on-primary-container);display:grid;place-items:center">${ic('play')}</div>
+  <div class="m-abs" style="left:300px;bottom:78px;width:140px;border-radius:14px;overflow:hidden;box-shadow:0 0 0 2px #fff">${img(1)}<div style="position:absolute;bottom:4px;width:100%;text-align:center;color:#fff;font:600 11px var(--font-display)">08:30</div></div>
+  <div class="m-abs" style="left:20px;right:20px;bottom:12px;display:flex;flex-direction:column;gap:6px;color:#fff">${wavy(.45, 740)}<div style="display:flex;align-items:center;gap:12px;font-size:12px"><span>${ic('pause')}</span><span>${ic('next')}</span><span class="num">08:30 / 18:42</span><div class="m-fill"></div><span class="m-chip" style="color:#fff;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .4);padding:3px 10px">选集</span><span class="m-chip" style="color:#fff;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .4);padding:3px 10px">1.0×</span><span class="m-chip on" style="padding:3px 10px">1080P 高码率</span><span>${ic('full')}</span></div></div></div>`;
+}
+function playerTablet() {
+  const sl = (name, val, pct) => `<div class="m-col" style="gap:8px"><div style="display:flex;justify-content:space-between;font-size:13px"><span>${name}</span><span class="num" style="color:var(--on-surface-variant)">${val}</span></div><div class="m-sl"><span class="a" style="width:${pct}%"></span><span class="h"></span><span class="b"></span></div></div>`;
+  return `<div class="scope cinema" data-seed-cover="0" style="position:absolute;inset:0;background:#000"><div class="m-video" style="position:absolute;inset:0">${img(0, 'W')}</div><div class="m-scrim-b"></div>${dmHtml(1.6)}
+  <div class="m-abs" style="left:28px;right:28px;bottom:20px;display:flex;flex-direction:column;gap:8px;color:#fff;width:800px">${wavy(.45, 800)}<div style="display:flex;gap:14px;align-items:center;font-size:13px"><span>${ic('pause')}</span><span>${ic('next')}</span><span class="num">08:30 / 18:42</span></div></div>
+  <div class="m-abs" style="top:16px;right:16px;bottom:16px;width:340px;border-radius:28px;background:var(--surface-container);padding:22px;display:flex;flex-direction:column;gap:20px;color:var(--on-surface)">
+    <div style="display:flex;justify-content:space-between;align-items:center"><b style="font:800 18px var(--font-display)">弹幕设置</b><span class="m-sw on"></span></div>
+    <div class="m-chips" style="flex-wrap:wrap"><span class="m-chip on">滚动</span><span class="m-chip on">顶部</span><span class="m-chip">底部</span><span class="m-chip on">彩色</span><span class="m-chip">高级</span></div>
+    ${sl('不透明度', '80%', 70)}${sl('显示区域', '1/2 屏', 45)}${sl('字号', '100%', 50)}${sl('速度', '适中', 55)}
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:14px"><span>智能防挡（人像蒙版）</span><span class="m-sw on"></span></div></div></div>`;
+}
+function playerTv() {
+  const opt = (t, on) => `<div class="m-li f${on ? ' on' : ''}" data-f style="padding:8px 12px">${on ? ic('check') : '<span style="width:24px"></span>'}<span class="tx"><b style="font-size:13px">${t}</b></span></div>`;
+  return `<div class="scope cinema" data-seed-cover="0" style="position:absolute;inset:0;background:#000"><div class="m-video" style="position:absolute;inset:0">${img(0, 'W')}</div><div class="m-scrim-b"></div>
+  <div class="m-abs" style="left:48px;top:27px;color:#fff"><div style="font:800 20px var(--font-display)">P2 黑沙滩</div><div style="font-size:12px;opacity:.8">冰岛 14 天环岛自驾 · 旅行的阿树</div></div>
+  <div class="m-abs" style="left:48px;right:340px;bottom:27px;display:flex;flex-direction:column;gap:10px;color:#fff"><div style="display:flex;justify-content:space-between;font:600 12px var(--font-display)" class="num"><span>08:30</span><span>18:42</span></div>${wavy(.45, 572)}
+    <div style="display:flex;gap:10px">${[['pause'], ['next'], ['dynamic'], ['comment'], ['cc'], ['tune', 1]].map(([n, on]) => `<span class="m-ib f t" data-f${on ? ' data-start' : ''} style="width:44px;height:44px">${ic(n)}</span>`).join('')}</div></div>
+  <div class="m-abs" style="top:16px;right:16px;bottom:16px;width:300px;border-radius:28px;background:var(--surface-container);display:flex;color:var(--on-surface);overflow:hidden">
+    <div class="m-col" style="width:96px;padding:16px 8px;gap:4px;background:var(--surface-container-high)">${['画面', '弹幕', '字幕', '其他'].map((t, i) => `<div class="m-li f${i === 0 ? ' on' : ''}" data-f style="padding:8px 10px;justify-content:center;font-size:13px">${t}</div>`).join('')}</div>
+    <div class="m-col m-fill" style="padding:16px 10px;gap:2px"><div class="m-eyebrow" style="padding:0 12px 6px">分辨率</div>${opt('4K 超清')}${opt('1080P 高码率', 1)}${opt('1080P 高清')}${opt('720P')}<div class="m-eyebrow" style="padding:10px 12px 6px">编码</div>${opt('HEVC', 1)}${opt('AV1')}</div></div></div>` + tvhint('确认键暂停 · 长按确认 / 菜单键打开设置');
+}
+</script>
+<script>
+'use strict';
+/* ---------- SEARCH ---------- */
+const HOT = ['冰岛极光 Kp7', '葬送的芙莉莲 第二季 第 8 话', '撒哈拉银河', '洪崖洞航拍', '自由潜蓝洞', '火山口熔岩湖'];
+const hotList = n => HOT.slice(0, n).map((h, i) => `<div style="display:flex;gap:12px;align-items:center;font-size:13px;min-width:0"><span class="num" style="width:22px;height:22px;border-radius:8px;display:grid;place-items:center;font-weight:800;font-size:12px;${i < 3 ? `background:var(${['--primary', '--tertiary', '--secondary'][i]});color:var(${['--on-primary', '--on-tertiary', '--on-secondary'][i]})` : 'color:var(--on-surface-variant)'}">${i + 1}</span><span class="m-t1">${h}</span></div>`).join('');
+const SUG = ['极光 4K', '极光 冰岛 自驾', '极光 延时摄影', '极光 预报 Kp 指数'];
+function searchPhone() {
+  return sb() + `<div style="padding:6px 12px 8px;display:flex;gap:6px;align-items:center"><span class="m-ib">${ic('back')}</span><div class="m-search m-fill" style="background:var(--surface-container-highest)"><span style="color:var(--on-surface)">极光<b style="color:var(--primary);font-weight:400">|</b></span><span class="m-ib" style="width:36px;height:36px">${ic('mic')}</span></div></div>
+  <div style="display:flex;flex-direction:column;padding:0 4px">${SUG.map(s => `<div class="m-li" style="padding:10px 16px">${ic('search')}<span class="tx"><b style="font-weight:400">${s.replace('极光', '<b>极光</b>')}</b></span></div>`).join('')}</div>
+  <div style="padding:12px 16px;display:flex;flex-direction:column;gap:12px"><div class="m-h">搜索历史 <small>清除</small></div><div class="m-chips" style="flex-wrap:wrap">${['芙莉莲', '冰岛', 'Compose 弹幕', '自由潜'].map(c => `<span class="m-chip">${c}</span>`).join('')}</div>
+  <div class="m-h" style="margin-top:6px">大家都在搜</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 12px">${hotList(6)}</div></div>`;
+}
+function searchTablet() {
+  return `<div style="display:flex;height:100%">${rail('')}<div class="m-fill m-col" style="padding:20px 28px 0 8px;gap:18px;overflow:hidden">
+    <div style="display:flex;gap:16px;align-items:center"><div class="m-search" style="width:560px;background:var(--surface-container-highest)">${ic('search')}<span style="color:var(--on-surface)">极光</span><span class="m-ib">${ic('mic')}</span></div><div class="m-chips"><span class="m-chip on">综合</span><span class="m-chip">视频</span><span class="m-chip">番剧</span><span class="m-chip">影视</span><span class="m-chip">UP 主</span></div></div>
+    <div style="display:flex;gap:16px;align-items:center;padding:16px;border-radius:24px;background:var(--surface-container)"><div class="m-av p lg">阿</div><div class="m-col m-fill" style="gap:4px"><b style="font-size:16px">旅行的阿树</b><span class="m-meta">粉丝 58.2万 · 216 个视频 · 极光、冰岛、北欧自驾</span></div><span class="m-btn fill">${ic('add')}关注</span><div class="m-row" style="gap:10px">${[0, 5, 3].map(i => `<div class="m-cv" style="width:120px">${img(i)}</div>`).join('')}</div></div>
+    <div class="m-h">视频 <small>按播放量 ›</small></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">${[0, 2, 5, 6].map(i => vcard(VIDS[i], { stat: 1 })).join('')}</div>
+    <div class="m-h">影视</div><div style="display:flex;gap:16px">${[1, 3].map(i => `<div style="display:flex;gap:14px;padding:12px;border-radius:20px;background:var(--surface-container-low);width:420px">${poster(PGCS[i], { w: 96 })}<div class="m-col" style="gap:6px"><b>${PGCS[i].t}</b><span class="m-meta">${PGCS[i].s}</span><span class="m-btn fill" style="height:34px;margin-top:8px;align-self:flex-start">${ic('play')}立即观看</span></div></div>`).join('')}</div>
+  </div></div>`;
+}
+function searchTv() {
+  const keys = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'.split('');
+  return `${tvrail('搜索')}<div class="m-abs" style="left:96px;top:27px;width:300px;display:flex;flex-direction:column;gap:12px;z-index:2">
+    <div class="m-search" style="background:var(--surface-container-highest);height:52px">${ic('search')}<span style="color:var(--on-surface);font-size:16px">JIGUANG<b style="color:var(--primary);font-weight:400">|</b></span></div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:6px">${keys.map((k, i) => `<div class="m-key f" data-f${i === 7 ? ' data-start' : ''}>${k}</div>`).join('')}</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px"><div class="m-key f" data-f>空格</div><div class="m-key f" data-f>删除</div><div class="m-key f" data-f>清空</div></div>
+    <div class="m-btn t f" data-f style="justify-content:flex-start">${ic('mic')}按住遥控器语音键说话</div></div>
+  <div class="m-abs" style="left:430px;top:27px;width:190px;display:flex;flex-direction:column;gap:4px;z-index:2"><div class="m-eyebrow" style="padding:4px 12px 8px">联想</div>${SUG.map(s => `<div class="m-li f" data-f style="padding:9px 12px"><span class="tx"><b style="font-weight:500;font-size:13px">${s}</b></span></div>`).join('')}</div>
+  <div class="m-abs" style="left:650px;top:27px;width:262px;display:flex;flex-direction:column;gap:12px;z-index:2"><div class="m-eyebrow">热搜</div>${hotList(6)}</div>
+  <div class="m-abs" style="left:430px;right:0;top:330px;z-index:2"><div class="m-h" style="font-size:15px">“极光”的结果</div><div class="m-row tvrow" style="gap:16px;overflow:hidden;padding:12px 48px 12px 4px">${[0, 2, 5, 6, 3].map(i => vcard(VIDS[i], { w: 180, f: 1, noMeta: true })).join('')}</div></div>` + tvhint();
+}
+
+/* ---------- PGC 影视 ---------- */
+const PGC_TABS = ['番剧', '国创', '电影', '电视剧', '纪录片', '综艺'];
+const DAYS = ['一', '二', '三', '四', '五', '六', '日'];
+function pgcPhone() {
+  return sb() + `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 16px 6px 20px"><b style="font:800 26px var(--font-display)">影视</b><span class="m-ib">${ic('search')}</span></div>
+  <div class="m-chips" style="padding:0 16px">${PGC_TABS.map((t, i) => `<span class="m-chip${i === 0 ? ' on' : ''}">${t}</span>`).join('')}</div>
+  <div style="display:flex;gap:8px;padding:14px 16px 0;height:290px"><div style="flex:1;position:relative;border-radius:28px;overflow:hidden">${img(8, 'S')}<div class="m-scrim-b"></div><div class="m-abs" style="left:14px;right:14px;bottom:14px;color:#fff"><div style="font:800 19px var(--font-display)">葬送的芙莉莲 第二季</div><div style="font-size:12px;opacity:.85">更新至第 8 话 · 每周五 23:00</div></div></div><div style="width:90px;border-radius:24px;overflow:hidden">${img(9, 'S')}</div><div style="width:34px;border-radius:16px;overflow:hidden">${img(4, 'S')}</div></div>
+  <div class="m-h" style="padding:16px 16px 8px">新番时间表 <small>完整 ›</small></div>
+  <div style="display:flex;gap:6px;padding:0 16px">${DAYS.map((d, i) => `<span style="flex:1;height:44px;border-radius:${i === 4 ? '16px' : '999px'};display:grid;place-items:center;font-weight:600;font-size:13px;${i === 4 ? 'background:var(--primary);color:var(--on-primary)' : 'background:var(--surface-container-high)'}">${d}</span>`).join('')}</div>
+  <div style="display:flex;flex-direction:column;gap:10px;padding:12px 16px">${[0, 3].map(i => `<div style="display:flex;gap:12px;align-items:center"><span class="num" style="font-weight:700;color:var(--primary);width:44px">${['23:00', '23:30'][i ? 1 : 0]}</span><div style="width:44px;height:58px;border-radius:10px;overflow:hidden;flex:none">${img(PGCS[i].c, 'S')}</div><div class="m-col m-fill"><b style="font-size:14px">${PGCS[i].t}</b><span class="m-meta">第 ${i ? 12 : 8} 话</span></div><span class="m-btn t" style="height:32px;padding:0 12px;font-size:12px">追番</span></div>`).join('')}</div>` + nbar('影视');
+}
+function pgcTablet() {
+  return `<div style="display:flex;height:100%">${rail('影视')}<div class="m-fill m-col" style="padding:20px 28px 0 8px;gap:18px;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:20px"><b style="font:800 28px var(--font-display)">影视</b><div class="m-chips">${PGC_TABS.map((t, i) => `<span class="m-chip${i === 0 ? ' on' : ''}">${t}</span>`).join('')}</div><div class="m-fill"></div><span class="m-btn t">${ic('tune')}索引</span><span class="m-btn t">${ic('star')}我的追番</span></div>
+    <div style="display:flex;gap:20px;flex:none"><div style="flex:1;position:relative;height:320px;border-radius:28px;overflow:hidden">${img(8, 'W')}<div class="m-scrim-b"></div><div class="m-abs" style="left:28px;bottom:24px;color:#fff;display:flex;flex-direction:column;gap:8px"><div class="m-eyebrow" style="color:#fff">本季热播 · 9.8 分</div><div style="font:800 34px var(--font-display)">葬送的芙莉莲 第二季</div><div style="display:flex;gap:10px"><span class="m-btn fill">${ic('play')}看第 8 话</span><span class="m-btn t">${ic('add')}追番</span></div></div></div>
+      <div style="width:300px;border-radius:28px;background:var(--surface-container);padding:18px;display:flex;flex-direction:column;gap:12px"><div class="m-h">今天更新 <small>周五</small></div>${[0, 3, 4].map(i => `<div style="display:flex;gap:10px;align-items:center"><div style="width:44px;height:58px;border-radius:10px;overflow:hidden;flex:none">${img(PGCS[i].c, 'S')}</div><div class="m-col"><b style="font-size:13px">${PGCS[i].t}</b><span class="m-meta">23:00 更新</span></div></div>`).join('')}</div></div>
+    <div class="m-h">热门番剧</div><div style="display:grid;grid-template-columns:repeat(6,1fr);gap:16px">${PGCS.map(p => poster(p)).join('')}</div></div></div>`;
+}
+function pgcTv() {
+  return `<div class="scope cinema" data-seed-cover="8" style="position:absolute;inset:0;background:var(--surface)"><div class="m-backdrop">${img(8, 'W')}</div>${tvrail('影视')}${tvTop(PGC_TABS, '番剧')}
+  <div class="m-abs" style="left:96px;top:78px;width:420px;display:flex;flex-direction:column;gap:10px;z-index:2"><div class="m-eyebrow">本季热播 · 评分 9.8</div><div class="m-display">葬送的芙莉莲<br>第二季</div><div class="m-meta" style="font-size:12px">更新至第 8 话 · 每周五 23:00 · 奇幻 / 冒险</div>
+    <div style="display:flex;gap:12px;margin-top:6px"><div class="m-btn fill lg f" data-f data-start>${ic('play')}看第 8 话</div><div class="m-btn t lg f" data-f>${ic('add')}追番</div></div>
+    <div style="display:flex;gap:8px;margin-top:4px">${['时间表', '索引', '我的追番'].map(t => `<span class="m-chip f" data-f>${t}</span>`).join('')}</div></div>
+  <div class="m-abs" style="left:96px;right:0;top:318px;z-index:2"><div class="m-h" style="font-size:15px">热门番剧</div><div class="m-row tvrow" style="gap:16px;overflow:hidden;padding:12px 48px 12px 4px">${PGCS.concat(PGCS.slice(0, 2)).map(p => poster(p, { w: 112, f: 1 })).join('')}</div></div></div>` + tvhint();
+}
+
+/* ---------- DYNAMIC ---------- */
+const UPS = ['阿树', '沙漠鱼', '飞手', '蓝调', '植物所', '北境', '老王'];
+const upRow = () => `<div style="display:flex;gap:14px;overflow:hidden">${UPS.map((u, i) => `<div class="m-col" style="align-items:center;gap:4px;flex:none;font-size:11px"><div class="m-av ${i % 2 ? 's' : 'p'}" style="width:48px;height:48px;${i === 0 ? 'box-shadow:0 0 0 2px var(--primary)' : ''}">${u[0]}</div>${u}</div>`).join('')}</div>`;
+const dynCard = (k, sel) => {
+  const v = VIDS[[0, 4, 6][k]];
+  const head = `<div style="display:flex;gap:10px;align-items:center"><div class="m-av p">${v.up[0]}</div><div class="m-col"><b style="font-size:13px">${v.up}</b><span class="m-meta">${['2 小时前 · 投稿了视频', '昨天 21:30 · 动态', '10-12 · 投稿了视频'][k]}</span></div></div>`;
+  const body = k === 1
+    ? `<div style="font-size:13px;line-height:1.55">第 30 天，花终于全开了。顺便晒一下拍摄用的延时轨道，下期讲布光。</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px">${[4, 11, 5].map(c => `<div class="m-cv" style="aspect-ratio:1;border-radius:10px">${img(c, 'S')}</div>`).join('')}</div>`
+    : `<div class="m-t2" style="font-size:13px">${v.t}</div><div style="display:flex;gap:10px;padding:8px;border-radius:16px;background:var(--surface-container-high)"><div class="m-cv" style="width:120px;flex:none;border-radius:10px">${img(v.c)}<span class="dur">${v.d}</span></div><div class="m-col" style="gap:4px;font-size:11px;color:var(--on-surface-variant);justify-content:center">${v.v}播放<br>${v.dm}弹幕</div></div>`;
+  return `<div style="display:flex;flex-direction:column;gap:10px;padding:14px;border-radius:24px;background:${sel ? 'var(--secondary-container)' : 'var(--surface-container-low)'}">${head}${body}<div class="m-meta" style="justify-content:space-around;font-size:12px"><span>${ic('share')} 转发</span><span>${ic('comment')} ${[312, 88, 640][k]}</span><span>${ic('like')} ${['1.2万', '2061', '3.4万'][k]}</span></div></div>`;
+};
+function dynPhone() {
+  return sb() + `<div style="padding:6px 20px 10px"><b style="font:800 26px var(--font-display)">动态</b></div><div style="padding:0 16px 12px">${upRow()}</div><div style="display:flex;flex-direction:column;gap:12px;padding:0 12px">${dynCard(0)}${dynCard(1)}</div>` + nbar('动态');
+}
+function dynTablet() {
+  return `<div style="display:flex;height:100%">${rail('动态')}<div class="m-col" style="width:470px;flex:none;padding:20px 8px 0;gap:14px;overflow:hidden"><b style="font:800 28px var(--font-display);padding-left:8px">动态</b>${upRow()}${dynCard(0, 1)}${dynCard(1)}</div>
+    <div class="m-fill" style="margin:16px 20px 16px 12px;border-radius:28px;background:var(--surface-container-low);padding:22px;display:flex;flex-direction:column;gap:14px;overflow:hidden"><div style="display:flex;gap:10px;align-items:center"><div class="m-av p" style="width:44px;height:44px">阿</div><div class="m-col"><b>旅行的阿树</b><span class="m-meta">2 小时前 · 投稿了视频</span></div></div>
+      <div class="m-video" style="height:300px;border-radius:24px">${img(0, 'W')}<div class="m-abs" style="left:50%;top:50%;width:64px;height:64px;margin:-32px;border-radius:22px;background:var(--primary);color:var(--on-primary);display:grid;place-items:center">${ic('play')}</div></div>
+      <b style="font-size:16px">${VIDS[0].t}</b><div class="m-tabs" style="padding:0"><div class="m-tab on">评论 312</div><div class="m-tab">转发</div></div>${COMMENTS.slice(0, 3).map(c => comment(...c)).join('')}</div></div>`;
+}
+function dynTv() {
+  return `${tvrail('动态')}<div class="m-abs" style="left:96px;top:27px;right:48px;display:flex;flex-direction:column;gap:16px;z-index:2"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font:800 26px var(--font-display)">动态</b><div class="m-chips">${['全部', '视频', '图文'].map((c, i) => `<span class="m-chip f${i ? '' : ' on'}" data-f>${c}</span>`).join('')}</div></div>${upRow()}</div>
+  <div class="m-abs" style="left:96px;right:0;top:170px;z-index:2"><div class="m-row tvrow" style="gap:18px;overflow:hidden;padding:12px 48px 12px 4px">${[0, 6, 2, 3, 5].map((i, k) => `<div class="m-vc f" data-f${k === 0 ? ' data-start' : ''} style="width:240px;flex:none"><div style="display:flex;gap:8px;align-items:center"><div class="m-av p" style="width:26px;height:26px;font-size:11px">${VIDS[i].up[0]}</div><span style="font-size:12px;font-weight:600">${VIDS[i].up}</span><span class="m-meta">· ${k + 1} 小时前</span></div><div class="m-cv">${img(VIDS[i].c)}<span class="dur">${VIDS[i].d}</span></div><div class="tt m-t2">${VIDS[i].t}</div></div>`).join('')}</div></div>` + tvhint();
+}
+
+/* ---------- ME 我的 ---------- */
+const TILES = [['history', '历史记录', '今天看了 6 个', 'primary'], ['star', '收藏夹', '12 个收藏夹', 'tertiary'], ['later', '稍后再看', '9 个待看', 'secondary'], ['movie', '追番追剧', '3 部更新', 'primary']];
+const tile = ([i, t, s, c]) => `<div style="padding:14px;border-radius:24px;background:var(--${c}-container);color:var(--on-${c}-container);display:flex;flex-direction:column;gap:10px"><span style="width:40px;height:40px;display:grid;place-items:center;border-radius:14px;background:var(--${c});color:var(--on-${c})">${ic(i)}</span><b style="font-size:15px">${t}</b><span style="font-size:12px;opacity:.8">${s}</span></div>`;
+const profileHead = () => `<div style="display:flex;gap:16px;align-items:center"><div class="m-av p lg">阿</div><div class="m-col" style="gap:6px"><div style="display:flex;gap:8px;align-items:center"><b style="font:800 20px var(--font-display)">阿树不吃香菜</b><span class="m-av s" style="width:30px;height:30px;font-size:11px">6</span></div><div class="m-meta" style="font-size:12px">关注 312 · 粉丝 1.2万 · 硬币 486</div></div></div>`;
+function mePhone() {
+  return sb() + `<div style="padding:16px 20px;display:flex;flex-direction:column;gap:18px">${profileHead()}<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${TILES.map(tile).join('')}</div>
+  <div class="m-h">继续观看 <small>全部</small></div><div class="m-row" style="gap:10px;overflow:hidden">${[2, 3, 5].map((i, k) => vcard(VIDS[i], { w: 150, prog: [62, 30, 80][k], noMeta: true })).join('')}</div>
+  <div style="display:flex;flex-direction:column;border-radius:24px;background:var(--surface-container-low);padding:6px">${[['person', '关注的 UP 主', '312 位'], ['shield', '账号与用户锁', '2 个账号'], ['settings', '设置', '主题、播放、弹幕']].map(([i, t, s]) => `<div class="m-li"><span class="ic" style="background:var(--surface-container-highest)">${ic(i)}</span><span class="tx"><b>${t}</b><span>${s}</span></span></div>`).join('')}</div></div>` + nbar('我的');
+}
+function meTablet() {
+  return `<div style="display:flex;height:100%">${rail('我的')}<div class="m-col" style="width:340px;flex:none;padding:24px 12px;gap:18px">${profileHead()}<div class="m-col" style="gap:4px">${[['history', '历史记录', '今天看了 6 个', 1], ['star', '收藏夹', '12 个收藏夹'], ['later', '稍后再看', '9 个待看'], ['movie', '追番追剧', '3 部更新'], ['person', '关注', '312 位 UP 主'], ['shield', '账号与用户锁', '2 个账号']].map(([i, t, s, on]) => `<div class="m-li${on ? ' on' : ''}"><span class="ic" style="${on ? 'background:var(--primary);color:var(--on-primary)' : 'background:var(--surface-container-high)'}">${ic(i)}</span><span class="tx"><b>${t}</b><span>${s}</span></span></div>`).join('')}</div></div>
+    <div class="m-fill" style="margin:16px 20px 16px 4px;border-radius:28px;background:var(--surface-container-low);padding:24px;display:flex;flex-direction:column;gap:16px;overflow:hidden"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font:800 24px var(--font-display)">历史记录</b><div class="m-chips"><span class="m-chip on">全部</span><span class="m-chip">视频</span><span class="m-chip">番剧</span></div></div>
+      <div class="m-h">今天</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">${[2, 3, 5, 0].map((i, k) => vcard(VIDS[i], { prog: [62, 30, 80, 100][k] })).join('')}</div><div class="m-h">昨天</div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">${[6, 7, 1, 4].map((i, k) => vcard(VIDS[i], { prog: [100, 45, 12, 70][k] })).join('')}</div></div></div>`;
+}
+function meTv() {
+  return `${tvrail('我的')}<div class="m-abs" style="left:96px;top:27px;right:48px;display:flex;gap:20px;align-items:center;z-index:2">${profileHead()}<div class="m-fill"></div><span class="m-btn t f" data-f>${ic('person')}切换账号</span><span class="m-btn t f" data-f>${ic('shield')}用户锁</span></div>
+  <div class="m-abs" style="left:96px;right:48px;top:118px;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;z-index:2">${TILES.map((t, i) => `<div class="f g" data-f${i === 0 ? ' data-start' : ''} style="border-radius:24px">${tile(t)}</div>`).join('')}</div>
+  <div class="m-abs" style="left:96px;right:0;top:300px;z-index:2"><div class="m-h" style="font-size:15px">继续观看</div><div class="m-row tvrow" style="gap:16px;overflow:hidden;padding:12px 48px 12px 4px">${[2, 3, 5, 0, 6, 7].map((i, k) => vcard(VIDS[i], { w: 190, f: 1, prog: [62, 30, 80, 15, 50, 90][k], noMeta: true })).join('')}</div></div>` + tvhint();
+}
+</script>
+<script>
+'use strict';
+/* ---------- SETTINGS ---------- */
+const SET_CATS = [['palette', '外观与主题', '种子色、配色风格、深色模式', 'primary'], ['play', '播放', '默认画质、编码、音质、倍速', 'tertiary'], ['comment', '弹幕', '类型、透明度、区域、防挡', 'secondary'], ['cc', '字幕', '字号、背景、底部边距', 'primary'], ['wifi', '网络与代理', '代理服务器、官方 CDN、测速', 'tertiary'], ['shield', '账号与安全', '多账号、用户锁、无痕模式', 'secondary'], ['storage', '存储', '图片缓存、日志', 'primary'], ['info', '关于', '版本、更新、解码器信息', 'tertiary']];
+const catRow = ([i, t, s, c], on, f) => `<div class="m-li${on ? ' on' : ''}${f ? ' f' : ''}"${f ? ' data-f' : ''}${f && on ? ' data-start' : ''}><span class="ic" style="background:var(--${c}-container);color:var(--on-${c}-container);clip-path:var(--shape-cookie9);border-radius:50%">${ic(i)}</span><span class="tx"><b>${t}</b><span>${s}</span></span></div>`;
+const swatches = () => `<div style="display:flex;gap:10px;align-items:center">${['#FB7299', '#23ADE5', '#F2A53A', '#5BB974', '#9B7BF0'].map((c, i) => `<span style="width:${i ? 32 : 36}px;height:${i ? 32 : 36}px;background:${c};border-radius:${i ? '50%' : '30%'};${i ? '' : 'transform:rotate(45deg);box-shadow:0 0 0 2px var(--surface-container-low),0 0 0 4px var(--on-surface)'}"></span>`).join('')}<span class="m-ib t">${ic('add')}</span></div>`;
+const segRow = (items, on) => `<div class="m-bg">${items.map((t, i) => `<div class="${i === on ? 'on' : ''}" style="font-size:12px;padding:10px 4px">${t}</div>`).join('')}</div>`;
+const appearance = f => `<div class="m-col" style="gap:8px"><b style="font-size:13px;color:var(--on-surface-variant)">主题来源</b>${segRow(['系统壁纸', '自选种子色', '跟随内容'], 1)}</div>
+  <div class="m-col" style="gap:8px"><b style="font-size:13px;color:var(--on-surface-variant)">种子色</b>${swatches()}</div>
+  <div class="m-col" style="gap:8px"><b style="font-size:13px;color:var(--on-surface-variant)">配色风格</b><div class="m-chips" style="flex-wrap:wrap">${['TonalSpot', 'Vibrant', 'Expressive', 'Fidelity', 'Content', 'Monochrome'].map((t, i) => `<span class="m-chip${i === 1 ? ' on' : ''}${f ? ' f' : ''}"${f ? ' data-f' : ''}>${t}</span>`).join('')}</div></div>
+  <div class="m-col" style="gap:8px"><div style="display:flex;justify-content:space-between;font-size:13px"><b style="color:var(--on-surface-variant)">对比度</b><span>标准</span></div><div class="m-sl"><span class="a" style="width:30%"></span><span class="h"></span><span class="b"></span></div></div>
+  <div class="m-col" style="gap:8px"><b style="font-size:13px;color:var(--on-surface-variant)">深色模式</b>${segRow(['跟随系统', '浅色', '深色', '影院纯黑'], 0)}</div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><div class="m-col"><b style="font-size:14px">详情页使用封面颜色</b><span class="m-meta">详情、播放器、刷刷随视频变色</span></div><span class="m-sw on"></span></div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><div class="m-col"><b style="font-size:14px">减少动效</b><span class="m-meta">关闭形状变形和弹簧回弹</span></div><span class="m-sw"></span></div>`;
+function setPhone() {
+  return sb() + `<div style="padding:6px 20px 12px"><b style="font:800 26px var(--font-display)">设置</b></div><div style="padding:0 8px;display:flex;flex-direction:column;gap:2px">${SET_CATS.map(c => catRow(c)).join('')}</div>`;
+}
+function setTablet() {
+  return `<div style="display:flex;height:100%;padding:20px 24px;gap:20px"><div class="m-col" style="width:380px;flex:none;gap:2px"><div style="display:flex;gap:8px;align-items:center;padding:0 8px 12px"><span class="m-ib">${ic('back')}</span><b style="font:800 24px var(--font-display)">设置</b></div>${SET_CATS.map((c, i) => catRow(c, i === 0)).join('')}</div>
+    <div class="m-fill" style="border-radius:28px;background:var(--surface-container-low);padding:26px 30px;display:flex;flex-direction:column;gap:22px;overflow:hidden"><b style="font:800 24px var(--font-display)">外观与主题</b>${appearance()}</div></div>`;
+}
+function setTv() {
+  return `<div style="position:absolute;inset:0;display:flex;padding:27px 48px;gap:24px"><div class="m-col" style="width:300px;flex:none;gap:2px"><b style="font:800 24px var(--font-display);padding:0 12px 12px">设置</b>${SET_CATS.slice(0, 7).map((c, i) => catRow(c, i === 0, 1)).join('')}</div>
+    <div class="m-fill" style="border-radius:28px;background:var(--surface-container);padding:22px 26px;display:flex;flex-direction:column;gap:16px;overflow:hidden"><b style="font:800 20px var(--font-display)">外观与主题</b>${appearance(1)}
+    <div class="m-col" style="gap:8px"><div style="display:flex;justify-content:space-between;font-size:13px"><b style="color:var(--on-surface-variant)">界面缩放（电视）</b><span class="num">960dp 基准 · 100%</span></div><div class="m-sl"><span class="a" style="width:50%"></span><span class="h"></span><span class="b"></span></div></div></div></div>` + tvhint('← 返回分类 · → 进入详情');
+}
+
+/* ---------- LOGIN ---------- */
+function qrGrid(seed) {
+  const r = rng(seed), n = 21, cells = [];
+  const finder = (x, y) => [[0, 0], [n - 7, 0], [0, n - 7]].some(([fx, fy]) => { const dx = x - fx, dy = y - fy; if (dx < 0 || dy < 0 || dx > 6 || dy > 6) return false; return dx === 0 || dy === 0 || dx === 6 || dy === 6 || (dx > 1 && dx < 5 && dy > 1 && dy < 5); });
+  const inFinderZone = (x, y) => (x < 8 && y < 8) || (x > n - 9 && y < 8) || (x < 8 && y > n - 9);
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) cells.push(inFinderZone(x, y) ? finder(x, y) : r() > .52);
+  return `<div class="m-qr">${cells.map(on => `<i${on ? '' : ' class="o"'}></i>`).join('')}</div>`;
+}
+const field = (label, val, extra = '') => `<div style="display:flex;flex-direction:column;gap:4px;padding:8px 16px;border-radius:16px 16px 4px 4px;background:var(--surface-container-highest);box-shadow:inset 0 -2px 0 var(--primary)"><span style="font-size:11px;color:var(--primary)">${label}</span><div style="display:flex;justify-content:space-between;align-items:center"><span class="num" style="font-size:16px">${val}</span>${extra}</div></div>`;
+function loginPhone() {
+  return sb() + `<div style="padding:40px 24px;display:flex;flex-direction:column;gap:18px"><div class="m-av p lg" style="width:64px;height:64px">B</div><b style="font:800 28px/1.2 var(--font-display)">登录哔哩哔哩</b><p style="font-size:14px;color:var(--on-surface-variant);margin:0">登录后同步历史、收藏和追番，三台设备进度一致。</p>
+  ${field('手机号', '+86 138 0013 8000')}${field('验证码', '6 2 9 _ _ _', '<span style="font-size:12px;color:var(--primary);font-weight:600">52 秒后重发</span>')}
+  <span class="m-btn fill lg" style="width:100%">登录</span><div style="display:flex;align-items:center;gap:10px;color:var(--on-surface-variant);font-size:12px"><span class="m-fill" style="height:1px;background:var(--outline-variant)"></span>或<span class="m-fill" style="height:1px;background:var(--outline-variant)"></span></div>
+  <span class="m-btn t lg" style="width:100%">${ic('qr')}在另一台设备上扫码</span><span class="m-btn o" style="width:100%">导入电视上已登录的账号</span></div>`;
+}
+const loginWide = tv => `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:${tv ? 56 : 80}px;padding:0 48px"><div class="m-col" style="align-items:center;gap:16px;width:${tv ? 260 : 340}px"><div style="width:${tv ? 230 : 300}px">${qrGrid(7)}</div><b style="font-size:${tv ? 15 : 17}px">用哔哩哔哩 App 扫码登录</b><span class="m-meta" style="font-size:12px">二维码 3 分钟后刷新 · 已扫码请在手机上确认</span></div>
+  <div class="m-col" style="gap:${tv ? 12 : 16}px;width:${tv ? 320 : 400}px"><b style="font:800 ${tv ? 26 : 32}px/1.2 var(--font-display)">登录哔哩哔哩</b>${['打开哔哩哔哩 App，点右上角扫一扫', '对准左侧二维码', '在手机上点「确认登录」'].map((t, i) => `<div style="display:flex;gap:12px;align-items:center;font-size:14px"><span class="m-av ${i === 1 ? 's' : 'p'}" style="width:30px;height:30px;font-size:13px">${i + 1}</span>${t}</div>`).join('')}
+  <div style="height:1px;background:var(--outline-variant);margin:6px 0"></div><span class="m-btn t${tv ? ' f' : ''}"${tv ? ' data-f data-start' : ''} style="align-self:flex-start">${ic('phone')}改用手机号和验证码</span><span class="m-btn o${tv ? ' f' : ''}"${tv ? ' data-f' : ''} style="align-self:flex-start">${ic('person')}切换到已保存的账号</span></div></div>`;
+const loginTablet = () => loginWide(false);
+const loginTv = () => loginWide(true) + tvhint();
+
+/* ---------- registry: screens × devices + adaptive rules ---------- */
+const SCREENS = [
+  { id: 'home', name: '首页', fn: { phone: homePhone, tablet: homeTablet, tv: homeTv },
+    comps: ['AppBarWithSearch', 'SecondaryTabRow', 'HorizontalMultiBrowseCarousel', 'HorizontalCenteredHeroCarousel', 'ShortNavigationBar', 'WideNavigationRail'],
+    rules: { phone: ['顶部是头像 + 搜索框（AppBarWithSearch），下面是推荐 / 热门 / 分区三个标签。', '精选用多尺寸轮播：一张大图露出下一张的边缘，暗示可以横滑。', '「继续观看」横向一行，卡片底部带进度条；推荐流 2 列。'],
+             tablet: ['左侧导航轨，搜索做成导航轨顶部的 FAB。', '精选改为居中大图轮播，左右两张竖图露边。', '推荐流 4–5 列，随宽度增减；分区标签横向铺开不折叠。'],
+             tv: ['全幅背景：当前精选的封面占右侧 74%，左和下渐隐到背景色。', '焦点在「播放」按钮上；向下进入内容行，行内枢轴滚动，焦点保持在左侧 15% 处。', '导航轨默认只有图标，焦点移进去时展开为带文字的模态导航轨。'] } },
+  { id: 'shorts', name: '刷刷', fn: { phone: shortsPhone, tablet: shortsTablet, tv: shortsTv },
+    comps: ['VerticalPager', 'VerticalFloatingToolbar', 'LinearWavyProgressIndicator', 'MaterialShapes.Heart', 'ModalBottomSheet'],
+    rules: { phone: ['全屏竖向翻页，底部导航变为半透明深色，不打断画面。', '右侧操作列：头像（带关注）、点赞、投币、收藏、评论、分享；点赞后按钮由圆形变为圆角方形。', '横屏视频居中显示，上下用封面模糊后的氛围光填满。'],
+             tablet: ['视频保持 9:16 居中，左右是氛围光；右侧固定显示信息和评论（SupportingPane）。', '竖向浮动工具栏放操作，左侧上一条 / 下一条按钮方便鼠标和触控笔。'],
+             tv: ['视频居中，左侧是播放队列缩略图，右侧是信息面板。', '↑↓ 换条，← → 快退快进；→ 移到右侧操作按钮。', '背景整屏氛围光，颜色来自当前视频封面，换条时颜色用弹簧动画过渡。'] } },
+  { id: 'detail', name: '视频详情', fn: { phone: detailPhone, tablet: detailTablet, tv: detailTv },
+    comps: ['ButtonGroup', 'ToggleButton', 'SupportingPaneScaffold', 'FilterChip', 'LinearWavyProgressIndicator'],
+    rules: { phone: ['整页用封面颜色做局部主题（CoverTheme）。', '点赞 / 投币 / 收藏 / 稍后 / 分享是一组相连按钮（ButtonGroup），选中项变成胶囊形。', '简介和评论用标签切换；评论的回复用底部抽屉。'],
+             tablet: ['左侧播放器 + 信息 + 选集，右侧评论和相关推荐。', '旋转为竖屏（Medium）时右栏收起，退化为手机布局。'],
+             tv: ['沉浸式背景，焦点默认在「继续 P2 · 06:12」。', '选集和相关推荐做成两行，与首页行为一致。', 'UP 主按钮进入 UP 主空间，收藏按钮弹出收藏夹选择对话框。'] } },
+  { id: 'player', name: '播放器', fn: { phone: playerPhone, tablet: playerTablet, tv: playerTv },
+    comps: ['LinearWavyProgressIndicator', 'Slider (Expressive)', 'Switch', 'SideSheet', 'LoadingIndicator'],
+    rules: { phone: ['横屏全屏：顶部标题和字幕 / 弹幕开关，底部波浪进度条、倍速、画质、选集。', '拖动进度时上方显示预览缩略图（videoshot）。', '暂停时中间按钮是圆角方形，播放时变回圆形。'],
+             tablet: ['菜单从右侧滑出为侧边面板，不遮挡画面主体。', '弹幕设置用 Expressive 滑块，开关就在面板标题旁。'],
+             tv: ['控制层只在按键后出现 3 秒；长按确认键或菜单键打开右侧菜单。', '菜单三栏：分类 / 项目 / 选项，沿用现有 MenuController 的数据结构。'] } },
+  { id: 'search', name: '搜索', fn: { phone: searchPhone, tablet: searchTablet, tv: searchTv },
+    comps: ['ExpandedFullScreenSearchBar', 'DockedSearchBar', 'FilterChip', 'ListItem'],
+    rules: { phone: ['全屏搜索：输入时显示联想，空闲时显示历史和热搜。', '热搜前三名用 primary / tertiary / secondary 三种强调色。'],
+             tablet: ['结果页顶部一排分类：综合、视频、番剧、影视、UP 主。', '综合结果把匹配的 UP 主和影视单独成块，视频 4 列。'],
+             tv: ['左侧屏幕键盘（拼音首字母），中间联想，右侧热搜。', '下方实时出结果，按 ↓ 直接进入结果行。', '支持遥控器语音键。'] } },
+  { id: 'pgc', name: '影视', fn: { phone: pgcPhone, tablet: pgcTablet, tv: pgcTv },
+    comps: ['HorizontalMultiBrowseCarousel', 'ButtonGroup', 'FilterChip', 'Card'],
+    rules: { phone: ['一级入口，包含番剧、国创、电影、电视剧、纪录片、综艺。', '竖海报轮播 + 一周时间表，今天的日期按钮是圆角方形。'],
+             tablet: ['横幅 + 「今天更新」侧栏，下方海报 6 列。', '索引和我的追番放在标题栏右侧。'],
+             tv: ['整页用当前推荐番剧的封面颜色做局部主题。', '时间表、索引、我的追番做成焦点可达的标签。'] } },
+  { id: 'dynamic', name: '动态', fn: { phone: dynPhone, tablet: dynTablet, tv: dynTv },
+    comps: ['ListDetailPaneScaffold', 'Card', 'MaterialShapes (头像)', 'ImageViewer'],
+    rules: { phone: ['顶部关注 UP 主头像行（Cookie 形状），下面是视频、图文混排的动态流。', '点图片进入现有的全屏图片查看器。'],
+             tablet: ['列表-详情：左侧动态流，右侧选中动态的内容和评论。'],
+             tv: ['横向卡片行，只展示视频动态和图文动态的封面，评论在详情里看。'] } },
+  { id: 'me', name: '我的', fn: { phone: mePhone, tablet: meTablet, tv: meTv },
+    comps: ['Card', 'ListItem', 'ListDetailPaneScaffold', 'MaterialShapes (等级徽章)'],
+    rules: { phone: ['头像、等级、关注 / 粉丝 / 硬币；四个彩色入口卡片分别用 primary、tertiary、secondary 容器色。', '「稍后再看」补齐（手机端现在是空操作）。'],
+             tablet: ['列表-详情：左侧入口列表，右侧直接展开历史 / 收藏等内容。'],
+             tv: ['入口卡片可聚焦；账号切换和用户锁放在顶部。'] } },
+  { id: 'settings', name: '设置', fn: { phone: setPhone, tablet: setTablet, tv: setTv },
+    comps: ['ListDetailPaneScaffold', 'ButtonGroup', 'Slider', 'Switch'],
+    rules: { phone: ['八个分类，图标容器用 Cookie 形状并轮换三种强调色。', '合并两端的设置项：手机端从 3 类补到 8 类。'],
+             tablet: ['列表-详情，「外观与主题」包含主题来源、种子色、配色风格、对比度、深色模式。'],
+             tv: ['同样的列表-详情，← 回分类、→ 进详情；额外有界面缩放（以 960dp 为基准）。'] } },
+  { id: 'login', name: '登录', fn: { phone: loginPhone, tablet: loginTablet, tv: loginTv },
+    comps: ['TextField', 'Button', 'MaterialShapes 二维码（现有 m3qrcode）'],
+    rules: { phone: ['默认短信登录，下方提供「在另一台设备上扫码」和导入电视账号。'],
+             tablet: ['默认二维码登录，右侧是步骤说明和改用短信的入口。'],
+             tv: ['与平板同一布局，二维码更大；焦点默认在「改用手机号」。'] } },
+];
+</script>
+<script>
+'use strict';
+const card = (icon, title, body, cls = '') => `<div class="card ${cls}"><h3><span class="ico">${ic(icon)}</span>${title}</h3>${body}</div>`;
+const P = t => `<p>${t}</p>`;
+const UL = items => `<ul class="clean">${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+
+const CONTENT = {
+  principleCards: [
+    card('tv', '一套界面，三种距离', P('布局看窗口宽度，交互看输入方式，字号看观看距离。不再按「手机版 / 电视版」分叉，同一个 Composable 在三块屏幕上各自成立。')),
+    card('palette', '内容决定颜色', P('全局用种子色生成主题，进到某个视频就换成它封面的颜色。颜色丰富但不杂乱，因为所有颜色都来自同一套色调算法。'), 't'),
+    card('movie', '画面优先', P('封面全幅、播放时界面退场、氛围光延伸画面边缘。电视、播放器和刷刷固定深色，深色模式另有「影院纯黑」。'), 's'),
+    card('explore', '动效有物理感，也有节制', P('只在按下、聚焦、选中、加载时出现形状变形和弹簧回弹，参数统一取自 <code>MotionScheme.expressive()</code>。系统「移除动画」开启时全部降级为淡入淡出。')),
+    card('tune', '焦点和触摸同等重要', P('每个可点的东西都能被方向键走到，并且有清楚的焦点样式。焦点路径是设计出来的，不靠默认搜索碰运气。'), 't'),
+    card('info', '功能三端一致', P('手机缺的番剧、分区、稍后再看、字幕，电视缺的评论、动态详情，这次全部补齐。差异只在布局，不在功能。'), 's'),
+  ],
+  axisCards: [
+    card('tablet', '尺寸 · WindowSizeClass', P('决定导航形态、分栏数量、网格列数。用 <code>currentWindowAdaptiveInfo()</code>，统一到一个入口，替换现在混用的两套 API。') + UL(['Compact：底部导航栏，单栏', 'Medium / Expanded：导航轨，双栏', 'Large 及以上：展开的导航轨，更多列'])),
+    card('tune', '输入 · InputMode', P('决定焦点是否可见、手势还是按键。根据最后一次输入事件的来源实时切换。') + UL(['Touch：无焦点框，手势优先', 'DPad：焦点放大 + 描边，按键映射', 'Pointer：悬停预览、右键菜单、滚轮翻页']), 't'),
+    card('tv', '距离 · Distance', P('决定字号、安全边距和最小焦点目标。由 <code>UiModeManager</code> 和 <code>FEATURE_LEANBACK</code> 判断，投屏到电视的平板也可以在设置里手动切换。') + UL(['Near：标准 M3 字号', 'Far：正文 16sp 起，四周留 48 × 27dp 过扫描安全区', '沿用 widthPx / 960 的密度换算，4K 和 1080p 布局一致']), 's'),
+  ],
+  colorRules: [
+    card('palette', '三层主题', UL(['系统壁纸色（Android 12+，可选）', '用户种子色，默认 B 站粉 #FB7299', '内容种子：详情、播放器、刷刷用封面色局部覆盖'])),
+    card('storage', '取色不卡顿', UL(['只取 112px 小图，关闭硬件位图', '在 Dispatchers.Default 计算，按 URL 放进 LruCache', '列表滚动停下后预取下一屏，进详情时已就绪']), 't'),
+    card('explore', '颜色过渡', UL(['<code>animate = true</code>：主题切换时颜色角色逐个补间', '刷刷换条时氛围光用 slowEffects 弹簧过渡', '减少动效时直接切换']), 's'),
+    card('tune', '和谐色', UL(['31 个分区各有标志色，经 <code>Color.harmonize()</code> 向 primary 靠拢', '点赞 / 投币 / 收藏的语义色同样处理', '任何种子色下都不刺眼']), ''),
+  ],
+  shortsCards: [
+    card('dynamic', '数据源', P('在 bili-api 新增 <code>StoryRepository</code>，调用 App 端竖屏流接口（<code>/x/v2/feed/index/story</code>，以当前 aid 为游标，需要 access_key）。接口不可用或未登录时，退回推荐流并优先排竖屏稿件。接口参数需要在实现时抓包核实。')),
+    card('play', '播放器池', P('同时只保留 3 个 ExoPlayer：上一条、当前、下一条，Surface 复用。用 media3 的 <code>DefaultPreloadManager</code> 预加载后两条的前几秒。翻页停稳 150ms 后才开始播放，快速划过时不发请求。'), 't'),
+    card('shorts', '页面结构', P('<code>VerticalPager</code>（<code>beyondViewportPageCount = 1</code>，<code>key = bvid</code>）+ <code>ShortsViewModel</code> 分页加载。播放心跳、历史上报复用 <code>VideoPlayerV3ViewModel</code> 的逻辑。'), 's'),
+    card('add', '入口', UL(['底部导航第二项 / 导航轨第二项', '任意视频卡长按菜单「从这里开始刷」', '竖屏视频在详情页点全屏，直接进入刷刷'])),
+    card('movie', '横屏视频', P('不裁切：居中显示，上下用封面模糊填满；手机横过来自动切成全屏播放，竖回来继续刷。平板和电视上横屏视频直接用横向布局。'), 't'),
+    card('wifi', '流量与默认值', UL(['移动网络默认 720P，只预加载 1 条', 'Wi-Fi 和电视用设置里的默认画质', '弹幕默认关闭，可在操作列打开']), 's'),
+  ],
+  tvCards: [
+    card('tune', '焦点只在需要时出现', P('<code>bvFocus()</code> 读 <code>LocalDeviceProfile.input</code>：触摸时不放大不描边，方向键或键盘一按立刻出现。平板接遥控器、电视接鼠标都能正常用。')),
+    card('history', '焦点记忆与进出规则', P('每个行和网格加 <code>focusRestorer()</code>；一级页面用 <code>rememberSaveable</code> 记住最后焦点。用 <code>focusProperties { onEnter / onExit }</code> 替换现在的 tabMoved 延迟标志和「最后一张卡吞掉右键」的写法。'), 't'),
+    card('explore', '枢轴滚动', P('通过 <code>LocalBringIntoViewSpec</code> 提供一个枢轴：横向行里焦点保持在 15% 处，纵向保持在 30% 处，滚动用 defaultSpatial 弹簧。不需要 tv-foundation 的 TvLazyRow。'), 's'),
+    card('menu', '按键集中处理', P('现在 player 里有 75 处 <code>onPreviewKeyEvent</code>。统一成一张 <code>KeyMap</code>：确认长按（兼容 keycode 763）、菜单、频道 ±、媒体键，各界面只声明动作。')),
+    card('tv', '10 英尺排版', UL(['过扫描安全区 48 × 27dp', '正文 16sp、标题 22sp、展示字 32–40sp（960dp 画布）', '焦点目标不小于 48dp，行间距 ≥ 24dp']), 't'),
+    card('check', '可测试', P('焦点路径写成 Compose UI 测试：<code>performKeyInput { pressKey(Key.DirectionDown) }</code> 后断言焦点节点，防止回归。'), 's'),
+  ],
+  motionRows: () => MOTION.map(m => `<tr><td><code>${m.name}</code></td><td class="num">damping ${m.z} · stiffness ${m.k}</td><td>${m.use}</td></tr>`).join(''),
+  compRows: [
+    ['ShortNavigationBar / WideNavigationRail', '应用外壳', '按 DeviceProfile 自动切换；电视用收起的导航轨，焦点进入时展开为模态'],
+    ['AppBarWithSearch / ExpandedFullScreenSearchBar', '首页顶部、搜索', '手机全屏展开搜索，平板用 Docked 形式'],
+    ['ButtonGroup + ToggleButton', '视频详情操作区、设置里的单选', '点赞、投币、收藏连成一组，选中项变胶囊形'],
+    ['HorizontalFloatingToolbar / VerticalFloatingToolbar', '刷刷操作列、平板播放控制', '悬浮在画面上，不占布局'],
+    ['FloatingActionButtonMenu', '动态页、收藏夹', '发动态、新建收藏夹等次要操作收进一个 FAB'],
+    ['LoadingIndicator / ContainedLoadingIndicator', '首屏、下拉刷新、播放缓冲', '替换线性进度条和旧的 pullRefresh'],
+    ['LinearWavyProgressIndicator', '播放进度、刷刷进度', '播放中显示波浪，暂停时拉直'],
+    ['HorizontalMultiBrowseCarousel / CenteredHeroCarousel', '首页精选、影视海报', '手机多尺寸露边，平板居中大图'],
+    ['MaterialShapes', '头像、等级徽章、设置图标、点赞反馈', '形状本身也是信息：头像用 Cookie，徽章用 Sunny'],
+    ['ListDetailPaneScaffold / SupportingPaneScaffold', '动态、我的、设置 / 视频详情', '大屏双栏，小屏自动退回单栏'],
+    ['Flexible TopAppBar（Large / Medium）', 'UP 主空间、收藏夹、历史', '滚动时标题从大字收为单行'],
+  ].map(([a, b, c]) => `<tr><td><code>${a}</code></td><td>${b}</td><td>${c}</td></tr>`).join(''),
+  routeRows: [
+    ['MainActivity（手机） / MainActivity（电视）', 'MainActivity + Home', '一个 Activity，两个启动类别；电视的用户锁解锁页作为启动时的覆盖层'],
+    ['VideoPlayerActivity / VideoInfoActivity / VideoPlayerV3Activity', 'Video(bvid) · Player(bvid, cid)', '手机和平板详情页内嵌播放器；电视从详情页进全屏 Player'],
+    ['SeasonInfoActivity', 'Season(seasonId | epId)', '番剧详情，选集和季度选择器沿用电视版逻辑'],
+    ['SearchInputActivity / SearchResultActivity', 'Search(query?)', '输入和结果是同一路由的两个状态'],
+    ['DynamicDetailActivity', 'Dynamic(id)', '大屏是列表-详情的右栏'],
+    ['UserSpaceActivity / UpInfoActivity', 'Space(mid)', ''],
+    ['History / Favorite / ToView / FollowingSeason / Follow(ing)User', 'Me.History / Me.Favorite / Me.ToView / Me.Bangumi / Me.Following', '「我的」下的子路由'],
+    ['TagActivity', 'Tag(id)', ''],
+    ['PgcIndexActivity / AnimeTimelineActivity', 'Pgc.Index(type) / Pgc.Timeline', ''],
+    ['LoginActivity ×2', 'Login', '大屏默认扫码，手机默认短信'],
+    ['UserSwitchActivity / UserLockSettingsActivity', 'Accounts / Accounts.Lock', ''],
+    ['SettingsActivity ×2 / LogsActivity / MediaCodecActivity / SpeedTestActivity', 'Settings(category)', '后三个成为设置的子页面'],
+    ['RemoteControllerPanelDemoActivity', '覆盖层', '电视首次播放时显示一次'],
+    ['IntentHandlerActivity / QrTokenResultActivity', '深链 → MainActivity', '<code>bugvideo://qrtoken</code> 进入后弹出导入账号对话框'],
+    ['（新增）', 'Shorts(startBvid?)', '刷刷'],
+  ].map(([a, b, c]) => `<tr><td>${a}</td><td><code>${b}</code></td><td>${c}</td></tr>`).join(''),
+  phases: [
+    ['地基', '2 周', '新建 <code>app:ui</code>；BvTheme + material-kolor；DeviceProfile；bvFocus 与 KeyMap；应用外壳和导航。旧入口暂时保留，设置里可切回。'],
+    ['核心链路', '3 周', '首页、视频详情、播放器（合并 player:mobile 与 player:tv 的控制层，补上手机端字幕和心跳）、搜索。'],
+    ['刷刷', '2 周', 'StoryRepository、VerticalPager + PreloadManager、三端交互和氛围光。'],
+    ['补齐其余界面', '3 周', '影视、分区、动态、我的、设置、登录；补齐两端各自缺失的功能，接入点赞和投币。'],
+    ['收尾', '1–2 周', '删除 <code>app:mobile</code>、<code>app:tv</code>、<code>player:mobile</code>、<code>player:tv</code> 和 androidx.tv 依赖；在手机、折叠屏、平板、电视盒子上回归；建立启动和滑动帧率基线。'],
+  ].map(([t, d, b], i) => `<div class="card" style="grid-template-columns:auto minmax(0,1fr);column-gap:16px"><span class="num" style="grid-row:span 2;width:44px;height:44px;display:grid;place-items:center;background:var(--primary);color:var(--on-primary);font-weight:800;font-size:18px;clip-path:var(--shape-cookie9)">P${i}</span><h3 style="font-size:17px">${t} <span class="pill o">${d}</span></h3><p>${b}</p></div>`).join(''),
+  risks: [
+    ['部分 Expressive API 仍是实验性', 'LoadingIndicator、MaterialShapes 在 1.5.0-alpha19 撤回了转正。全部包在 designsystem 里，业务代码不直接 opt-in，升级时只改一处。'],
+    ['低端电视盒子性能', '模糊依赖 RenderEffect（API 31+）。低于 31 用 Coil 预先模糊的小图；<code>isLowRamDevice</code> 时关闭氛围光和形状变形。'],
+    ['封面取色开销', '只在详情、播放器、刷刷取色；小图 + 后台线程 + 缓存；列表卡片不取色。'],
+    ['Prefs 的 runBlocking 读取', '主题偏好改为 Flow 收集，首帧用上次缓存的种子色，避免启动阻塞。'],
+    ['story 接口需要 App 鉴权', 'Web 登录的账号可能拿不到，回退到推荐流；接口字段在实现时抓包确认。'],
+    ['焦点回归', '旧电视代码有 57 处 FocusRequester、21 处 focusRestorer。迁移时按界面写焦点路径测试，逐页替换。'],
+  ].map(([t, b]) => `<div class="card" style="gap:6px"><h3 style="font-size:16px">${t}</h3><p>${b}</p></div>`).join(''),
+  modules: `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:12px;align-items:center">
+    <div style="display:grid;gap:8px">${['app（空壳）', 'app:mobile', 'app:tv', 'player:mobile', 'player:tv'].map((m, i) => `<div style="padding:10px 14px;border-radius:14px;background:var(--surface-container-high);font:500 13px var(--font-mono);${i ? 'text-decoration:line-through;color:var(--on-surface-variant)' : ''}">${m}</div>`).join('')}</div>
+    <svg viewBox="0 0 24 24" width="28" height="28" style="fill:var(--primary)" aria-hidden="true"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+    <div style="display:grid;gap:8px"><div style="padding:10px 14px;border-radius:14px;background:var(--primary-container);color:var(--on-primary-container);font:500 13px var(--font-mono)">app<br><span style="font-family:var(--font-body);font-size:12px">单 Activity、清单、flavor</span></div><div style="padding:10px 14px;border-radius:14px;background:var(--primary);color:var(--on-primary);font:500 13px var(--font-mono)">app:ui（新）<br><span style="font-family:var(--font-body);font-size:12px">designsystem / adaptive / feature/*</span></div><div style="padding:10px 14px;border-radius:14px;background:var(--tertiary);color:var(--on-tertiary);font:500 13px var(--font-mono)">player:ui（新）<br><span style="font-family:var(--font-body);font-size:12px">统一控制层与菜单</span></div></div>
+  </div>
+  <p class="muted" style="font-size:14px;margin-top:12px">不变：<code>app:shared</code>（ViewModel、Prefs、Room）、<code>player:core</code>、<code>player:shared</code>、<code>bili-api</code>。<code>app:ui</code> 内按 <code>designsystem/</code>（主题、形状、动效、焦点、组件）、<code>adaptive/</code>（DeviceProfile、外壳）、<code>feature/home|shorts|video|player|search|pgc|dynamic|me|settings|login</code> 分包。</p>`,
+};
+</script>
+<script>
+'use strict';
+(function () {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- static content ---------- */
+  $('#principleCards').innerHTML = CONTENT.principleCards.join('');
+  $('#axisCards').innerHTML = CONTENT.axisCards.join('');
+  $('#colorRules').innerHTML = CONTENT.colorRules.join('');
+  $('#shortsCards').innerHTML = CONTENT.shortsCards.join('');
+  $('#tvCards').innerHTML = CONTENT.tvCards.join('');
+  $('#motionRows').innerHTML = CONTENT.motionRows();
+  $('#compRows').innerHTML = CONTENT.compRows;
+  $('#routeRows').innerHTML = CONTENT.routeRows;
+  $('#phases').innerHTML = CONTENT.phases;
+  $('#risks').innerHTML = CONTENT.risks;
+  $('#modules').innerHTML = CONTENT.modules;
+
+  /* ---------- color engine ---------- */
+  const ROLES = ['primary', 'onPrimary', 'primaryContainer', 'onPrimaryContainer', 'secondary', 'onSecondary', 'secondaryContainer', 'onSecondaryContainer', 'tertiary', 'onTertiary', 'tertiaryContainer', 'onTertiaryContainer', 'surface', 'onSurface', 'onSurfaceVariant', 'surfaceContainerLowest', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest', 'outline', 'outlineVariant', 'inverseSurface', 'inverseOnSurface', 'inversePrimary'];
+  const kebab = s => s.replace(/[A-Z]/g, m => '-' + m.toLowerCase());
+  const state = { seed: '#FB7299', style: 'Vibrant', contrast: 0 };
+  let M = null;
+
+  const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const rgb2hex = (r, g, b) => '#' + [r, g, b].map(v => Math.round(Math.max(0, Math.min(255, v))).toString(16).padStart(2, '0')).join('');
+  function rgb2hsl([r, g, b]) { r /= 255; g /= 255; b /= 255; const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2; if (mx !== mn) { const d = mx - mn; s = l > .5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; } return [h, s * 100, l * 100]; }
+  function hsl(h, s, l) { h = ((h % 360) + 360) % 360; s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l); const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return rgb2hex(f(0) * 255, f(8) * 255, f(4) * 255); }
+  function fallbackScheme(seed, dark) {
+    const [h, s0] = rgb2hsl(hex2rgb(seed)), s = Math.min(s0, 75);
+    const t = h + 60, n = Math.min(s, 14);
+    return dark ? {
+      primary: hsl(h, s, 80), onPrimary: hsl(h, s, 20), primaryContainer: hsl(h, s * .7, 30), onPrimaryContainer: hsl(h, s, 90),
+      secondary: hsl(h, s * .3, 80), onSecondary: hsl(h, s * .3, 20), secondaryContainer: hsl(h, s * .25, 30), onSecondaryContainer: hsl(h, s * .4, 90),
+      tertiary: hsl(t, s * .5, 78), onTertiary: hsl(t, s * .5, 20), tertiaryContainer: hsl(t, s * .4, 30), onTertiaryContainer: hsl(t, s * .6, 90),
+      surface: hsl(h, n, 7), onSurface: hsl(h, n, 90), onSurfaceVariant: hsl(h, n, 80),
+      surfaceContainerLowest: hsl(h, n, 5), surfaceContainerLow: hsl(h, n, 10), surfaceContainer: hsl(h, n, 12), surfaceContainerHigh: hsl(h, n, 17), surfaceContainerHighest: hsl(h, n, 22),
+      outline: hsl(h, n, 58), outlineVariant: hsl(h, n, 30), inverseSurface: hsl(h, n, 90), inverseOnSurface: hsl(h, n, 20), inversePrimary: hsl(h, s, 40),
+    } : {
+      primary: hsl(h, s, 40), onPrimary: '#ffffff', primaryContainer: hsl(h, s, 90), onPrimaryContainer: hsl(h, s, 25),
+      secondary: hsl(h, s * .3, 40), onSecondary: '#ffffff', secondaryContainer: hsl(h, s * .4, 90), onSecondaryContainer: hsl(h, s * .3, 25),
+      tertiary: hsl(t, s * .5, 38), onTertiary: '#ffffff', tertiaryContainer: hsl(t, s * .7, 90), onTertiaryContainer: hsl(t, s * .5, 25),
+      surface: hsl(h, n * 2, 98), onSurface: hsl(h, n, 10), onSurfaceVariant: hsl(h, n, 30),
+      surfaceContainerLowest: '#ffffff', surfaceContainerLow: hsl(h, n * 2, 96), surfaceContainer: hsl(h, n * 2, 94), surfaceContainerHigh: hsl(h, n * 2, 92), surfaceContainerHighest: hsl(h, n * 2, 90),
+      outline: hsl(h, n, 48), outlineVariant: hsl(h, n, 80), inverseSurface: hsl(h, n, 20), inverseOnSurface: hsl(h, n, 95), inversePrimary: hsl(h, s, 80),
+    };
+  }
+  const schemeCache = new Map();
+  function schemeFor(seed, dark) {
+    const key = [seed, dark, state.style, state.contrast, !!M].join('|');
+    if (schemeCache.has(key)) return schemeCache.get(key);
+    let out;
+    if (M) {
+      const S = M['Scheme' + state.style] || M.SchemeTonalSpot;
+      const sc = new S(M.Hct.fromInt(M.argbFromHex(seed)), dark, state.contrast);
+      out = {}; ROLES.forEach(r => { out[r] = M.hexFromArgb(M.MaterialDynamicColors[r].getArgb(sc)); });
+    } else out = fallbackScheme(seed, dark);
+    schemeCache.set(key, out); return out;
+  }
+  function applyScheme(el, seed) {
+    const L = schemeFor(seed, false), D = schemeFor(seed, true);
+    ROLES.forEach(r => { const k = kebab(r); el.style.setProperty('--l-' + k, L[r]); el.style.setProperty('--d-' + k, D[r]); });
+  }
+
+  /* cover -> seed (QuantizerCelebi + Score, same pipeline as material-kolor's themeColors) */
+  const seedCache = new Map();
+  function coverSeeds(idx) {
+    const key = idx + '|' + !!M;
+    if (seedCache.has(key)) return seedCache.get(key);
+    const cv = document.createElement('canvas'); cv.width = 96; cv.height = 60;
+    const ctx = cv.getContext('2d', { willReadFrequently: true }); drawCover(ctx, 96, 60, idx);
+    const d = ctx.getImageData(0, 0, 96, 60).data, px = [];
+    for (let i = 0; i < d.length; i += 4) if (d[i + 3] === 255) px.push(((255 << 24) | (d[i] << 16) | (d[i + 1] << 8) | d[i + 2]) >>> 0);
+    let seeds;
+    if (M) {
+      const ranked = M.Score.score(M.QuantizerCelebi.quantize(px, 128), { desired: 4, fallbackColorARGB: 0xff4285f4, filter: true });
+      seeds = ranked.map(a => M.hexFromArgb(a));
+    } else {
+      let best = null, bs = -1; for (const a of px) { const r = (a >> 16) & 255, g = (a >> 8) & 255, b = a & 255; const [, s, l] = rgb2hsl([r, g, b]); const sc = s * (1 - Math.abs(l - 50) / 50); if (sc > bs) { bs = sc; best = rgb2hex(r, g, b); } }
+      seeds = [best || '#888888'];
+    }
+    seedCache.set(key, seeds); return seeds;
+  }
+  function applyScopes(root) {
+    $$('[data-seed-cover]', root).forEach(el => applyScheme(el, coverSeeds(+el.dataset.seedCover)[0]));
+    $$('[data-seed-hex]', root).forEach(el => applyScheme(el, el.dataset.seedHex));
+  }
+  const isDark = () => { const t = document.documentElement.dataset.theme; return t ? t === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; };
+
+  function renderPalette() {
+    const dark = isDark(), S = schemeFor(state.seed, dark);
+    const cell = (role, on, label, big) => `<div style="background:var(--${kebab(role)});color:var(--${kebab(on)});padding:${big ? '14px 12px 22px' : '10px 12px'};border-radius:${big ? 18 : 12}px;display:grid;gap:2px;min-width:0"><b style="font:600 12px var(--font-display)">${label}</b><span class="mono" style="font-size:11px;opacity:.85">${S[role]}</span></div>`;
+    const col = (r, n) => `<div style="display:grid;gap:4px;min-width:0">${cell(r, 'on' + r[0].toUpperCase() + r.slice(1), n, 1)}${cell(r + 'Container', 'on' + r[0].toUpperCase() + r.slice(1) + 'Container', n + ' Container')}</div>`;
+    const surf = ['surfaceContainerLowest', 'surfaceContainerLow', 'surfaceContainer', 'surfaceContainerHigh', 'surfaceContainerHighest'];
+    $('#palette').innerHTML = `<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">${col('primary', 'Primary')}${col('secondary', 'Secondary')}${col('tertiary', 'Tertiary')}</div>
+      <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;margin-top:8px">${surf.map((r, i) => `<div style="background:var(--${kebab(r)});color:var(--on-surface);padding:10px 8px;border-radius:10px;box-shadow:inset 0 0 0 1px var(--outline-variant);min-width:0"><b style="font:600 11px var(--font-display)">${['Lowest', 'Low', 'Container', 'High', 'Highest'][i]}</b><div class="mono" style="font-size:10px;opacity:.8">${S[r]}</div></div>`).join('')}</div>
+      <p class="muted" style="font-size:13px;margin-top:8px">当前显示${dark ? '深色' : '浅色'}方案 · 种子 <span class="mono">${state.seed.toUpperCase()}</span> · PaletteStyle.${state.style}</p>`;
+  }
+  function refresh() {
+    applyScheme(document.documentElement, state.seed);
+    applyScopes(document);
+    renderPalette();
+    $('#engineStatus').textContent = M ? `配色：material-color-utilities 0.3.0 · ${state.style} · 对比度 ${state.contrast}` : '配色库未加载，正在使用近似算法（颜色与真实结果有差异）';
+  }
+
+  /* ---------- controls ---------- */
+  const PRESETS = [['B 站粉', '#FB7299'], ['天蓝', '#23ADE5'], ['琥珀', '#F2A53A'], ['青绿', '#1FA88C'], ['紫罗兰', '#8C6FF7'], ['朱红', '#E5484D']];
+  function renderSeeds() {
+    $('#seeds').innerHTML = PRESETS.map(([n, c]) => `<button type="button" class="swatch" style="--c:${c}" aria-label="${n} ${c}" aria-pressed="${state.seed.toUpperCase() === c}" data-seed="${c}"></button>`).join('')
+      + `<button type="button" class="swatch cover" style="background-image:url(${cover(0)})" aria-label="跟随封面：从极光封面取色" aria-pressed="${state.fromCover === 0}" data-cover="0"></button>`;
+  }
+  $('#seeds').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.cover != null) { state.seed = coverSeeds(+b.dataset.cover)[0]; state.fromCover = +b.dataset.cover; }
+    else { state.seed = b.dataset.seed; state.fromCover = null; }
+    renderSeeds(); refresh();
+  });
+  function bindSeg(sel, attr, apply) {
+    $(sel).addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      $$('button', $(sel)).forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      apply(b.dataset[attr]);
+    });
+  }
+  bindSeg('#modeSeg', 'mode', m => { if (m === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = m; renderPalette(); });
+  bindSeg('#styleSeg', 'style', s => { state.style = s; refresh(); renderCoverResult(); });
+  bindSeg('#contrastSeg', 'contrast', c => { state.contrast = +c; refresh(); renderCoverResult(); });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', renderPalette);
+
+  /* cover extraction demo */
+  const PICKS = [0, 1, 2, 3, 6, 8];
+  let picked = 6;
+  $('#coverPick').innerHTML = PICKS.map(c => `<button type="button" class="swatch cover" style="width:100%;height:auto;aspect-ratio:3/4;border-radius:14px;background-image:url(${cover(c, 'S')})" aria-label="封面 ${c + 1}" aria-pressed="${c === picked}" data-c="${c}"></button>`).join('');
+  $('#coverPick').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; picked = +b.dataset.c; $$('button', $('#coverPick')).forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderCoverResult(); });
+  function renderCoverResult() {
+    const seeds = coverSeeds(picked), v = VIDS.find(x => x.c === picked) || { t: PGCS.find(p => p.c === picked)?.t || '示例视频', up: '示例 UP 主' };
+    $('#coverResult').innerHTML = `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="muted" style="font-size:13px">Score 排序后的候选种子</span>${seeds.map((s, i) => `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px 4px 4px;border-radius:999px;background:var(--surface-container-high);font:500 12px var(--font-mono)"><i style="width:22px;height:22px;border-radius:${i ? '50%' : '30%'};background:${s};display:inline-block"></i>${s.toUpperCase()}</span>`).join('')}</div>
+      <div class="scr scope" data-seed-hex="${seeds[0]}" style="border-radius:28px;padding:16px;display:grid;grid-template-columns:120px minmax(0,1fr);gap:16px;align-items:center;font-size:14px">
+        <div class="m-cv" style="aspect-ratio:3/4">${img(picked, 'S')}</div>
+        <div class="m-col" style="gap:10px;min-width:0"><span class="m-eyebrow">局部主题预览</span><b class="m-t2" style="font-size:16px;line-height:1.4">${v.t}</b>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="m-btn fill" style="height:36px">${ic('play')}播放</span><span class="m-btn t" style="height:36px">${ic('add')}追番</span></div>
+          <div class="m-bg" style="max-width:300px">${ACTIONS.map(([i, l, on]) => `<div class="${on ? 'on' : ''}">${ic(i)}${l}</div>`).join('')}</div></div></div>
+      <button type="button" class="m-btn" id="useCoverSeed" style="justify-self:start;border:0;cursor:pointer;background:var(--secondary-container);color:var(--on-secondary-container);font-family:var(--font-body)">把 ${seeds[0].toUpperCase()} 设为全局种子色</button>`;
+    applyScopes($('#coverResult'));
+    $('#useCoverSeed').onclick = () => { state.seed = seeds[0]; state.fromCover = picked; renderSeeds(); refresh(); };
+  }
+
+  /* ---------- device frames ---------- */
+  const PAD = { phone: 10, phoneL: 10, tablet: 16, tv: 8 };
+  const ro = new ResizeObserver(es => es.forEach(e => { const f = e.target; if (f._dims && f.clientWidth !== f._w) fitFrame(f); }));
+  function fitFrame(fit) {
+    const [fw, fh] = fit._dims, w = fit.clientWidth, maxh = +fit.dataset.maxh || Infinity;
+    fit._w = w; const s = Math.min(w / fw, maxh / fh);
+    const fr = fit.firstElementChild; fr.style.transform = `scale(${s})`; fr.style.left = ((w - fw * s) / 2) + 'px';
+    fit.style.height = (fh * s) + 'px';
+  }
+  function mount(fit, id, dev) {
+    const sc = SCREENS.find(s => s.id === id);
+    const key = id === 'player' && dev === 'phone' ? 'phoneL' : dev;
+    const [w, h] = DEV[key], pad = PAD[key];
+    const cinema = dev === 'tv' || id === 'player' || id === 'shorts';
+    const frameCls = dev === 'phone' ? 'phone' : dev;
+    fit.innerHTML = `<div class="frame ${frameCls}"><div class="viewport"><div class="scr ${dev}${cinema ? ' cinema' : ''}" data-screen="${id}" style="width:${w}px;height:${h}px"${dev === 'tv' ? ' tabindex="0" role="application" aria-label="电视界面原型：点击后用方向键移动焦点"' : ''}>${sc.fn[dev]()}</div></div></div>`;
+    fit._dims = [w + pad * 2, h + pad * 2]; fit._w = -1;
+    fitFrame(fit); ro.observe(fit);
+    applyScopes(fit);
+    const scr = $('.scr', fit);
+    if (dev === 'tv') initTv(scr);
+    if (id === 'shorts' && dev !== 'tv') initFeed(scr);
+  }
+
+  /* ---------- TV focus engine: 2D focus search like Compose's FocusOwner ---------- */
+  function initTv(scr) {
+    const list = () => $$('[data-f]', scr);
+    let cur = $('[data-start]', scr) || list()[0];
+    if (cur) cur.classList.add('fx');
+    const rail = $('.m-tvrail', scr);
+    function move(n) {
+      if (!n || n === cur) return;
+      cur.classList.remove('fx'); cur = n; n.classList.add('fx');
+      if (rail) rail.classList.toggle('open', rail.contains(n));
+      const row = n.closest('.tvrow');
+      if (row) row.scrollTo({ left: Math.max(0, n.offsetLeft - row.clientWidth * .15), behavior: reduced ? 'auto' : 'smooth' });
+    }
+    scr.addEventListener('keydown', e => {
+      const dir = { ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd' }[e.key];
+      if (!dir && e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      if (!dir) { cur.animate([{ transform: getComputedStyle(cur).transform }, { transform: 'scale(.94)' }, { transform: getComputedStyle(cur).transform }], { duration: 260 }); return; }
+      if (scr.dataset.screen === 'shorts' && cur.hasAttribute('data-start') && (dir === 'u' || dir === 'd')) { swapShort(scr, dir === 'd' ? 1 : -1); return; }
+      move(nearest(cur, dir, list()));
+    });
+    scr.addEventListener('click', e => { const t = e.target.closest('[data-f]'); scr.focus({ preventScroll: true }); if (t) move(t); });
+  }
+  function nearest(cur, dir, list) {
+    const a = cur.getBoundingClientRect(), horiz = dir === 'l' || dir === 'r', sign = dir === 'r' || dir === 'd' ? 1 : -1;
+    let best = null, bestScore = Infinity;
+    for (const el of list) {
+      if (el === cur || el.contains(cur) || cur.contains(el)) continue;
+      const b = el.getBoundingClientRect();
+      const main = horiz ? (sign > 0 ? b.left - a.right : a.left - b.right) : (sign > 0 ? b.top - a.bottom : a.top - b.bottom);
+      const center = horiz ? (sign * ((b.left + b.right) - (a.left + a.right)) / 2) : (sign * ((b.top + b.bottom) - (a.top + a.bottom)) / 2);
+      if (center <= 2) continue;
+      const overlap = horiz ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      const cross = horiz ? Math.abs((b.top + b.bottom) - (a.top + a.bottom)) / 2 : Math.abs((b.left + b.right) - (a.left + a.right)) / 2;
+      const score = (overlap > 0 ? 0 : 1e5) + Math.max(main, 0) * 13 + cross * cross / 40;
+      if (score < bestScore) { bestScore = score; best = el; }
+    }
+    return best;
+  }
+  let shortIdx = 0;
+  function swapShort(scr, delta) {
+    shortIdx = (shortIdx + delta + SHORTS.length) % SHORTS.length;
+    const s = SHORTS[shortIdx];
+    $$('[data-seed-cover]', scr).forEach(el => { el.dataset.seedCover = s.c; });
+    $$('.m-ambient img, [data-start] > img', scr).forEach(im => { im.src = cover(s.c, 'P'); });
+    const info = $$('[data-seed-cover]', scr)[1];
+    if (info) { const t = info.children[1]; if (t) t.textContent = s.t; const u = $('b', info); if (u) u.textContent = s.up; }
+    applyScopes(scr);
+    const v = $('[data-start]', scr); v.animate([{ transform: `translateY(${delta * 40}px)`, opacity: .3 }, { transform: 'none', opacity: 1 }], { duration: reduced ? 1 : 420, easing: 'cubic-bezier(.2,0,0,1)' });
+  }
+
+  /* ---------- phone feed: double-tap like ---------- */
+  function initFeed(scr) {
+    scr.addEventListener('dblclick', e => {
+      const slide = e.target.closest('.m-slide'); if (!slide) return;
+      const r = slide.getBoundingClientRect(), k = r.width / slide.offsetWidth;
+      const h = document.createElement('span'); h.className = 'm-heart';
+      h.style.left = ((e.clientX - r.left) / k - 48) + 'px'; h.style.top = ((e.clientY - r.top) / k - 48) + 'px';
+      h.innerHTML = `<svg viewBox="0 0 24 24"><path d="${ICONS.heart}"/></svg>`;
+      slide.appendChild(h); setTimeout(() => h.remove(), 900);
+      const b = slide.querySelector('.m-acts > div:nth-child(2) .b'); if (b) b.classList.add('on');
+    });
+  }
+
+  /* ---------- screens section ---------- */
+  const DEV_NAMES = { phone: ['phone', '手机 · Compact'], tablet: ['tablet', '平板 · Expanded'], tv: ['tv', '电视 · Far + 方向键'] };
+  let curScreen = 'home', curDev = 'tv';
+  $('#screenSeg').innerHTML = SCREENS.map(s => `<button type="button" data-id="${s.id}" aria-pressed="${s.id === curScreen}">${s.name}</button>`).join('');
+  function renderScreen() {
+    const s = SCREENS.find(x => x.id === curScreen), stage = $('#screenStage');
+    stage.dataset.maxh = curDev === 'phone' ? 680 : '';
+    mount(stage, curScreen, curDev);
+    $('#screenCap').innerHTML = `${s.name} · <b>${DEV_NAMES[curDev][1]}</b>${curDev === 'tv' ? ' · 点击画面后用方向键' : ''}`;
+    $('#screenRules').innerHTML = `<div class="card" style="gap:12px"><span class="eyebrow">用到的组件</span><div style="display:flex;flex-wrap:wrap;gap:6px">${s.comps.map(c => `<span class="pill o">${c}</span>`).join('')}</div></div>`
+      + ['phone', 'tablet', 'tv'].map(d => `<div class="card${d === curDev ? ' cur' : ''}"><h3 style="font-size:16px"><span class="ico">${ic(DEV_NAMES[d][0])}</span>${DEV_NAMES[d][1]}</h3>${UL(s.rules[d])}</div>`).join('');
+  }
+  $('#screenSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; curScreen = b.dataset.id; $$('button', $('#screenSeg')).forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderScreen(); });
+  bindSeg('#deviceSeg', 'dev', d => { curDev = d; renderScreen(); });
+
+  /* ---------- shapes + loader + focus demo ---------- */
+  const SHAPE_USE = [['Cookie9Sided', '头像'], ['Sunny', '等级徽章'], ['Clover4Leaf', '设置图标容器'], ['SoftBurst', '点赞反馈'], ['Pentagon', '加载'], ['Pill', '选中按钮'], ['Flower', '空状态插图'], ['Gem', '大会员标识']];
+  const shapeFill = ['primary-container', 'tertiary-container', 'secondary-container', 'primary'];
+  $('#shapes').innerHTML = SHAPE_USE.map(([n, u], i) => `<div style="display:grid;gap:6px;justify-items:center;padding:14px 8px;border-radius:20px;background:var(--surface-container);min-width:0"><svg viewBox="-52 -52 104 104" width="64" height="64" aria-hidden="true"><path d="${radiiToPath(shapeRadii(n), 50, -Math.PI / 2)}" fill="var(--${shapeFill[i % 4]})"/></svg><b style="font:600 12px var(--font-display);text-align:center;overflow-wrap:anywhere">${n}</b><span class="muted" style="font-size:12px">${u}</span></div>`).join('');
+  const LOADER = ['SoftBurst', 'Cookie9Sided', 'Pentagon', 'Pill', 'Sunny', 'Cookie4Sided', 'Circle'].map(shapeRadii);
+  const path = $('#loader path');
+  if (reduced) path.setAttribute('d', radiiToPath(LOADER[1], 46));
+  else {
+    const spring = t => 1 - Math.exp(-6 * t) * Math.cos(9 * t);
+    const t0 = performance.now(), step = 650;
+    const tick = now => {
+      const el = Math.max(0, now - t0), i = Math.floor(el / step) % LOADER.length, p = Math.min(1, (el % step) / step * 1.6);
+      const A = LOADER[i], B = LOADER[(i + 1) % LOADER.length], e = spring(p);
+      path.setAttribute('d', radiiToPath(A.map((v, k) => v + (B[k] - v) * e), 46, el * .004 + i * .9));
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+  $('#focusDemo').innerHTML = [1, 2, 3, 6].map(i => vcard(VIDS[i], { f: 1, noMeta: true })).join('');
+  $$('#focusDemo .m-vc').forEach(c => {
+    c.tabIndex = 0;
+    const on = () => c.classList.add('fx'), off = () => c.classList.remove('fx');
+    c.addEventListener('mouseenter', on); c.addEventListener('mouseleave', () => { if (document.activeElement !== c) off(); });
+    c.addEventListener('focus', on); c.addEventListener('blur', off);
+  });
+
+  /* ---------- toc highlight ---------- */
+  const links = $$('.toc nav a');
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id)); }), { rootMargin: '-40% 0px -55% 0px' });
+  $$('section.sec').forEach(s => io.observe(s));
+
+  /* ---------- boot ---------- */
+  renderSeeds();
+  refresh();
+  $$('.fit[data-device]').forEach(f => mount(f, f.dataset.screen, f.dataset.device));
+  mount($('#shortsPhone'), 'shorts', 'phone');
+  renderScreen();
+  renderCoverResult();
+  import('https://cdn.jsdelivr.net/npm/@material/material-color-utilities@0.3.0/+esm')
+    .then(mod => { M = mod; schemeCache.clear(); seedCache.clear(); if (state.fromCover != null) state.seed = coverSeeds(state.fromCover)[0]; refresh(); renderCoverResult(); })
+    .catch(() => { $('#engineStatus').textContent = '配色库加载失败，正在使用近似算法（颜色与真实结果有差异）'; });
+})();
+</script>
+
+</body>
+</html>

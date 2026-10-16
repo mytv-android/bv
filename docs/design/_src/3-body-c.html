@@ -1,0 +1,136 @@
+
+<section class="sec" id="shorts">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">07 · 新入口「刷刷」</span>
+      <h2>一直往下刷，刷到的每条都带着自己的颜色</h2>
+      <p class="lede">「刷刷」是新的一级入口：全屏竖向翻页，一次一条，自动播放。每条视频的操作按钮、进度条和背后的氛围光都用它封面的颜色重新生成。左边的手机画面可以直接滚动。</p>
+    </div>
+    <div class="split" style="grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr);margin-bottom:40px">
+      <figure class="dv"><div class="fit" id="shortsPhone" data-maxh="700"></div><figcaption>手机 · <b>上下滑动试试</b></figcaption></figure>
+      <div style="display:grid;gap:20px;min-width:0;align-content:start">
+        <figure class="dv"><div class="fit" data-device="tv" data-screen="shorts"></div><figcaption>电视 · <b>↑↓ 换条，← → 快退快进，确认键暂停</b></figcaption></figure>
+        <div class="tbl-wrap">
+          <table style="min-width:560px">
+            <thead><tr><th>操作</th><th>手机 / 平板</th><th>电视遥控器</th><th>键盘鼠标</th></tr></thead>
+            <tbody>
+              <tr><td>下一条 / 上一条</td><td>上滑 / 下滑</td><td>↓ ↑，频道 − / +</td><td>↓ ↑，滚轮</td></tr>
+              <tr><td>暂停 / 继续</td><td>单击画面</td><td>确认键</td><td>空格</td></tr>
+              <tr><td>点赞</td><td>双击画面（爱心形状弹出）</td><td>长按确认键</td><td><kbd>L</kbd></td></tr>
+              <tr><td>倍速</td><td>长按 2×，松手恢复</td><td>按住 → 键</td><td>按住 → 键</td></tr>
+              <tr><td>快进 / 快退</td><td>拖动波浪进度条</td><td>← → 每次 5 秒，连按加速</td><td>← →</td></tr>
+              <tr><td>评论</td><td>底部抽屉（平板为右侧栏）</td><td>菜单键，右侧面板</td><td><kbd>C</kbd></td></tr>
+              <tr><td>去 UP 主页 / 完整详情</td><td>左滑 / 点标题</td><td>→ 移到操作栏选择</td><td>点击</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="grid-3" id="shortsCards"></div>
+  </div>
+</section>
+
+<section class="sec band" id="tv">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">08 · 电视端去掉 androidx.tv</span>
+      <h2>焦点系统自己做，组件全部回到 material3</h2>
+      <p class="lede">现在只用到 <code>tv-material</code>，<code>tv-foundation</code> 已经零引用，列表本来就是普通的 <code>LazyRow</code> / <code>LazyColumn</code>。替换的核心是一个统一的焦点修饰符和一套焦点进出规则；组件本身大多是同名机械替换。</p>
+    </div>
+    <div class="split" style="margin-bottom:36px">
+      <div class="tbl-wrap">
+        <table style="min-width:520px">
+          <thead><tr><th>androidx.tv.material3</th><th>import 次数</th><th>替换为</th></tr></thead>
+          <tbody>
+            <tr><td><code>Text</code> <code>Icon</code> <code>MaterialTheme</code> 等</td><td class="num">157</td><td>material3 同名 API，改 import 即可</td></tr>
+            <tr><td><code>Surface</code> <code>ClickableSurfaceDefaults</code> <code>Border</code> <code>Glow</code></td><td class="num">53</td><td><code>BvSurface</code> = material3 <code>Surface</code> + <code>Modifier.bvFocus()</code></td></tr>
+            <tr><td><code>Button</code> <code>OutlinedButton</code> <code>IconButton</code></td><td class="num">29</td><td>material3 按钮 + <code>bvFocus()</code>，电视用大尺寸按钮</td></tr>
+            <tr><td><code>TabRow</code> <code>Tab</code></td><td class="num">11</td><td><code>PrimaryTabRow</code>，聚焦即选中</td></tr>
+            <tr><td><code>ListItem</code> <code>DenseListItem</code></td><td class="num">11</td><td>material3 <code>ListItem</code> + <code>bvFocus()</code></td></tr>
+            <tr><td><code>NavigationDrawer</code> 系列</td><td class="num">8</td><td><code>WideNavigationRail</code>：收起 ↔ 模态展开</td></tr>
+            <tr><td><code>Typography</code> <code>darkColorScheme</code></td><td class="num">6</td><td>删除，由 <code>BvTheme</code> 统一提供</td></tr>
+            <tr><td><code>Switch</code> <code>Checkbox</code> <code>RadioButton</code> <code>Chip</code> <code>Card</code></td><td class="num">15</td><td>material3 同名组件 + <code>bvFocus()</code></td></tr>
+            <tr><td><code>CarouselDefaults.IndicatorRow</code></td><td class="num">1</td><td>自绘指示器（现有轮播本来就是自定义的）</td></tr>
+          </tbody>
+        </table>
+      </div>
+<pre class="code"><span class="c">// designsystem/focus/BvFocus.kt（示意；正式实现用 Modifier.Node）</span>
+<span class="k">fun</span> Modifier.bvFocus(
+    shape: CornerBasedShape = RoundedCornerShape(<span class="s">16</span>.dp),
+    focusedShape: CornerBasedShape = RoundedCornerShape(<span class="s">22</span>.dp),
+    scale: Float = <span class="s">1.08f</span>,
+) = composed {
+    <span class="k">val</span> profile = LocalDeviceProfile.current
+    <span class="k">var</span> focused <span class="k">by</span> remember { mutableStateOf(<span class="k">false</span>) }
+    <span class="c">// 触摸模式下不放大不描边，只有方向键 / 键盘导航时才显示</span>
+    <span class="k">val</span> visible = focused &amp;&amp; profile.input != InputMode.Touch
+    <span class="k">val</span> motion = MaterialTheme.motionScheme
+    <span class="k">val</span> s <span class="k">by</span> animateFloatAsState(<span class="k">if</span> (visible) scale <span class="k">else</span> <span class="s">1f</span>, motion.fastSpatialSpec())
+    <span class="k">val</span> morph <span class="k">by</span> animateFloatAsState(<span class="k">if</span> (visible) <span class="s">1f</span> <span class="k">else</span> <span class="s">0f</span>, motion.defaultSpatialSpec())
+    <span class="k">val</span> ring = MaterialTheme.colorScheme.primary
+    <span class="k">this</span>
+        .onFocusChanged { focused = it.isFocused }
+        .graphicsLayer { scaleX = s; scaleY = s }
+        .focusRing(visible, ring, lerp(shape, focusedShape, morph))
+        .focusable()
+}
+
+<span class="c">// 行和网格：记住上次焦点，枢轴滚动</span>
+LazyRow(
+    modifier = Modifier.focusRestorer().focusGroup(),
+    flingBehavior = ...,
+) { ... }
+CompositionLocalProvider(LocalBringIntoViewSpec provides PivotSpec(<span class="s">0.15f</span>)) { ... }</pre>
+    </div>
+    <div class="grid-3" id="tvCards"></div>
+  </div>
+</section>
+
+<section class="sec" id="arch">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">09 · 工程落地</span>
+      <h2>四个界面模块合成两个，35 个 Activity 合成一个</h2>
+      <p class="lede"><code>app/ui</code> 目录已经存在但没有加入 <code>settings.gradle.kts</code>，正好用来放合并后的界面层。ViewModel、Prefs、Room 留在 <code>app/shared</code> 不动。</p>
+    </div>
+    <div class="split" style="margin-bottom:40px">
+      <div style="display:grid;gap:14px;min-width:0"><h3>模块调整</h3><div id="modules"></div></div>
+      <div style="display:grid;gap:14px;min-width:0">
+        <h3>依赖变化</h3>
+        <div class="tbl-wrap">
+          <table style="min-width:460px">
+            <thead><tr><th></th><th>依赖</th><th>原因</th></tr></thead>
+            <tbody>
+              <tr><td><span class="pill p">新增</span></td><td><code>com.materialkolor:material-kolor:5.0.x</code></td><td>种子色生成配色、封面取色、harmonize</td></tr>
+              <tr><td><span class="pill p">新增</span></td><td><code>androidx.navigation3</code> + <code>adaptive-navigation3</code></td><td>单 Activity 导航，大屏列表-详情场景</td></tr>
+              <tr><td><span class="pill">升级</span></td><td>material3 <span class="mono">1.5.0-alpha03 → 1.5.0-beta01</span></td><td>ButtonGroup、FloatingToolbar、SplitButton、FAB Menu、Flexible TopAppBar 已转正</td></tr>
+              <tr><td><span class="pill">升级</span></td><td>Compose 改用 BOM 统一版本；adaptive <span class="mono">1.1 → 1.2</span></td><td>与 material3 1.5 对齐</td></tr>
+              <tr><td><span class="pill">升级</span></td><td>media3 <span class="mono">1.8.0-rc01 → 1.8 正式版</span></td><td>刷刷用 <code>DefaultPreloadManager</code></td></tr>
+              <tr><td><span class="pill o">移除</span></td><td><code>androidx.tv:tv-material</code>、<code>tv-foundation</code></td><td>用户要求；焦点系统自建</td></tr>
+              <tr><td><span class="pill o">移除</span></td><td>accompanist <code>systemuicontroller</code>、M2 <code>pullRefresh</code></td><td>换成 <code>enableEdgeToEdge()</code> 和 <code>PullToRefreshBox</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <h3 style="margin-bottom:14px">路由迁移</h3>
+    <div class="tbl-wrap" style="margin-bottom:40px">
+      <table>
+        <thead><tr><th>现在的 Activity</th><th>新路由</th><th>说明</th></tr></thead>
+        <tbody id="routeRows"></tbody>
+      </table>
+    </div>
+    <div class="split">
+      <div style="display:grid;gap:14px;min-width:0"><h3>实施顺序 <span class="muted" style="font-size:14px;font-weight:400">（工期为单人粗估）</span></h3><div id="phases" style="display:grid;gap:12px"></div></div>
+      <div style="display:grid;gap:14px;min-width:0"><h3>风险与对策</h3><div id="risks" style="display:grid;gap:12px"></div></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="band">
+  <div class="wrap" style="padding-block:36px;display:grid;gap:8px">
+    <p class="muted" style="font-size:14px">本页颜色由 <code>@material/material-color-utilities</code> 在浏览器中实时计算；App 里由 material-kolor 计算，两者算法同源，但 SPEC_2025 与本页使用的 2021 规范在个别色调上会有差别。封面图是脚本生成的示意画面，视频标题和数据均为示例。</p>
+    <p class="muted" style="font-size:14px">盘点依据：<code>app/mobile</code>、<code>app/tv</code>、<code>app/shared</code>、<code>player/*</code>、<code>bili-api</code> 当前 develop 分支代码。</p>
+  </div>
+</footer>

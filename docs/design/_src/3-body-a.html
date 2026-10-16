@@ -1,0 +1,165 @@
+
+<div class="toc">
+  <div class="wrap">
+    <div class="brand"><i aria-hidden="true"></i>BV Expressive</div>
+    <nav aria-label="章节">
+      <a href="#now">现状</a>
+      <a href="#principles">原则</a>
+      <a href="#adaptive">自适应</a>
+      <a href="#color">色彩</a>
+      <a href="#expressive">组件与动效</a>
+      <a href="#screens">界面</a>
+      <a href="#shorts">刷刷</a>
+      <a href="#tv">电视焦点</a>
+      <a href="#arch">工程落地</a>
+    </nav>
+  </div>
+</div>
+
+<header class="hero cinema" id="top">
+  <div class="glow" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="hero-top">
+      <div style="display:grid;gap:18px;min-width:0">
+        <span class="eyebrow">重设计方案 · Material 3 Expressive · 2026.10</span>
+        <h1>一个入口，<br><em>三块屏幕</em>，<br>一间影院。</h1>
+        <p class="sub">把现在分开的手机版和电视版合成一个自适应应用：按窗口尺寸决定布局，按输入方式决定交互，按观看距离决定字号。颜色由 material-kolor 从种子色和视频封面实时生成，另外新增一个可以一直往下刷的竖屏入口「刷刷」。</p>
+      </div>
+      <div class="ctrl" aria-label="主题演示">
+        <div class="ctrl-row"><span class="ctrl-label">种子色</span><div class="ctrl-row" id="seeds" style="gap:8px"></div></div>
+        <div class="ctrl-row"><span class="ctrl-label">页面</span>
+          <div class="seg" id="modeSeg" role="group" aria-label="页面明暗">
+            <button type="button" data-mode="auto" aria-pressed="true">跟随系统</button><button type="button" data-mode="light" aria-pressed="false">浅色</button><button type="button" data-mode="dark" aria-pressed="false">深色</button>
+          </div>
+        </div>
+        <p class="status-chip" id="engineStatus">配色引擎加载中…</p>
+      </div>
+    </div>
+    <div class="stage" id="heroStage">
+      <figure class="dv dv-tv"><div class="fit" data-device="tv" data-screen="home"></div><div class="tv-stand" aria-hidden="true"></div><figcaption>电视 <b>960 × 540 dp · 遥控器</b></figcaption></figure>
+      <figure class="dv"><div class="fit" data-device="tablet" data-screen="home"></div><figcaption>平板 <b>1200 × 800 dp</b></figcaption></figure>
+      <figure class="dv"><div class="fit" data-device="phone" data-screen="home"></div><figcaption>手机 <b>360 dp</b></figcaption></figure>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="sec" id="now">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">01 · 现状</span>
+      <h2>两套界面、两个入口，功能各缺一半</h2>
+      <p class="lede">数据层已经共享（ViewModel、Prefs、Room、播放器实体都在 <code>app/shared</code> 和 <code>player/shared</code>），重复的只是界面层。手机版和电视版各自实现了一部分功能，用户换一块屏幕就少一半东西。</p>
+    </div>
+    <div class="grid-4" style="margin-bottom:36px">
+      <div class="stat"><b>2</b><span>个启动 Activity：<code>LAUNCHER</code> 和 <code>LEANBACK_LAUNCHER</code>，没有任何运行时设备判断</span></div>
+      <div class="stat"><b>35</b><span>个 Activity（手机 12 + 电视 23），彼此用 Intent 跳转，没有统一导航</span></div>
+      <div class="stat"><b>83</b><span>个文件引用 <code>androidx.tv.material3</code>，共 296 处 import；<code>tv-foundation</code> 已经没人用</span></div>
+      <div class="stat"><b>0</b><span>个竖屏 / 连续刷视频入口，bili-api 里也还没有 story 接口</span></div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>功能</th><th>手机版</th><th>电视版</th><th>重设计后（三端一致）</th></tr></thead>
+        <tbody>
+          <tr><td>推荐 / 热门</td><td class="yes">有</td><td class="yes">有</td><td>首页标签页，平板和电视加大图轮播</td></tr>
+          <tr><td>番剧 · 国创 · 电影 · 电视剧 · 纪录片 · 综艺</td><td class="no">无</td><td class="yes">有</td><td>新的一级入口「影视」，含时间表、索引、追番</td></tr>
+          <tr><td>31 个 UGC 分区</td><td class="no">占位页</td><td class="yes">有</td><td>首页「分区」标签，分区色经过 harmonize 处理</td></tr>
+          <tr><td>动态列表 / 动态详情 + 评论</td><td class="yes">有 / 有</td><td class="yes">有 / <span class="no">无</span></td><td>大屏用列表-详情双栏</td></tr>
+          <tr><td>视频评论</td><td class="yes">有</td><td class="no">无</td><td>手机用底部抽屉，平板侧栏，电视右侧面板</td></tr>
+          <tr><td>搜索结果分类</td><td>只有视频</td><td>视频 / 番剧 / 影视 / UP 主</td><td>四类全做，电视加屏幕键盘</td></tr>
+          <tr><td>稍后再看 · Tag 页 · UP 主关注</td><td class="no">无（按钮无效）</td><td class="yes">有</td><td>收进「我的」和详情页操作组</td></tr>
+          <tr><td>字幕显示 · 播放心跳 · 画面比例</td><td class="no">无</td><td class="yes">有</td><td>统一播放器控制层，三端共用菜单数据</td></tr>
+          <tr><td>点赞 / 投币</td><td class="no">无</td><td class="no">无</td><td>接口已有（<code>sendVideoLike</code> / <code>sendVideoCoin</code>），接入操作组</td></tr>
+          <tr><td>用户锁 · 测速 · 解码器信息 · 日志</td><td class="no">无</td><td class="yes">有</td><td>设置里统一提供</td></tr>
+          <tr><td>竖屏连续刷</td><td class="no">无</td><td class="no">无</td><td>新增一级入口「刷刷」</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="sec band" id="principles">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">02 · 设计原则</span>
+      <h2>五条原则，后面的每个决定都能追溯到这里</h2>
+    </div>
+    <div class="grid-3" id="principleCards"></div>
+  </div>
+</section>
+
+<section class="sec" id="adaptive">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="eyebrow">03 · 自适应框架</span>
+      <h2>三个维度决定一块屏幕长什么样</h2>
+      <p class="lede">电视在 1080p、xhdpi 下的逻辑宽度只有 960dp，单看 <code>WindowSizeClass</code> 会被当成横屏平板。所以除了尺寸，还要单独判断输入方式和观看距离。三个维度互相独立，组合起来覆盖手机、折叠屏、平板、带键盘的平板、电视和投屏。</p>
+    </div>
+    <div class="grid-3" style="margin-bottom:36px" id="axisCards"></div>
+    <div class="tbl-wrap" style="margin-bottom:36px">
+      <table>
+        <thead><tr><th>宽度级别</th><th>典型设备</th><th>导航</th><th>首页内容</th><th>视频详情</th><th>播放</th></tr></thead>
+        <tbody>
+          <tr><td><b>Compact</b><br><span class="mono muted">&lt; 600dp</span></td><td>手机竖屏</td><td><code>ShortNavigationBar</code> 底部 5 项</td><td>2 列网格</td><td>单栏：播放器 + 简介/评论标签</td><td>竖屏内嵌，横屏全屏</td></tr>
+          <tr><td><b>Medium</b><br><span class="mono muted">600–839dp</span></td><td>折叠屏展开、平板竖屏</td><td><code>WideNavigationRail</code> 收起</td><td>3 列</td><td>单栏，评论用底部抽屉</td><td>同上</td></tr>
+          <tr><td><b>Expanded</b><br><span class="mono muted">840–1199dp</span></td><td>平板横屏</td><td>Rail 收起 + 搜索 FAB</td><td>居中大图轮播 + 4 列</td><td>双栏 <code>SupportingPaneScaffold</code></td><td>大尺寸内嵌，可切全屏</td></tr>
+          <tr><td><b>Large / XL</b><br><span class="mono muted">≥ 1200dp</span></td><td>大平板、桌面窗口、ChromeOS</td><td>Rail 展开（220dp）</td><td>5–6 列</td><td>双栏，右栏同时放评论和相关</td><td>同上，支持鼠标悬停预览</td></tr>
+          <tr><td><b>Far（电视）</b><br><span class="mono muted">任意宽度，常见 960dp</span></td><td>电视、盒子、投影</td><td>电视导航轨：收起成图标，获得焦点时展开</td><td>全幅背景 + 横向内容行</td><td>沉浸式背景，选集和相关做成行</td><td>全屏，遥控器控制层 + 右侧菜单</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="split">
+      <div style="display:grid;gap:12px;min-width:0">
+        <h3>统一入口：一个 Activity，两个启动类别</h3>
+        <p class="muted" style="font-size:15px">手机桌面和电视桌面都启动同一个 <code>MainActivity</code>。去掉电视版的强制横屏，横竖屏交给传感器；<code>configChanges</code> 接管尺寸变化，折叠、分屏、拖动窗口时不重建 Activity，播放不中断。</p>
+<pre class="code"><span class="c">&lt;!-- app/src/main/AndroidManifest.xml --&gt;</span>
+&lt;uses-feature android:name=<span class="s">"android.software.leanback"</span> android:required=<span class="s">"false"</span>/&gt;
+&lt;uses-feature android:name=<span class="s">"android.hardware.touchscreen"</span> android:required=<span class="s">"false"</span>/&gt;
+
+&lt;application android:banner=<span class="s">"@drawable/tv_banner"</span> ...&gt;
+  &lt;activity android:name=<span class="s">".MainActivity"</span>
+      android:exported=<span class="s">"true"</span>
+      android:resizeableActivity=<span class="s">"true"</span>
+      android:configChanges=<span class="s">"orientation|screenSize|screenLayout|
+          smallestScreenSize|keyboard|keyboardHidden|navigation|density"</span>&gt;
+    &lt;intent-filter&gt;
+      &lt;action android:name=<span class="s">"android.intent.action.MAIN"</span>/&gt;
+      &lt;category android:name=<span class="s">"android.intent.category.LAUNCHER"</span>/&gt;
+      &lt;category android:name=<span class="s">"android.intent.category.LEANBACK_LAUNCHER"</span>/&gt;
+    &lt;/intent-filter&gt;
+    <span class="c">&lt;!-- bugvideo://qrtoken、b23.tv、bilibili.com/video 深链也收进来 --&gt;</span>
+  &lt;/activity&gt;
+&lt;/application&gt;</pre>
+      </div>
+      <div style="display:grid;gap:12px;min-width:0">
+        <h3>DeviceProfile：三个维度合成一个 CompositionLocal</h3>
+        <p class="muted" style="font-size:15px">所有界面只读 <code>LocalDeviceProfile</code>，不再各自调用 <code>calculateWindowSizeClass</code>（现在手机端混用了两套 API）。输入方式随最后一次输入事件实时切换：平板接上蓝牙键盘按方向键，焦点框马上出现。</p>
+<pre class="code"><span class="k">enum class</span> InputMode { Touch, DPad, Pointer }
+<span class="k">enum class</span> Distance { Near, Far }
+
+<span class="k">@Immutable data class</span> DeviceProfile(
+    <span class="k">val</span> width: WidthClass,    <span class="c">// Compact … ExtraLarge</span>
+    <span class="k">val</span> input: InputMode,
+    <span class="k">val</span> distance: Distance,
+) {
+    <span class="k">val</span> isTv <span class="k">get</span>() = distance == Distance.Far
+    <span class="k">val</span> navigation <span class="k">get</span>() = <span class="k">when</span> {
+        isTv -> NavKind.TvRail
+        width >= WidthClass.Large -> NavKind.RailExpanded
+        width >= WidthClass.Medium -> NavKind.Rail
+        <span class="k">else</span> -> NavKind.Bar
+    }
+}
+
+<span class="k">@Composable fun</span> rememberDeviceProfile(): DeviceProfile {
+    <span class="k">val</span> size = currentWindowAdaptiveInfo().windowSizeClass
+    <span class="k">val</span> far = rememberIsTelevision()   <span class="c">// UiModeManager + FEATURE_LEANBACK</span>
+    <span class="k">val</span> input = rememberLastInputMode() <span class="c">// KeyEvent / MotionEvent 的 source</span>
+    <span class="k">return</span> remember(size, far, input) {
+        DeviceProfile(size.toWidthClass(), input, <span class="k">if</span> (far) Far <span class="k">else</span> Near)
+    }
+}</pre>
+      </div>
+    </div>
+  </div>
+</section>
