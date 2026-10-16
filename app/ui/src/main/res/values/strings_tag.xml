@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tag 页（第 9.11 节） -->
+    <string name="tag_title">标签</string>
+    <string name="tag_empty">这个标签下还没有视频</string>
+</resources>

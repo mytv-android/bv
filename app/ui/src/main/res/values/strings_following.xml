@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 关注的 UP 主、追番追剧（第 9.11 节） -->
+    <string name="following_title">关注</string>
+    <string name="following_empty">还没有关注 UP 主</string>
+    <string name="following_seasons_title">追番追剧</string>
+    <string name="following_seasons_empty">这里还没有追的番剧</string>
+</resources>

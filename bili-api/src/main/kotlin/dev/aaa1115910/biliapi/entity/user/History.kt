@@ -39,6 +39,14 @@ data class HistoryItem(
     val progress: Int,
     val type: HistoryItemType
 ) {
+    /** 观看时间（秒级时间戳），未知时为 0 */
+    var viewAt: Long = 0L
+        internal set
+
+    /** UP 主 mid，未知时为 0 */
+    var authorMid: Long = 0L
+        internal set
+
     companion object {
         fun fromHistoryItem(item: dev.aaa1115910.biliapi.http.entity.history.HistoryItem) =
             HistoryItem(
@@ -58,7 +66,10 @@ data class HistoryItem(
                     "pgc" -> HistoryItemType.Pgc
                     else -> HistoryItemType.Unknown
                 }
-            )
+            ).apply {
+                viewAt = item.viewAt.toLong()
+                authorMid = item.authorMid
+            }
 
         @Suppress("RemoveRedundantQualifierName")
         fun fromHistoryItem(item: bilibili.app.interfaces.v1.CursorItem) = HistoryItem(
@@ -105,7 +116,13 @@ data class HistoryItem(
                 CursorItem.CardItemCase.CARD_OGV -> HistoryItemType.Pgc
                 else -> HistoryItemType.Unknown
             }
-        )
+        ).apply {
+            viewAt = item.viewAt
+            authorMid = when (item.cardItemCase) {
+                CursorItem.CardItemCase.CARD_UGC -> item.cardUgc.mid
+                else -> 0L
+            }
+        }
     }
 }
 

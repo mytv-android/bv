@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 稍后再看（第 9.11 节） -->
+    <string name="toview_title">稍后再看</string>
+    <string name="toview_empty">稍后再看列表是空的</string>
+    <string name="toview_remove">从稍后再看移除</string>
+    <string name="toview_removed">已从稍后再看移除</string>
+    <string name="toview_remove_failed">移除失败：%s</string>
+</resources>

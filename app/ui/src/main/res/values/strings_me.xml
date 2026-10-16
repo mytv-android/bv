@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 我的（第 9.8 节）与模板页共用的登录提示 -->
+    <string name="me_history">历史记录</string>
+    <string name="me_favorite">收藏夹</string>
+    <string name="me_toview">稍后再看</string>
+    <string name="me_seasons">追番追剧</string>
+    <string name="me_following">关注</string>
+    <string name="me_following_ups">关注的 UP 主</string>
+    <string name="me_accounts">账号与用户锁</string>
+    <string name="me_settings">设置</string>
+    <string name="me_settings_sub">主题、播放、弹幕</string>
+    <string name="me_history_sub">今天看了 %d 个</string>
+    <string name="me_favorite_sub">%d 个收藏夹</string>
+    <string name="me_toview_sub">%d 个待看</string>
+    <string name="me_seasons_sub">%d 部在追</string>
+    <string name="me_following_count">%d 位</string>
+    <string name="me_following_sub">%d 位 UP 主</string>
+    <string name="me_accounts_sub">%d 个账号</string>
+    <string name="me_continue">继续观看</string>
+    <string name="me_all">全部</string>
+    <string name="me_login_hint">登录后同步历史、收藏和追番</string>
+    <string name="me_login">登录</string>
+    <string name="me_switch_account">切换账号</string>
+    <string name="me_user_lock">用户锁</string>
+    <string name="me_profile_stats">关注 %1$s · 粉丝 %2$s · 硬币 %3$s</string>
+    <string name="me_count_wan">%s万</string>
+    <string name="me_level">等级 %d</string>
+</resources>

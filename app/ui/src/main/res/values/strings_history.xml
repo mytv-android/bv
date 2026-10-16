@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 历史记录（第 9.11 节、我的平板右栏） -->
+    <string name="history_title">历史记录</string>
+    <string name="history_empty">还没有观看记录</string>
+    <string name="history_today">今天</string>
+    <string name="history_yesterday">昨天</string>
+    <string name="history_earlier">更早</string>
+    <string name="history_filter_all">全部</string>
+    <string name="history_filter_video">视频</string>
+    <string name="history_filter_pgc">番剧</string>
+</resources>

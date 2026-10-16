@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UP 主空间（第 9.11 节） -->
+    <string name="space_title">UP 主空间</string>
+    <string name="space_follow">关注</string>
+    <string name="space_followed">已关注</string>
+    <string name="space_follow_done">已关注</string>
+    <string name="space_unfollow_done">已取消关注</string>
+    <string name="space_follow_failed">操作失败</string>
+    <string name="space_stats">粉丝 %1$s · 关注 %2$s · 投稿 %3$s</string>
+    <string name="space_empty">还没有投稿</string>
+</resources>

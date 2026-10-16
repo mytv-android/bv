@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 收藏夹（第 9.11 节） -->
+    <string name="favorite_title">收藏夹</string>
+    <string name="favorite_empty">这个收藏夹里还没有视频</string>
+    <string name="favorite_no_folder">没有找到收藏夹</string>
+</resources>

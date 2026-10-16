@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 账号管理（第 9.11 节） -->
+    <string name="accounts_list_title">账号管理</string>
+    <string name="accounts_list_current">当前账号</string>
+    <string name="accounts_list_locked">已设置用户锁</string>
+    <string name="accounts_list_current_locked">当前账号 · 已设置用户锁</string>
+    <string name="accounts_list_add">添加账号</string>
+    <string name="accounts_list_add_sub">登录另一个哔哩哔哩账号</string>
+    <string name="accounts_list_lock">用户锁</string>
+    <string name="accounts_list_lock_sub">打开应用时需要输入密码</string>
+    <string name="accounts_list_delete">删除账号</string>
+    <string name="accounts_list_delete_message">从本机删除「%s」的登录信息？</string>
+    <string name="accounts_list_cancel">取消</string>
+    <string name="accounts_list_confirm_delete">删除</string>
+    <string name="accounts_list_empty">还没有保存的账号</string>
+    <string name="accounts_list_unlock_title">输入「%s」的密码</string>
+    <string name="accounts_list_switched">已切换到 %s</string>
+</resources>
