@@ -170,6 +170,8 @@ java {
 
 dependencies {
     implementation(project(":app:ui"))
+    // 安装 src/main/baselineProfiles/baseline-prof.txt 里编译出的 baseline profile
+    implementation(androidx.profileinstaller)
 }
 
 tasks.withType<Test> {
