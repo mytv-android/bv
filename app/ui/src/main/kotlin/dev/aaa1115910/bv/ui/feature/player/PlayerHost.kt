@@ -155,6 +155,8 @@ internal fun BvPlayerHost(
                     incognitoMode = Prefs.incognitoMode,
                     longPressAction = Prefs.playerLongPressAction,
                     longPressSpeed = Prefs.playerLongPressSpeed,
+                    clipInfoList = playerVm.clipInfoList,
+                    skipPgcIntroOutro = Prefs.skipPgcIntroOutro,
                 ),
                 LocalVideoPlayerDanmakuMasksData provides VideoPlayerDanmakuMasksData(
                     danmakuMasks = playerVm.danmakuMasks,

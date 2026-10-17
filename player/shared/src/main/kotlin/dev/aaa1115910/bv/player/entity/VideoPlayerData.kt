@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.aaa1115910.biliapi.entity.danmaku.DanmakuMaskSegment
 import dev.aaa1115910.biliapi.entity.video.Subtitle
+import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
 import dev.aaa1115910.biliapi.entity.video.VideoShot
 import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
 
@@ -91,6 +92,10 @@ data class VideoPlayerConfigData(
     val incognitoMode: Boolean = false,
     val longPressAction: PlayerLongPressAction = PlayerLongPressAction.SpeedUp,
     val longPressSpeed: Float = 2f,
+    /** PGC 片头/片尾配置；null 表示当前视频没有（UGC 恒为 null） */
+    val clipInfoList: List<ClipInfo>? = null,
+    /** 自动跳过 PGC 片头片尾，默认关闭 */
+    val skipPgcIntroOutro: Boolean = false,
 )
 
 data class VideoPlayerDanmakuMasksData(

@@ -1,6 +1,7 @@
 package dev.aaa1115910.biliapi.http.entity.proxy
 
 import dev.aaa1115910.biliapi.entity.VolumeInfo
+import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
 import dev.aaa1115910.biliapi.http.entity.video.DashData
 import dev.aaa1115910.biliapi.http.entity.video.DashFlac
 import dev.aaa1115910.biliapi.http.entity.video.Durl
@@ -9,7 +10,6 @@ import dev.aaa1115910.biliapi.http.entity.video.SegmentBase
 import dev.aaa1115910.biliapi.http.entity.video.SupportFormat
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 
 @Serializable
 data class ProxyWebPlayUrlData(
@@ -61,7 +61,7 @@ data class ProxyWebPlayUrlData(
     @SerialName("last_play_cid")
     val lastPlaycid: Long = 0,
     @SerialName("clip_info_list")
-    val clipInfoList: List<JsonElement> = emptyList(),
+    val clipInfoList: List<ClipInfo> = emptyList(),
     @SerialName("record_info")
     val recordInfo: RecordInfo? = null,
     val volume: VolumeInfo? = null
@@ -117,7 +117,7 @@ data class ProxyAppPlayUrlData(
     @SerialName("last_play_cid")
     val lastPlaycid: Long = 0,
     @SerialName("clip_info_list")
-    val clipInfoList: List<JsonElement> = emptyList(),
+    val clipInfoList: List<ClipInfo> = emptyList(),
     @SerialName("record_info")
     val recordInfo: RecordInfo? = null,
     val volume: VolumeInfo? = null

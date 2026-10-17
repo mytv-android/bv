@@ -7,6 +7,9 @@ import bilibili.playershared.dashVideoOrNull
 import bilibili.playershared.dolbyOrNull
 import bilibili.playershared.lossLessItemOrNull
 import bilibili.playershared.volumeOrNull
+import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
+import dev.aaa1115910.biliapi.http.entity.video.ClipType
+import dev.aaa1115910.biliapi.http.entity.video.resolveClipInfoList
 
 data class PlayData(
     val dashVideos: List<DashVideo>,
@@ -17,6 +20,11 @@ data class PlayData(
     val needPay: Boolean = false,
     /** 响度元数据；为 null 表示服务端未提供（gRPC PGC 的 proto 没有该字段），播放器应保持原音量 */
     val volume: VolumeInfo? = null,
+    /**
+     * PGC 跳过片头/片尾配置；为 null 表示接口没有提供（UGC 恒为 null），
+     * 播放器据此完全跳过相关逻辑。
+     */
+    val clipInfoList: List<ClipInfo>? = null,
 ) {
     companion object {
         fun fromPlayViewUniteReply(playViewUniteReply: PlayViewUniteReply): PlayData {
@@ -127,7 +135,10 @@ data class PlayData(
                 dolby = dolby,
                 flac = null,
                 codec = codecs,
-                needPay = needPay
+                needPay = needPay,
+                clipInfoList = pgcPlayViewReply.business.clipInfoList
+                    .map { it.toClipInfo() }
+                    .takeIf { it.isNotEmpty() }
             )
         }
 
@@ -186,7 +197,8 @@ data class PlayData(
                 flac = flac,
                 codec = codec,
                 needPay = needPay,
-                volume = playUrlData.volume
+                volume = playUrlData.volume,
+                clipInfoList = playUrlData.resolveClipInfoList().takeIf { it.isNotEmpty() }
             )
         }
 
@@ -245,7 +257,8 @@ data class PlayData(
                 flac = flac,
                 codec = codec,
                 needPay = needPay,
-                volume = playUrlData.volume
+                volume = playUrlData.volume,
+                clipInfoList = playUrlData.clipInfoList.takeIf { it.isNotEmpty() }
             )
         }
 
@@ -304,7 +317,8 @@ data class PlayData(
                 flac = flac,
                 codec = codec,
                 needPay = needPay,
-                volume = playUrlData.volume
+                volume = playUrlData.volume,
+                clipInfoList = playUrlData.clipInfoList.takeIf { it.isNotEmpty() }
             )
         }
     }
@@ -325,10 +339,28 @@ data class PlayData(
                     .filter { it != "none" }
             }.toMap(),
             needPay = needPay || other.needPay,
-            volume = volume ?: other.volume
+            volume = volume ?: other.volume,
+            clipInfoList = (clipInfoList.orEmpty() + other.clipInfoList.orEmpty())
+                .distinct()
+                .takeIf { it.isNotEmpty() }
         )
     }
 }
+
+internal fun bilibili.pgc.gateway.player.v2.ClipInfo.toClipInfo() = ClipInfo(
+    materialNo = materialNo,
+    start = start,
+    end = end,
+    clipType = when (clipType) {
+        bilibili.pgc.gateway.player.v2.ClipType.CLIP_TYPE_OP -> ClipType.Op
+        bilibili.pgc.gateway.player.v2.ClipType.CLIP_TYPE_ED -> ClipType.Ed
+        bilibili.pgc.gateway.player.v2.ClipType.CLIP_TYPE_HE -> ClipType.He
+        bilibili.pgc.gateway.player.v2.ClipType.CLIP_TYPE_MULTI_VIEW -> ClipType.MultiView
+        bilibili.pgc.gateway.player.v2.ClipType.CLIP_TYPE_AD -> ClipType.Ad
+        else -> ClipType.Unknown
+    },
+    toastText = toastText,
+)
 
 /**
  * @param quality 视频分辨率

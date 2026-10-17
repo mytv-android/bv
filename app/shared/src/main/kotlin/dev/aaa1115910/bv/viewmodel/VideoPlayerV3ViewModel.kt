@@ -24,6 +24,7 @@ import dev.aaa1115910.biliapi.entity.video.SubtitleAiType
 import dev.aaa1115910.biliapi.entity.video.SubtitleType
 import dev.aaa1115910.biliapi.entity.video.VideoShot
 import dev.aaa1115910.biliapi.http.BiliHttpApi
+import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
 import dev.aaa1115910.biliapi.repositories.VideoPlayRepository
 import dev.aaa1115910.bilisubtitle.SubtitleParser
 import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
@@ -77,6 +78,9 @@ class VideoPlayerV3ViewModel(
     var danmakuData = mutableStateListOf<DanmakuItemData>()
     val danmakuMasks = mutableStateListOf<DanmakuMaskSegment>()
     var videoShot: VideoShot? by mutableStateOf(null)
+
+    /** 当前剧集的片头/片尾配置；换集时先清空，拿到新播放数据后再更新 */
+    var clipInfoList: List<ClipInfo>? by mutableStateOf(null)
 
     var availableQuality = mutableStateListOf<Resolution>()
     var availableVideoCodec = mutableStateListOf<VideoCodec>()
@@ -149,6 +153,8 @@ class VideoPlayerV3ViewModel(
         currentAid = avid
         currentCid = cid
         currentEpid = epid ?: 0
+        // 换集后先清空上一集的片头片尾，避免新数据返回前用旧配置误跳
+        clipInfoList = null
         epid?.let { this.epid = it }
         seasonId?.let { this.seasonId = it }
         viewModelScope.launch(Dispatchers.Default) {
@@ -208,7 +214,10 @@ class VideoPlayerV3ViewModel(
             withContext(Dispatchers.Main) { needPay = playData.needPay }
             if (needPay) return@runCatching
 
-            withContext(Dispatchers.Main) { this@VideoPlayerV3ViewModel.playData = playData }
+            withContext(Dispatchers.Main) {
+                this@VideoPlayerV3ViewModel.playData = playData
+                this@VideoPlayerV3ViewModel.clipInfoList = playData.clipInfoList
+            }
             logger.fInfo { "Load play data response success" }
             //logger.info { "Play data: $playData" }
 

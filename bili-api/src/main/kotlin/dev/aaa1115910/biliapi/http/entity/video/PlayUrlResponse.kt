@@ -1,9 +1,128 @@
 package dev.aaa1115910.biliapi.http.entity.video
 
 import dev.aaa1115910.biliapi.entity.VolumeInfo
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.descriptors.PrimitiveKind
+import kotlinx.serialization.descriptors.PrimitiveSerialDescriptor
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonDecoder
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNames
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.intOrNull
+
+/**
+ * 跳过片头/片尾配置
+ *
+ * 旧 web 接口的 `clip_info_list` 使用 camelCase 字段；新 ogv 接口挪到
+ * `video_extra.clip_info` 且 `clip_type` 变成数字枚举，这里两种写法都兼容。
+ *
+ * @param materialNo 素材编号
+ * @param start 跳过区间开始（秒）
+ * @param end 跳过区间结束（秒）
+ * @param clipType Clip 类型，见 [ClipType]
+ * @param toastText 跳过时的提示语
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class ClipInfo(
+    @JsonNames("material_no")
+    val materialNo: Long = 0L,
+    val start: Int = 0,
+    val end: Int = 0,
+    @SerialName("clipType")
+    @JsonNames("clip_type")
+    val clipType: ClipType = ClipType.Unknown,
+    @SerialName("toastText")
+    @JsonNames("toast_text")
+    val toastText: String = "",
+)
+
+/**
+ * 跳过片头/片尾配置类型。
+ *
+ * 数字值与 fantasy 以及 PGC gRPC proto 一致；旧接口可能返回
+ * `"CLIP_TYPE_OP"` 这样的字符串，[ClipTypeSerializer] 会一并处理。
+ */
+@Serializable(with = ClipTypeSerializer::class)
+enum class ClipType(val value: Int) {
+    Unknown(0),
+    Op(1),
+    Ed(2),
+    He(3),
+    MultiView(4),
+    Ad(5);
+
+    companion object {
+        fun fromValue(value: Int): ClipType =
+            entries.firstOrNull { it.value == value } ?: Unknown
+
+        fun fromName(name: String): ClipType = when (name.uppercase()) {
+            "CLIP_TYPE_OP", "OP" -> Op
+            "CLIP_TYPE_ED", "ED" -> Ed
+            "CLIP_TYPE_HE", "HE" -> He
+            "CLIP_TYPE_MULTI_VIEW", "MULTI_VIEW" -> MultiView
+            "CLIP_TYPE_AD", "AD" -> Ad
+            else -> Unknown
+        }
+    }
+}
+
+object ClipTypeSerializer : KSerializer<ClipType> {
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor(
+        "dev.aaa1115910.biliapi.http.entity.video.ClipType",
+        PrimitiveKind.STRING
+    )
+
+    override fun deserialize(decoder: Decoder): ClipType {
+        val jsonDecoder = decoder as? JsonDecoder ?: return ClipType.fromValue(decoder.decodeInt())
+        val element = jsonDecoder.decodeJsonElement()
+        if (element is JsonPrimitive) {
+            element.intOrNull?.let { return ClipType.fromValue(it) }
+            return ClipType.fromName(element.content)
+        }
+        return ClipType.Unknown
+    }
+
+    override fun serialize(encoder: Encoder, value: ClipType) {
+        encoder.encodeInt(value.value)
+    }
+}
+
+private val clipInfoJson = Json {
+    ignoreUnknownKeys = true
+    coerceInputValues = true
+}
+
+/**
+ * 跳过片头/片尾配置：旧接口在 [PlayUrlData.clipInfoList]，
+ * 新 ogv 接口在 `video_extra.clip_info`。
+ */
+fun PlayUrlData.resolveClipInfoList(): List<ClipInfo> {
+    if (clipInfoList.isNotEmpty()) return clipInfoList
+    val extra = videoExtra ?: return emptyList()
+    val extraObject = when (extra) {
+        is JsonObject -> extra
+        // 少数接口会把 video_extra 再序列化成字符串
+        is JsonPrimitive -> extra.contentOrNull
+            ?.let { runCatching { clipInfoJson.parseToJsonElement(it) }.getOrNull() as? JsonObject }
+
+        else -> null
+    } ?: return emptyList()
+    val clipInfo = extraObject["clip_info"] ?: extraObject["clipInfo"] ?: return emptyList()
+    return runCatching {
+        clipInfoJson.decodeFromJsonElement<List<ClipInfo>>(clipInfo)
+    }.getOrDefault(emptyList())
+}
 
 /**
  * @param code 作用尚不明确 pcg独有
@@ -37,7 +156,8 @@ import kotlinx.serialization.json.JsonElement
  * @param high_format null
  * @param lastPlayTime 上次播放进度 毫秒值 非pgc接口独有
  * @param lastPlayCid 上次播放分p的cid 非pgc接口独有
- * @param clipInfoList 作用尚不明确 pcg独有
+ * @param clipInfoList 跳过片头/片尾配置 pcg独有
+ * @param videoExtra 新 ogv 接口的扩展信息，跳过配置位于 `clip_info` pcg独有
  * @param recordInfo 备案登记信息 pcg独有
  */
 @Serializable
@@ -90,7 +210,9 @@ data class PlayUrlData(
     @SerialName("last_play_cid")
     val lastPlaycid: Long = 0,
     @SerialName("clip_info_list")
-    val clipInfoList: List<JsonElement> = emptyList(),
+    val clipInfoList: List<ClipInfo> = emptyList(),
+    @SerialName("video_extra")
+    val videoExtra: JsonElement? = null,
     @SerialName("record_info")
     val recordInfo: RecordInfo? = null,
     val volume: VolumeInfo? = null

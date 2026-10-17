@@ -46,6 +46,8 @@ import com.kuaishou.akdanmaku.ext.RETAINER_BILIBILI
 import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.aaa1115910.biliapi.entity.danmaku.DanmakuMaskFrame
 import dev.aaa1115910.biliapi.entity.video.Subtitle
+import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
+import dev.aaa1115910.biliapi.http.entity.video.ClipType
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.AkDanmakuPlayer
 import dev.aaa1115910.bv.player.BvVideoPlayer
@@ -206,6 +208,12 @@ fun BvPlayerScreen(
 
     var hideBackToHistoryTimer: CountDownTimer? by remember { mutableStateOf(null) }
     var currentDanmakuMaskFrame: DanmakuMaskFrame? by remember { mutableStateOf(null) }
+
+    // 跳过 PGC 片头片尾：同一集每个区间只自动跳一次，换集或拿到新配置时重置
+    var processedClipIndices by remember { mutableStateOf(emptySet<Int>()) }
+    LaunchedEffect(configData.currentVideoCid, configData.clipInfoList) {
+        processedClipIndices = emptySet()
+    }
 
     val typeFilter = remember { TypeFilter() }
     var danmakuConfig by remember { mutableStateOf(DanmakuConfig()) }
@@ -395,12 +403,33 @@ fun BvPlayerScreen(
         }
     }
 
-    // 进度轮询
+    // 进度轮询 + 跳过 PGC 片头/片尾
     LaunchedEffect(Unit) {
         while (true) {
             currentPosition = videoPlayer.currentPosition.coerceAtLeast(0L)
             duration = videoPlayer.duration.coerceAtLeast(0L)
             bufferedPercentage = videoPlayer.bufferedPercentage
+
+            val config = latestConfig
+            val clips = config.clipInfoList
+            if (config.skipPgcIntroOutro && videoPlayer.isPlaying && !clips.isNullOrEmpty()) {
+                val positionSeconds = (currentPosition / 1000).toInt()
+                val matched = clips.withIndex().firstOrNull { (index, clip) ->
+                    index !in processedClipIndices &&
+                            clip.isSkippable() &&
+                            positionSeconds >= clip.start && positionSeconds < clip.end
+                }
+                if (matched != null) {
+                    val clip = matched.value
+                    processedClipIndices = processedClipIndices + matched.index
+                    val target = clip.end * 1000L
+                    logger.info { "Skip PGC clip: ${clip.clipType}, $positionSeconds -> ${clip.end}" }
+                    videoPlayer.seekTo(target)
+                    mDanmakuPlayer?.seekTo(target)
+                    mDanmakuPlayer?.pause()
+                }
+            }
+
             delay(100)
         }
     }
@@ -549,6 +578,19 @@ fun BvPlayerScreen(
 
     // ---------------------------------------------------------------- 控制层
 
+    // 用户手动 seek 到片头/片尾区间内时不强行跳走：把目标区间标记为已处理
+    val markManualSeekClip: (position: Long) -> Unit = { position ->
+        val positionSeconds = (position.coerceAtLeast(0L) / 1000).toInt()
+        val handled = configData.clipInfoList.orEmpty().mapIndexedNotNull { index, clip ->
+            if (clip.isSkippable() &&
+                positionSeconds >= clip.start && positionSeconds < clip.end
+            ) index else null
+        }
+        if (handled.isNotEmpty()) {
+            processedClipIndices = processedClipIndices + handled
+        }
+    }
+
     val controller = PlayerController(
         videoPlayer = videoPlayer,
         menuState = menuState,
@@ -558,6 +600,7 @@ fun BvPlayerScreen(
             sendHeartbeat(true)
         },
         seekTo = { position ->
+            markManualSeekClip(position)
             videoPlayer.seekTo(position)
             mDanmakuPlayer?.seekTo(position)
             // akdanmaku 会在跳转后立即播放，如果需要缓冲则会导致弹幕不同步
@@ -566,6 +609,7 @@ fun BvPlayerScreen(
         backToHistory = {
             val time = lastPlayed
             logger.fInfo { "Back to history: ${time.formatHourMinSec()}" }
+            markManualSeekClip(time)
             videoPlayer.seekTo(time)
             mDanmakuPlayer?.seekTo(time)
             // akdanmaku 会在跳转后立即播放，如果需要缓冲则会导致弹幕不同步
@@ -673,6 +717,10 @@ fun BvPlayerScreen(
         }
     }
 }
+
+/** 只处理片头/片尾，忽略 HE、多视图、广告等其他 Clip 类型；时间区间无效时也不处理。 */
+private fun ClipInfo.isSkippable(): Boolean =
+    (clipType == ClipType.Op || clipType == ClipType.Ed) && end > start
 
 /** 控制层共用的播放器操作（由 [BvPlayerScreen] 组装，触摸端和电视端共用）。 */
 internal class PlayerController(

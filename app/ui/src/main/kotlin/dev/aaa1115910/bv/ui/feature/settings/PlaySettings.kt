@@ -47,6 +47,7 @@ internal fun PlaySettings() {
     var audioBalance by remember { mutableStateOf(Prefs.playerAudioBalanceLevel) }
     var ffmpegAudio by remember { mutableStateOf(Prefs.enableFfmpegAudioRenderer) }
     var skipSilence by remember { mutableStateOf(Prefs.playerSkipSilence) }
+    var skipPgcIntroOutro by remember { mutableStateOf(Prefs.skipPgcIntroOutro) }
     var longPressAction by remember { mutableStateOf(Prefs.playerLongPressAction) }
     var longPressSpeed by remember { mutableFloatStateOf(Prefs.playerLongPressSpeed) }
 
@@ -137,6 +138,15 @@ internal fun PlaySettings() {
         onCheckedChange = {
             skipSilence = it
             Prefs.playerSkipSilence = it
+        },
+    )
+    SettingSwitchRow(
+        title = stringResource(R.string.settings_play_skip_pgc_intro_outro),
+        subtitle = stringResource(R.string.settings_play_skip_pgc_intro_outro_desc),
+        checked = skipPgcIntroOutro,
+        onCheckedChange = {
+            skipPgcIntroOutro = it
+            Prefs.skipPgcIntroOutro = it
         },
     )
     SettingChoiceGroup(

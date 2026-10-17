@@ -72,6 +72,8 @@
     <string name="settings_play_ffmpeg_desc">尝试使用 FFmpeg 播放硬解不兼容的音频</string>
     <string name="settings_play_skip_silence">跳过静音</string>
     <string name="settings_play_skip_silence_desc">自动跳过音频中的静音片段（仅 2.5 倍速及以上生效）</string>
+    <string name="settings_play_skip_pgc_intro_outro">跳过片头片尾</string>
+    <string name="settings_play_skip_pgc_intro_outro_desc">自动跳过番剧、影视的片头片尾（需片源提供数据）</string>
     <string name="settings_play_long_press_action">长按确认键行为（电视）</string>
     <string name="settings_play_long_press_speed">长按加速倍速</string>
 

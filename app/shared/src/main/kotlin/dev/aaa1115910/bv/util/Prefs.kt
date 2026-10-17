@@ -368,6 +368,15 @@ object Prefs {
             dsm.editPreference(PrefKeys.prefPlayerSkipSilenceKey, value)
         }
 
+    /** 自动跳过 PGC 片头片尾，默认关闭（照搬 fantasy） */
+    var skipPgcIntroOutro: Boolean
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefSkipPgcIntroOutroRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefSkipPgcIntroOutroKey, value)
+        }
+
     /** 电视端长按确认键行为，默认加速播放（照搬 fantasy） */
     var playerLongPressAction: PlayerLongPressAction
         get() = runBlocking {
@@ -502,6 +511,7 @@ object PrefKeys {
     val prefEnableFfmpegAudioRenderer = booleanPreferencesKey("enable_ffmpeg_audio_renderer")
     val prefPlayerAudioBalanceLevelKey = intPreferencesKey("player_audio_balance_level")
     val prefPlayerSkipSilenceKey = booleanPreferencesKey("player_skip_silence")
+    val prefSkipPgcIntroOutroKey = booleanPreferencesKey("skip_pgc_intro_outro")
     val prefPlayerLongPressActionKey = intPreferencesKey("player_long_press_action")
     val prefPlayerLongPressSpeedKey = floatPreferencesKey("player_long_press_speed")
     val prefBlacklistUserKey = booleanPreferencesKey("blacklist_user")
@@ -570,6 +580,7 @@ object PrefKeys {
     val prefPlayerAudioBalanceLevelRequest =
         PreferenceRequest(prefPlayerAudioBalanceLevelKey, AudioBalanceLevel.Off.ordinal)
     val prefPlayerSkipSilenceRequest = PreferenceRequest(prefPlayerSkipSilenceKey, false)
+    val prefSkipPgcIntroOutroRequest = PreferenceRequest(prefSkipPgcIntroOutroKey, false)
     val prefPlayerLongPressActionRequest =
         PreferenceRequest(prefPlayerLongPressActionKey, PlayerLongPressAction.SpeedUp.ordinal)
     val prefPlayerLongPressSpeedRequest = PreferenceRequest(prefPlayerLongPressSpeedKey, 2f)
