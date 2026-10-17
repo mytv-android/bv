@@ -60,7 +60,6 @@ dependencies {
     api(project(":bili-api"))
     api(project(":bili-subtitle"))
     api(project(":symbols"))
-    api(libs.akdanmaku)
     implementation(androidx.activity.compose)
     implementation(androidx.core.ktx)
     implementation(androidx.compose.constraintlayout)
@@ -74,6 +73,7 @@ dependencies {
     implementation(libs.logging)
     implementation(libs.lottie)
     implementation(libs.material)
+    testImplementation(libs.kotlin.test)
     debugImplementation(androidx.compose.ui.test.manifest)
     debugImplementation(androidx.compose.ui.tooling)
 }

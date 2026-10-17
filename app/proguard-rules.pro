@@ -20,21 +20,6 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 
-# akdanmaku
--dontwarn com.badlogic.gdx.backends.android.AndroidFragmentApplication
--dontwarn com.badlogic.gdx.utils.GdxBuild
--dontwarn com.badlogic.gdx.jnigen.BuildTarget*
--dontwarn com.badlogic.gdx.graphics.g2d.freetype.FreetypeBuild
--keep class com.badlogic.gdx.controllers.android.AndroidControllers
--keep class com.kuaishou.akdanmaku.ecs.DanmakuContext
--keepclasseswithmembers class * {
-    public <init>(com.kuaishou.akdanmaku.ecs.DanmakuContext);
-}
--keepclasseswithmembers class com.kuaishou.akdanmaku.ecs.component.*
--keep class com.kuaishou.akdanmaku.ecs.component.* {
-  <init>(...);
-}
-
 # okhttp
 -dontwarn org.bouncycastle.jsse.BCSSLParameters
 -dontwarn org.bouncycastle.jsse.BCSSLSocket

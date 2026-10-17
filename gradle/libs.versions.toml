@@ -1,6 +1,5 @@
 [versions]
 accompanist = "0.36.0"
-akdanmaku = "1.0.3"
 androidsvg = "1.4"
 brotli = "0.1.2"
 coil = "2.7.0"
@@ -33,9 +32,6 @@ zxing = "3.5.3"
 [libraries]
 # https://google.github.io/accompanist/
 accompanist-systemuicontroller = { module = "com.google.accompanist:accompanist-systemuicontroller", version.ref = "accompanist" }
-
-# https://github.com/KwaiAppTeam/AkDanmaku
-akdanmaku = { module = "com.kuaishou:akdanmaku", version.ref = "akdanmaku" }
 
 # https://github.com/BigBadaboom/androidsvg
 androidSvg = { module = "com.caverock:androidsvg-aar", version.ref = "androidsvg" }

@@ -7,7 +7,9 @@ data class DanmakuEvent(
     val mid: Long,
     val username: String,
     val medalName: String? = null,
-    val medalLevel: Int? = null
+    val medalLevel: Int? = null,
+    /** 发送者用户等级（info[4][0]，0-60），用于按等级过滤直播弹幕 */
+    val userLevel: Int = 0,
 ) : LiveEvent
 
 /** 进入直播间/关注主播事件。 */

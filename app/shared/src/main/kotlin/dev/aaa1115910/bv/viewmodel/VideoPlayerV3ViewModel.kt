@@ -11,9 +11,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.kuaishou.akdanmaku.data.DanmakuItemData
-import com.kuaishou.akdanmaku.render.SimpleRenderer
-import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.aaa1115910.biliapi.entity.ApiType
 import dev.aaa1115910.biliapi.entity.PlayData
 import dev.aaa1115910.biliapi.entity.danmaku.DanmakuMaskSegment
@@ -33,6 +30,8 @@ import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
 import dev.aaa1115910.bv.BVApp
 import dev.aaa1115910.bv.entity.proxy.ProxyArea
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
+import dev.aaa1115910.bv.player.danmaku.DanmakuView
+import dev.aaa1115910.bv.player.danmaku.model.Danmaku
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
 import dev.aaa1115910.bv.player.entity.PlayMode
@@ -90,14 +89,19 @@ class VideoPlayerV3ViewModel(
     private val playUrlResolver = PlayUrlResolver(videoPlayRepository)
 
     var videoPlayer: AbstractVideoPlayer? by mutableStateOf(null)
-    var danmakuPlayer: DanmakuPlayer? by mutableStateOf(null)
+
+    /**
+     * 自研弹幕引擎的渲染 View：由播放页组合创建并赋值（离开页面时 release），
+     * ViewModel 只往里喂数据 / 清空，不负责其生命周期。
+     */
+    var danmakuView: DanmakuView? by mutableStateOf(null)
     var show by mutableStateOf(false)
 
     var loadState by mutableStateOf(RequestState.Ready)
     var errorMessage by mutableStateOf("")
 
     private var playData: PlayData? by mutableStateOf(null)
-    var danmakuData = mutableStateListOf<DanmakuItemData>()
+    var danmakuData = mutableStateListOf<Danmaku>()
     val danmakuMasks = mutableStateListOf<DanmakuMaskSegment>()
     var videoShot: VideoShot? by mutableStateOf(null)
 
@@ -126,6 +130,9 @@ class VideoPlayerV3ViewModel(
     }
     var currentDanmakuArea by mutableFloatStateOf(Prefs.defaultDanmakuArea)
     var currentDanmakuMask by mutableStateOf(Prefs.defaultDanmakuMask)
+    var currentDanmakuLaneDensity by mutableStateOf(Prefs.defaultDanmakuLaneDensity)
+    var currentDanmakuRollingDurationFactor by mutableFloatStateOf(Prefs.defaultDanmakuRollingDurationFactor)
+    var currentDanmakuFilterLevel by mutableIntStateOf(Prefs.defaultDanmakuFilterLevel)
     var currentSubtitleId by mutableLongStateOf(-1L)
     var currentSubtitleData = mutableStateListOf<SubtitleItem>()
     var currentSubtitleFontSize by mutableStateOf(Prefs.defaultSubtitleFontSize)
@@ -181,12 +188,15 @@ class VideoPlayerV3ViewModel(
     var currentCid by mutableLongStateOf(0L)
     private var currentEpid = 0
 
-    private suspend fun releaseDanmakuPlayer() = withContext(Dispatchers.Main) {
-        danmakuPlayer?.release()
+    /** 换集前清空上一集的弹幕数据（引擎保留，View 生命周期由播放页管理）。 */
+    private suspend fun clearDanmakuView() = withContext(Dispatchers.Main) {
+        danmakuView?.clearDanmakus()
     }
 
-    suspend fun initDanmakuPlayer() = withContext(Dispatchers.Main) {
-        danmakuPlayer = DanmakuPlayer(SimpleRenderer())
+    override fun onCleared() {
+        super.onCleared()
+        runCatching { danmakuView?.release() }
+        danmakuView = null
     }
 
     fun loadPlayUrl(
@@ -205,8 +215,7 @@ class VideoPlayerV3ViewModel(
         seasonId?.let { this.seasonId = it }
         viewModelScope.launch(Dispatchers.Default) {
             addLogs("加载视频中")
-            releaseDanmakuPlayer()
-            initDanmakuPlayer()
+            clearDanmakuView()
             addLogs("初始化弹幕引擎")
             if (epid != null || seasonId != null) {
                 addLogs("av$avid，cid:$cid, epid:$epid, seasonId:$seasonId")
@@ -500,22 +509,24 @@ class VideoPlayerV3ViewModel(
         runCatching {
             val danmakuXmlData = BiliHttpApi.getDanmakuXml(cid = cid, sessData = Prefs.sessData)
 
-            val danmakuItemDataList = danmakuXmlData.data.map {
-                DanmakuItemData(
-                    danmakuId = it.dmid,
-                    position = (it.time * 1000).toLong(),
-                    content = it.text,
-                    mode = when (it.type) {
-                        4 -> DanmakuItemData.DANMAKU_MODE_CENTER_TOP
-                        5 -> DanmakuItemData.DANMAKU_MODE_CENTER_BOTTOM
-                        else -> DanmakuItemData.DANMAKU_MODE_ROLLING
+            // mode 映射沿用旧引擎的行为语义：4→顶部、5→底部、其余滚动
+            val danmakuList = danmakuXmlData.data.map {
+                Danmaku(
+                    dmid = it.dmid,
+                    positionMs = (it.time * 1000).toInt(),
+                    text = it.text,
+                    type = when (it.type) {
+                        4 -> Danmaku.MODE_TOP
+                        5 -> Danmaku.MODE_BOTTOM
+                        else -> Danmaku.MODE_SCROLL
                     },
                     textSize = it.size,
-                    textColor = Color(it.color).toArgb()
+                    color = Color(it.color).toArgb(),
+                    level = it.level,
                 )
             }
-            danmakuData.swapListWithMainContext(danmakuItemDataList)
-            danmakuPlayer?.updateData(danmakuData)
+            danmakuData.swapListWithMainContext(danmakuList)
+            danmakuView?.setDanmakus(danmakuList)
         }.onFailure {
             addLogs("加载弹幕失败：${it.localizedMessage}")
             logger.fWarn { "Load danmaku filed: ${it.stackTraceToString()}" }
@@ -694,8 +705,7 @@ class VideoPlayerV3ViewModel(
 
             PlayMode.SingleLoop -> {
                 logger.info { "Play mode: $currentPlayMode, replay current video" }
-                danmakuPlayer?.seekTo(0L)
-                danmakuPlayer?.pause()
+                danmakuView?.notifySeek(0L)
                 videoPlayer?.seekTo(0L)
             }
 

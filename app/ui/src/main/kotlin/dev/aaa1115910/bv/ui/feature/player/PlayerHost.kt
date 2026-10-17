@@ -12,9 +12,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.aaa1115910.bv.entity.ThemeSource
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
+import dev.aaa1115910.bv.player.danmaku.DanmakuView
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerDanmakuMasksData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerHistoryData
@@ -53,7 +53,7 @@ import kotlinx.coroutines.withContext
  * 外层包 `BvTheme(forceDark = true) { CoverTheme(cover, forceDark = true) { … } }`。
  *
  * 播放内核由调用方创建并传入（[videoPlayer]），离开组合时由 `BvVideoPlayer` 释放；
- * 弹幕播放器由 [VideoPlayerV3ViewModel.loadPlayUrl] 创建。
+ * 弹幕引擎 View 由调用方创建并传入（[danmakuView]），离开组合时释放。
  *
  * @param onLoadNewVideo 选集面板切换分 P / 剧集；默认照抄旧电视版直接让 ViewModel 播放
  */
@@ -61,7 +61,7 @@ import kotlinx.coroutines.withContext
 internal fun BvPlayerHost(
     playerVm: VideoPlayerV3ViewModel,
     videoPlayer: AbstractVideoPlayer,
-    danmakuPlayer: DanmakuPlayer?,
+    danmakuView: DanmakuView?,
     cover: String?,
     isTv: Boolean,
     isTablet: Boolean,
@@ -83,12 +83,11 @@ internal fun BvPlayerHost(
     val lifecycleOwner = LocalLifecycleOwner.current
     val latestOnLoadNewVideo by rememberUpdatedState(onLoadNewVideo)
 
-    // 旧播放页 onPause：暂停视频和弹幕
+    // 旧播放页 onPause：暂停视频（弹幕引擎通过 isPlayingProvider 跟随，无需单独暂停）
     DisposableEffect(lifecycleOwner, videoPlayer) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
                 videoPlayer.pause()
-                playerVm.danmakuPlayer?.pause()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -150,6 +149,9 @@ internal fun BvPlayerHost(
                     currentDanmakuOpacity = playerVm.currentDanmakuOpacity,
                     currentDanmakuArea = playerVm.currentDanmakuArea,
                     currentDanmakuMask = playerVm.currentDanmakuMask,
+                    currentDanmakuLaneDensity = playerVm.currentDanmakuLaneDensity,
+                    currentDanmakuRollingDurationFactor = playerVm.currentDanmakuRollingDurationFactor,
+                    currentDanmakuFilterLevel = playerVm.currentDanmakuFilterLevel,
                     currentSubtitleId = playerVm.currentSubtitleId,
                     currentSubtitleData = playerVm.currentSubtitleData,
                     currentSubtitleFontSize = playerVm.currentSubtitleFontSize,
@@ -196,7 +198,7 @@ internal fun BvPlayerHost(
                 }
                 BvPlayerScreen(
                     videoPlayer = videoPlayer,
-                    danmakuPlayer = danmakuPlayer,
+                    danmakuView = danmakuView,
                     isTv = isTv,
                     isTablet = isTablet,
                     onExit = onExit,
@@ -272,6 +274,14 @@ internal fun BvPlayerHost(
                     onDanmakuMaskChange = { mask ->
                         Prefs.defaultDanmakuMask = mask
                         playerVm.currentDanmakuMask = mask
+                    },
+                    onDanmakuLaneDensityChange = { density ->
+                        Prefs.defaultDanmakuLaneDensity = density
+                        playerVm.currentDanmakuLaneDensity = density
+                    },
+                    onDanmakuFilterLevelChange = { level ->
+                        Prefs.defaultDanmakuFilterLevel = level
+                        playerVm.currentDanmakuFilterLevel = level
                     },
                     onSubtitleChange = { subtitle ->
                         playerVm.loadSubtitle(subtitle.id)

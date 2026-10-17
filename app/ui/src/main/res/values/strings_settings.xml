@@ -81,11 +81,18 @@
     <string name="settings_danmaku_enabled">默认开启弹幕</string>
     <string name="settings_danmaku_enabled_desc">打开视频时自动显示弹幕</string>
     <string name="settings_danmaku_types">显示的弹幕类型</string>
+    <string name="settings_danmaku_density">弹幕密度</string>
+    <string name="settings_danmaku_density_sparse">稀疏</string>
+    <string name="settings_danmaku_density_standard">标准</string>
+    <string name="settings_danmaku_density_dense">密集</string>
     <string name="settings_danmaku_scale">弹幕大小</string>
+    <string name="settings_danmaku_speed">弹幕速度</string>
     <string name="settings_danmaku_opacity">不透明度</string>
     <string name="settings_danmaku_area">显示区域</string>
     <string name="settings_danmaku_mask">智能防挡</string>
     <string name="settings_danmaku_mask_desc">弹幕不遮挡画面中的人物（需视频支持）</string>
+    <string name="settings_danmaku_filter_level">按等级过滤弹幕</string>
+    <string name="settings_danmaku_filter_level_value">过滤低于 %1$d 级</string>
 
     <!-- 字幕 -->
     <string name="settings_subtitle_size">字号</string>

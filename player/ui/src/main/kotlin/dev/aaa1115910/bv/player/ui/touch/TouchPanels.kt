@@ -49,6 +49,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.aaa1115910.bv.player.danmaku.DanmakuLaneDensity
 import dev.aaa1115910.bv.player.entity.DanmakuType
 import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
@@ -356,6 +357,21 @@ private fun DanmakuPanel(menuState: PlayerMenuState) {
             )
         }
     }
+    ChipFlow {
+        DanmakuLaneDensity.entries.forEach { density ->
+            PlayerChip(
+                text = stringResource(
+                    when (density) {
+                        DanmakuLaneDensity.Sparse -> R.string.player_ui_danmaku_density_sparse
+                        DanmakuLaneDensity.Standard -> R.string.player_ui_danmaku_density_standard
+                        DanmakuLaneDensity.Dense -> R.string.player_ui_danmaku_density_dense
+                    }
+                ),
+                selected = menuState.danmakuLaneDensity == density,
+                onClick = { menuState.setDanmakuLaneDensity(density) },
+            )
+        }
+    }
     SliderBlock(
         name = stringResource(R.string.player_ui_danmaku_opacity),
         value = formatPercent(menuState.danmakuOpacity),
@@ -393,6 +409,16 @@ private fun DanmakuPanel(menuState: PlayerMenuState) {
         checked = menuState.danmakuMask,
         onCheckedChange = { menuState.setDanmakuMask(it) },
     )
+    SliderBlock(
+        name = stringResource(R.string.player_ui_danmaku_filter_level),
+        value = stringResource(R.string.player_ui_danmaku_filter_level_value, menuState.danmakuFilterLevel),
+    ) {
+        ExpressiveSlider(
+            value = menuState.danmakuFilterLevel.toFloat(),
+            onValueChange = { menuState.setDanmakuFilterLevel(it.roundToInt()) },
+            valueRange = 0f..10f,
+        )
+    }
 }
 
 // ------------------------------------------------------------------ 字幕（来自电视 ClosedCaptionMenu）

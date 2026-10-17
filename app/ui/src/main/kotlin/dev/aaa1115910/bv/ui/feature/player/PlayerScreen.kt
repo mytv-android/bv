@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import dev.aaa1115910.biliapi.repositories.VideoDetailRepository
 import dev.aaa1115910.bv.entity.proxy.ProxyArea
+import dev.aaa1115910.bv.player.danmaku.DanmakuView
 import dev.aaa1115910.bv.ui.designsystem.adaptive.DeviceLayout
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.navigation.PlayerRoute
@@ -57,8 +58,8 @@ fun PlayerScreen(nav: NavController, route: PlayerRoute) {
     val configuration = LocalConfiguration.current
 
     val videoPlayer = remember { createVideoPlayer(context) }
-    // 重新进入时 ViewModel 里可能还是已被释放的弹幕播放器，等 loadPlayUrl 创建新的之后再交给播放器
-    val staleDanmaku = remember { playerVm.danmakuPlayer }
+    // 自研弹幕引擎 View：每个播放页一个实例，交给 ViewModel 喂数据，离开页面时释放
+    val danmakuView = remember { DanmakuView(context).also { playerVm.danmakuView = it } }
     val launchExtras = remember(route.aid) { PlayerLaunchExtras.get(route.aid) }
 
     var showRemoteHint by remember { mutableStateOf(isTv && !Prefs.showedRemoteControllerPanelDemo) }
@@ -73,8 +74,14 @@ fun PlayerScreen(nav: NavController, route: PlayerRoute) {
         playerVm.videoPlayer = videoPlayer
         onDispose {
             if (playerVm.videoPlayer === videoPlayer) playerVm.videoPlayer = null
-            // release() 可重复调用；播放内核由 BvVideoPlayer 释放
-            playerVm.danmakuPlayer?.release()
+        }
+    }
+
+    DisposableEffect(danmakuView) {
+        onDispose {
+            // release() 幂等（onDetachedFromWindow 也会触发一次）
+            danmakuView.release()
+            if (playerVm.danmakuView === danmakuView) playerVm.danmakuView = null
         }
     }
 
@@ -142,7 +149,7 @@ fun PlayerScreen(nav: NavController, route: PlayerRoute) {
             BvPlayerHost(
                 playerVm = playerVm,
                 videoPlayer = videoPlayer,
-                danmakuPlayer = playerVm.danmakuPlayer.takeIf { it !== staleDanmaku },
+                danmakuView = danmakuView,
                 cover = launchExtras?.cover,
                 isTv = isTv,
                 isTablet = profile.layout == DeviceLayout.Tablet,

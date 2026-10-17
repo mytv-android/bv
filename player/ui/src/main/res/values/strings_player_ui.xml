@@ -37,10 +37,16 @@
     <string name="player_ui_danmaku_type_rolling">滚动</string>
     <string name="player_ui_danmaku_type_top">顶部</string>
     <string name="player_ui_danmaku_type_bottom">底部</string>
+    <string name="player_ui_danmaku_density">弹幕密度</string>
+    <string name="player_ui_danmaku_density_sparse">稀疏</string>
+    <string name="player_ui_danmaku_density_standard">标准</string>
+    <string name="player_ui_danmaku_density_dense">密集</string>
     <string name="player_ui_danmaku_opacity">不透明度</string>
     <string name="player_ui_danmaku_area">显示区域</string>
     <string name="player_ui_danmaku_size">字号</string>
     <string name="player_ui_danmaku_mask">智能防挡（人像蒙版）</string>
+    <string name="player_ui_danmaku_filter_level">按等级过滤弹幕</string>
+    <string name="player_ui_danmaku_filter_level_value">过滤低于 %1$d 级</string>
     <string name="player_ui_panel_subtitle">字幕设置</string>
     <string name="player_ui_subtitle_empty">暂无字幕</string>
     <string name="player_ui_subtitle_size">字号</string>

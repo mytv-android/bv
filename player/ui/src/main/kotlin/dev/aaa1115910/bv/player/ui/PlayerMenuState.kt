@@ -20,6 +20,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import dev.aaa1115910.biliapi.entity.video.Subtitle
+import dev.aaa1115910.bv.player.danmaku.DanmakuLaneDensity
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.DanmakuType
 import dev.aaa1115910.bv.player.entity.PlayMode
@@ -31,7 +32,7 @@ import dev.aaa1115910.bv.player.entity.VideoPlayerConfigData
 
 /**
  * 播放器菜单的统一状态（第 11 节第 5 条）：分辨率、编码、音质、倍速、画面比例、
- * 弹幕开关 / 类型 / 大小 / 透明度 / 区域 / 蒙版、字幕轨道 / 字号 / 背景 / 边距、播放模式。
+ * 弹幕开关 / 类型 / 大小 / 透明度 / 区域 / 蒙版 / 密度 / 等级过滤、字幕轨道 / 字号 / 背景 / 边距、播放模式。
  *
  * 触摸端的侧边面板和电视端的菜单面板都读写它：
  * - 读：当前值来自调用方提供的 `LocalVideoPlayerConfigData`（即 VideoPlayerV3ViewModel 的状态），
@@ -66,6 +67,8 @@ class PlayerMenuState internal constructor() {
     val danmakuOpacity: Float get() = config.currentDanmakuOpacity
     val danmakuArea: Float get() = config.currentDanmakuArea
     val danmakuMask: Boolean get() = config.currentDanmakuMask
+    val danmakuLaneDensity: DanmakuLaneDensity get() = config.currentDanmakuLaneDensity
+    val danmakuFilterLevel: Int get() = config.currentDanmakuFilterLevel
 
     // ---------- 字幕 ----------
     val subtitleTracks: List<Subtitle> get() = config.availableSubtitleTracks
@@ -143,6 +146,14 @@ class PlayerMenuState internal constructor() {
         handlers?.onDanmakuMaskChange?.invoke(enabled)
     }
 
+    fun setDanmakuLaneDensity(density: DanmakuLaneDensity) {
+        handlers?.onDanmakuLaneDensityChange?.invoke(density)
+    }
+
+    fun setDanmakuFilterLevel(level: Int) {
+        handlers?.onDanmakuFilterLevelChange?.invoke(level)
+    }
+
     fun selectSubtitle(subtitle: Subtitle) {
         handlers?.onSubtitleChange?.invoke(subtitle)
     }
@@ -186,6 +197,8 @@ internal class PlayerMenuHandlers(
     val onDanmakuOpacityChange: (Float) -> Unit,
     val onDanmakuAreaChange: (Float) -> Unit,
     val onDanmakuMaskChange: (Boolean) -> Unit,
+    val onDanmakuLaneDensityChange: (DanmakuLaneDensity) -> Unit,
+    val onDanmakuFilterLevelChange: (Int) -> Unit,
     val onSubtitleChange: (Subtitle) -> Unit,
     val onSubtitleSizeChange: (TextUnit) -> Unit,
     val onSubtitleBackgroundOpacityChange: (Float) -> Unit,

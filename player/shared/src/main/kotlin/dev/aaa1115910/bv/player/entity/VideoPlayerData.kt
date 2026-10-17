@@ -10,6 +10,7 @@ import dev.aaa1115910.biliapi.entity.video.Subtitle
 import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
 import dev.aaa1115910.biliapi.entity.video.VideoShot
 import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
+import dev.aaa1115910.bv.player.danmaku.DanmakuLaneDensity
 
 data class VideoPlayerSeekData(
     val duration: Long = 1,
@@ -87,6 +88,9 @@ data class VideoPlayerConfigData(
     val currentDanmakuOpacity: Float = 1f,
     val currentDanmakuArea: Float = 1f,
     val currentDanmakuMask: Boolean = false,
+    val currentDanmakuLaneDensity: DanmakuLaneDensity = DanmakuLaneDensity.Standard,
+    val currentDanmakuRollingDurationFactor: Float = 1f,
+    val currentDanmakuFilterLevel: Int = 0,
     val currentSubtitleId: Long = 0,
     val currentSubtitleData: List<SubtitleItem> = emptyList(),
     val currentSubtitleFontSize: TextUnit = 24.sp,

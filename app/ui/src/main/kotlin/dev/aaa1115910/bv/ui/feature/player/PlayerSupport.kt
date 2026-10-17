@@ -130,8 +130,6 @@ internal suspend fun startPlayback(
     if (prepared == null || playerVm.videoPlayer !== videoPlayer) return
     videoPlayer.seekTo(resumeMs)
     runCatching {
-        playerVm.danmakuPlayer?.seekTo(resumeMs)
-        // akdanmaku 会在跳转后立即播放，等视频开始播放时再一起开始
-        playerVm.danmakuPlayer?.pause()
+        playerVm.danmakuView?.notifySeek(resumeMs)
     }
 }

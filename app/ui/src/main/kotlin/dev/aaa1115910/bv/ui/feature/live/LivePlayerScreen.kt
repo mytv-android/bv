@@ -57,7 +57,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -81,21 +80,20 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
-import com.kuaishou.akdanmaku.DanmakuConfig
-import com.kuaishou.akdanmaku.data.DanmakuItemData
-import com.kuaishou.akdanmaku.ext.RETAINER_BILIBILI
-import com.kuaishou.akdanmaku.render.SimpleRenderer
-import com.kuaishou.akdanmaku.ui.DanmakuPlayer
 import dev.aaa1115910.biliapi.http.BiliLiveHttpApi
 import dev.aaa1115910.biliapi.http.entity.live.DanmakuEvent
 import dev.aaa1115910.biliapi.http.entity.live.LiveEvent
 import dev.aaa1115910.biliapi.http.entity.live.RoomRealTimeMessageUpdateEvent
 import dev.aaa1115910.biliapi.http.entity.live.WatchedChangeEvent
 import dev.aaa1115910.bv.appui.R
-import dev.aaa1115910.bv.player.AkDanmakuPlayer
+import dev.aaa1115910.bv.player.BvDanmakuPlayer
 import dev.aaa1115910.bv.player.BvVideoPlayer
+import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.VideoPlayerListener
 import dev.aaa1115910.bv.player.VideoPlayerOptions
+import dev.aaa1115910.bv.player.danmaku.DanmakuConfig
+import dev.aaa1115910.bv.player.danmaku.DanmakuView
+import dev.aaa1115910.bv.player.danmaku.model.Danmaku
 import dev.aaa1115910.bv.player.impl.exo.ExoPlayerFactory
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.designsystem.component.BvButton
@@ -122,12 +120,15 @@ import org.koin.androidx.compose.koinViewModel
 /** 控制层显示后自动隐藏的时间。 */
 private const val AutoHideMillis = 4000L
 
+/** 直播弹幕按用户等级过滤的可选档位（LV0 = 不过滤）。 */
+private val LiveDanmakuFilterLevelPresets = listOf(0, 10, 20, 30, 40, 50, 60)
+
 /**
  * 直播间播放页（LivePlayerRoute）：播放器 + 实时弹幕 + 控制层，替换 LivePlayerPlaceholder。
  *
  * - 播放：进页 [LivePlayerViewModel.load] → 当前线路 url → ExoMediaPlayer（HLS 直播，单一地址）；
  *   画质 / 线路切换、刷新都会替换 playInfo，UI 以 url 变化为准重新起播。
- * - 弹幕：VM 的 WS 事件流收集后 send 进 DanmakuPlayer（主线程）；进房先刷一遍历史弹幕（失败静默）。
+ * - 弹幕：VM 的 WS 事件流收集后 append 进自研弹幕引擎 DanmakuView（主线程）；进房先刷一遍历史弹幕（失败静默）。
  * - 触屏：点击画面显隐控制层（几秒自动隐藏）；电视：确认键显隐控制栏、菜单键打开菜单、左右键切线路。
  */
 @Composable
@@ -151,13 +152,25 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
             )
         )
     }
-    // 弹幕播放器：AkDanmakuPlayer 在离开页面（离开组合）时 release
-    val danmakuPlayer = remember { DanmakuPlayer(SimpleRenderer()) }
-    val danmakuConfig = remember {
-        DanmakuConfig().copy(
-            retainerPolicy = RETAINER_BILIBILI,
-            textSizeScale = Prefs.defaultDanmakuScale,
-        )
+    // 弹幕引擎 View：离开页面（离开组合）时 release；位置 / 播放状态 / 倍速跟随直播流播放器
+    val danmakuView = remember {
+        DanmakuView(context).apply {
+            setPositionProvider { videoPlayer.currentPosition.coerceAtLeast(0L) }
+            setIsPlayingProvider { videoPlayer.isPlaying }
+            setPlaybackSpeedProvider { videoPlayer.speed }
+            setConfig(
+                DanmakuConfig(
+                    textSizeScale = (Prefs.defaultDanmakuScale * 100).toInt(),
+                    opacity = Prefs.defaultDanmakuOpacity,
+                )
+            )
+        }
+    }
+    DisposableEffect(danmakuView) {
+        onDispose {
+            // release() 幂等（onDetachedFromWindow 也会触发一次）
+            danmakuView.release()
+        }
     }
 
     var isBuffering by remember { mutableStateOf(true) }
@@ -167,6 +180,7 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
     var menuOpen by rememberSaveable { mutableStateOf(false) }
     var interactionTick by remember { mutableIntStateOf(0) }
     var danmakuEnabled by rememberSaveable { mutableStateOf(Prefs.defaultDanmakuEnabled) }
+    var danmakuFilterLevel by rememberSaveable { mutableIntStateOf(Prefs.defaultLiveDanmakuFilterLevel) }
     var barsVisible by rememberSaveable { mutableStateOf(false) }
 
     // 人气 / 看过人数：初始取 roomInfo，WS 事件更新
@@ -227,26 +241,20 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
 
             override fun onPlay() {
                 isBuffering = false
-                if (latestDanmakuEnabled) danmakuPlayer.start()
+                // 弹幕引擎通过 isPlayingProvider / config.enabled 自行跟随，无需显式 start
             }
 
-            override fun onPause() {
-                danmakuPlayer.pause()
-            }
+            override fun onPause() = Unit
 
             override fun onBuffering() {
                 isBuffering = true
-                danmakuPlayer.pause()
             }
 
             override fun onEnd() {
                 isBuffering = false
-                danmakuPlayer.pause()
             }
 
-            override fun onIdle() {
-                danmakuPlayer.pause()
-            }
+            override fun onIdle() = Unit
 
             override fun onSeekBack(seekBackIncrementMs: Long) = Unit
             override fun onSeekForward(seekForwardIncrementMs: Long) = Unit
@@ -255,13 +263,15 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
 
     // ------------------------------------------------------------- 弹幕
 
-    LaunchedEffect(danmakuPlayer) {
-        danmakuPlayer.updateConfig(danmakuConfig)
-    }
-
-    // 弹幕关闭时停住渲染层；新事件直接丢弃并推进游标，重新打开不会涌出积压
+    // 弹幕关闭时直接停掉引擎；新事件直接丢弃并推进游标，重新打开不会涌出积压
     LaunchedEffect(danmakuEnabled) {
-        if (!danmakuEnabled) danmakuPlayer.pause()
+        danmakuView.setConfig(
+            DanmakuConfig(
+                enabled = danmakuEnabled,
+                textSizeScale = (Prefs.defaultDanmakuScale * 100).toInt(),
+                opacity = Prefs.defaultDanmakuOpacity,
+            )
+        )
     }
 
     // WS 实时事件：弹幕 send（主线程），人气 / 看过更新；游标去重（StateFlow 会重放）
@@ -277,7 +287,12 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
             consumedDanmaku = events.size
             fresh.forEach { event ->
                 when (event) {
-                    is DanmakuEvent -> sendLiveDanmaku(danmakuPlayer, event.content)
+                    is DanmakuEvent -> {
+                        // 按发送者等级过滤（等级低于设置的丢弃）
+                        if (event.userLevel >= danmakuFilterLevel) {
+                            sendLiveDanmaku(danmakuView, videoPlayer, event.content)
+                        }
+                    }
                     is WatchedChangeEvent -> watchedText = event.textLarge
                     is RoomRealTimeMessageUpdateEvent -> popularity = event.popularity
                     else -> Unit
@@ -297,7 +312,7 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
         }.onSuccess { history ->
             history.room
                 .filter { it.dmType == 0 }
-                .forEach { item -> sendLiveDanmaku(danmakuPlayer, item.text) }
+                .forEach { item -> sendLiveDanmaku(danmakuView, videoPlayer, item.text) }
         }
     }
 
@@ -504,14 +519,12 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
             playerListener = playerListener,
         )
 
-        // 弹幕层
-        AkDanmakuPlayer(
+        // 弹幕层（透明度由引擎 config 处理）
+        BvDanmakuPlayer(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .fillMaxHeight(Prefs.defaultDanmakuArea)
-                .alpha(if (danmakuEnabled) Prefs.defaultDanmakuOpacity else 0f),
-            danmakuPlayer = danmakuPlayer,
+                .align(Alignment.Center)
+                .matchParentSize(),
+            danmakuView = danmakuView,
         )
 
         // 触屏：点画面显隐控制层 / 关菜单
@@ -580,7 +593,12 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
             visible = menuOpen,
             isTv = isTv,
             danmakuEnabled = danmakuEnabled,
+            danmakuFilterLevel = danmakuFilterLevel,
             onDanmakuToggle = { danmakuEnabled = !danmakuEnabled },
+            onDanmakuFilterLevelChange = { level ->
+                danmakuFilterLevel = level
+                Prefs.defaultLiveDanmakuFilterLevel = level
+            },
             onSwitchQuality = { qn ->
                 pendingQualityToast = true
                 vm.switchQuality(qn)
@@ -604,18 +622,25 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
     }
 }
 
-/** 直播弹幕 send（必须在主线程；position 取引擎当前时间稍后一点，立即上屏且不会被当「迟到」丢弃）。 */
-private fun sendLiveDanmaku(danmakuPlayer: DanmakuPlayer?, content: String) {
-    if (danmakuPlayer == null || danmakuPlayer.isReleased || content.isBlank()) return
-    danmakuPlayer.send(
-        DanmakuItemData(
-            danmakuId = 0L,
-            position = danmakuPlayer.currentTimeMs + 100L,
-            content = content,
-            mode = DanmakuItemData.DANMAKU_MODE_ROLLING,
-            textSize = 25,
-            textColor = android.graphics.Color.WHITE,
-        )
+/**
+ * 直播弹幕 append（必须在主线程；position 取播放器当前位置稍后一点，
+ * 下一帧就会被引擎拾取上屏，且不会被当「迟到」丢弃）。
+ */
+private fun sendLiveDanmaku(danmakuView: DanmakuView?, videoPlayer: AbstractVideoPlayer, content: String) {
+    if (danmakuView == null || content.isBlank()) return
+    danmakuView.appendDanmakus(
+        listOf(
+            Danmaku(
+                dmid = 0L,
+                positionMs = videoPlayer.currentPosition.coerceAtLeast(0L).toInt() + 100,
+                text = content,
+                type = Danmaku.MODE_SCROLL,
+                textSize = 25,
+                color = android.graphics.Color.WHITE,
+            )
+        ),
+        maxItems = 5000,
+        alreadySorted = true,
     )
 }
 
@@ -784,7 +809,9 @@ private fun LiveMenuPanel(
     visible: Boolean,
     isTv: Boolean,
     danmakuEnabled: Boolean,
+    danmakuFilterLevel: Int,
     onDanmakuToggle: () -> Unit,
+    onDanmakuFilterLevelChange: (Int) -> Unit,
     onSwitchQuality: (Int) -> Unit,
     onSwitchLine: (Int) -> Unit,
     onClose: () -> Unit,
@@ -905,6 +932,24 @@ private fun LiveMenuPanel(
                         selected = danmakuEnabled,
                         onClick = onDanmakuToggle,
                     )
+                    // 按发送者用户等级过滤实时弹幕（历史弹幕没有等级信息，不过滤）
+                    Text(
+                        text = stringResource(R.string.live_player_danmaku_filter_level),
+                        style = BvType.Section,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        LiveDanmakuFilterLevelPresets.forEach { level ->
+                            BvChip(
+                                text = stringResource(R.string.live_player_danmaku_filter_level_value, level),
+                                selected = level == danmakuFilterLevel,
+                                onClick = { onDanmakuFilterLevelChange(level) },
+                            )
+                        }
+                    }
                 }
             }
         }

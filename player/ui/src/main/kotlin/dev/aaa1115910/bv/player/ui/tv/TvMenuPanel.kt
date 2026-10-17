@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.aaa1115910.bv.player.entity.DanmakuType
+import dev.aaa1115910.bv.player.danmaku.DanmakuLaneDensity
 import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
 import dev.aaa1115910.bv.player.entity.VideoListItem
@@ -94,6 +95,7 @@ private val OptionText = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWei
 private val DanmakuScalePresets = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f, 3f, 4f)
 private val DanmakuOpacityPresets = listOf(0.2f, 0.4f, 0.6f, 0.8f, 1f)
 private val DanmakuAreaPresets = listOf(0.25f, 0.5f, 0.75f, 1f)
+private val DanmakuFilterLevelPresets = listOf(0, 2, 4, 6, 8, 10)
 private val SubtitleSizePresets = listOf(16, 20, 24, 28, 32, 40, 48)
 private val SubtitleBackgroundPresets = listOf(0f, 0.2f, 0.4f, 0.6f, 0.8f, 1f)
 private val SubtitlePaddingPresets = listOf(0, 8, 12, 16, 24, 32, 48)
@@ -174,7 +176,7 @@ private fun <T> LazyListScope.optionSection(
  * 电视菜单面板（长按确认或菜单键打开）：
  * 左列分类（宽 96，surfaceContainerHigh，聚焦即选中），右列选项（Eyebrow 标题 + ✓ 选项）。
  * 菜单内容沿用旧 MenuController：画面（分辨率、编码、画面比例、倍速、音质）、
- * 弹幕（开关、类型、大小、透明度、区域、蒙版）、字幕（轨道、字号、背景透明度、底部边距）、其他（播放模式）。
+ * 弹幕（开关、类型、密度、大小、透明度、区域、蒙版、等级过滤）、字幕（轨道、字号、背景透明度、底部边距）、其他（播放模式）。
  */
 @Composable
 internal fun TvMenuPanel(
@@ -312,6 +314,23 @@ private fun LazyListScope.danmakuOptions(menuState: PlayerMenuState, context: an
         onSelect = { menuState.toggleDanmakuType(it) },
     )
     optionSection(
+        key = "danmakuDensity",
+        title = { stringResource(R.string.player_ui_danmaku_density) },
+        first = false,
+        options = DanmakuLaneDensity.entries,
+        label = {
+            stringResource(
+                when (it) {
+                    DanmakuLaneDensity.Sparse -> R.string.player_ui_danmaku_density_sparse
+                    DanmakuLaneDensity.Standard -> R.string.player_ui_danmaku_density_standard
+                    DanmakuLaneDensity.Dense -> R.string.player_ui_danmaku_density_dense
+                }
+            )
+        },
+        isSelected = { it == menuState.danmakuLaneDensity },
+        onSelect = { menuState.setDanmakuLaneDensity(it) },
+    )
+    optionSection(
         key = "danmakuScale",
         title = { stringResource(R.string.player_ui_danmaku_size) },
         first = false,
@@ -346,6 +365,19 @@ private fun LazyListScope.danmakuOptions(menuState: PlayerMenuState, context: an
         label = { stringResource(if (it) R.string.player_ui_on else R.string.player_ui_off) },
         isSelected = { it == menuState.danmakuMask },
         onSelect = { menuState.setDanmakuMask(it) },
+    )
+    optionSection(
+        key = "danmakuFilterLevel",
+        title = { stringResource(R.string.player_ui_danmaku_filter_level) },
+        first = false,
+        options = DanmakuFilterLevelPresets,
+        label = { stringResource(R.string.player_ui_danmaku_filter_level_value, it) },
+        // 档位选中规则：当前等级落在 [preset, 下一档) 区间内即视为选中该档
+        isSelected = { preset ->
+            val next = DanmakuFilterLevelPresets.getOrNull(DanmakuFilterLevelPresets.indexOf(preset) + 1)
+            menuState.danmakuFilterLevel >= preset && (next == null || menuState.danmakuFilterLevel < next)
+        },
+        onSelect = { menuState.setDanmakuFilterLevel(it) },
     )
 }
 

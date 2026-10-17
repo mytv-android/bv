@@ -24,6 +24,7 @@ import dev.aaa1115910.bv.entity.PlayerType
 import dev.aaa1115910.bv.entity.ThemePrefs
 import dev.aaa1115910.bv.entity.ThemeSource
 import dev.aaa1115910.bv.entity.ThemeType
+import dev.aaa1115910.bv.player.danmaku.DanmakuLaneDensity
 import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.AudioBalanceLevel
 import dev.aaa1115910.bv.player.entity.DanmakuType
@@ -155,6 +156,39 @@ object Prefs {
             dsm.getPreferenceFlow(PrefKeys.prefDefaultDanmakuAreaRequest).first()
         }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefDefaultDanmakuAreaKey, value) }
+
+    var defaultDanmakuLaneDensity: DanmakuLaneDensity
+        get() = runBlocking {
+            val name = dsm.getPreferenceFlow(PrefKeys.prefDefaultDanmakuLaneDensityRequest).first()
+            DanmakuLaneDensity.entries.firstOrNull { it.name == name } ?: DanmakuLaneDensity.Standard
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefDefaultDanmakuLaneDensityKey, value.name)
+        }
+
+    var defaultDanmakuRollingDurationFactor: Float
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefDefaultDanmakuRollingDurationFactorRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefDefaultDanmakuRollingDurationFactorKey, value)
+        }
+
+    var defaultDanmakuFilterLevel: Int
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefDefaultDanmakuFilterLevelRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefDefaultDanmakuFilterLevelKey, value)
+        }
+
+    var defaultLiveDanmakuFilterLevel: Int
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefDefaultLiveDanmakuFilterLevelRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefDefaultLiveDanmakuFilterLevelKey, value)
+        }
 
     var defaultVideoCodec: dev.aaa1115910.bv.player.entity.VideoCodec
         get() = dev.aaa1115910.bv.player.entity.VideoCodec.Companion.fromCode(
@@ -483,6 +517,10 @@ object PrefKeys {
     val prefDefaultDanmakuEnabledKey = booleanPreferencesKey("dde")
     val prefDefaultDanmakuTypesKey = stringPreferencesKey("ddts")
     val prefDefaultDanmakuAreaKey = floatPreferencesKey("dda")
+    val prefDefaultDanmakuLaneDensityKey = stringPreferencesKey("ddld")
+    val prefDefaultDanmakuRollingDurationFactorKey = floatPreferencesKey("ddrdf")
+    val prefDefaultDanmakuFilterLevelKey = intPreferencesKey("default_danmaku_filter_level")
+    val prefDefaultLiveDanmakuFilterLevelKey = intPreferencesKey("default_live_danmaku_filter_level")
     val prefDefaultVideoCodecKey = intPreferencesKey("dvc")
     val prefEnabledFirebaseCollectionKey = booleanPreferencesKey("efc")
     val prefIncognitoModeKey = booleanPreferencesKey("im")
@@ -539,6 +577,13 @@ object PrefKeys {
     val prefDefaultDanmakuTypesRequest =
         PreferenceRequest(prefDefaultDanmakuTypesKey, "0,1,2,3")
     val prefDefaultDanmakuAreaRequest = PreferenceRequest(prefDefaultDanmakuAreaKey, 1f)
+    val prefDefaultDanmakuLaneDensityRequest =
+        PreferenceRequest(prefDefaultDanmakuLaneDensityKey, DanmakuLaneDensity.Standard.name)
+    val prefDefaultDanmakuRollingDurationFactorRequest =
+        PreferenceRequest(prefDefaultDanmakuRollingDurationFactorKey, 1f)
+    val prefDefaultDanmakuFilterLevelRequest = PreferenceRequest(prefDefaultDanmakuFilterLevelKey, 0)
+    val prefDefaultLiveDanmakuFilterLevelRequest =
+        PreferenceRequest(prefDefaultLiveDanmakuFilterLevelKey, 0)
     val prefDefaultVideoCodecRequest =
         PreferenceRequest(prefDefaultVideoCodecKey, VideoCodec.AVC.ordinal)
     val prefEnabledFirebaseCollectionRequest =

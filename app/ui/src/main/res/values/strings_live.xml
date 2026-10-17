@@ -23,6 +23,8 @@
     <string name="live_player_line_label">线路 %1$d</string>
     <string name="live_player_danmaku_on">弹幕开</string>
     <string name="live_player_danmaku_off">弹幕关</string>
+    <string name="live_player_danmaku_filter_level">按用户等级过滤</string>
+    <string name="live_player_danmaku_filter_level_value">LV%1$d 以下</string>
     <string name="live_player_switched_quality">已切换到画质 %1$s</string>
     <string name="live_player_switched_line">已切换到%1$s</string>
     <string name="live_player_popularity">人气 %1$s</string>

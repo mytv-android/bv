@@ -372,12 +372,18 @@ object LiveDataWebSocket {
                     medalLevel = dataJson["info"]?.jsonArray?.get(3)?.jsonArray?.get(0)?.jsonPrimitive?.int
                     medalName = dataJson["info"]?.jsonArray?.get(3)?.jsonArray?.get(1)?.jsonPrimitive?.content
                 }
+                // 发送者用户等级 info[4][0]，解析失败按 0 处理（不过滤）
+                var userLevel = 0
+                runCatching {
+                    userLevel = dataJson["info"]!!.jsonArray[4].jsonArray[0].jsonPrimitive.int
+                }
                 DanmakuEvent(
                     content = danmakuContent,
                     mid = senderMid,
                     username = senderUsername,
                     medalName = medalName,
-                    medalLevel = medalLevel
+                    medalLevel = medalLevel,
+                    userLevel = userLevel
                 )
             }.onFailure {
                 logger.warn { "Parse danmaku content failed: ${it.message}" }

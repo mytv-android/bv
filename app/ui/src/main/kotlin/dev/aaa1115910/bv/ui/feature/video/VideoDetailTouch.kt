@@ -26,6 +26,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import dev.aaa1115910.biliapi.repositories.VideoDetailRepository
+import dev.aaa1115910.bv.player.danmaku.DanmakuView
 import dev.aaa1115910.bv.player.entity.VideoListItemData
 import dev.aaa1115910.bv.ui.designsystem.adaptive.DeviceLayout
 import dev.aaa1115910.bv.ui.feature.player.BvPlayerHost
@@ -239,16 +240,22 @@ private fun DetailEmbeddedPlayer(
 ) {
     val context = LocalContext.current
     val videoPlayer = remember { createVideoPlayer(context) }
-    // ViewModel 里可能还是上次（已释放）的弹幕播放器，等 loadPlayUrl 创建新的之后再交给播放器
-    val staleDanmaku = remember { playerVm.danmakuPlayer }
+    // 自研弹幕引擎 View：每个播放页一个实例，交给 ViewModel 喂数据，离开页面时释放
+    val danmakuView = remember { DanmakuView(context).also { playerVm.danmakuView = it } }
     val latestBeforePlay by rememberUpdatedState(onBeforePlay)
 
     DisposableEffect(videoPlayer) {
         playerVm.videoPlayer = videoPlayer
         onDispose {
             if (playerVm.videoPlayer === videoPlayer) playerVm.videoPlayer = null
-            // release() 可重复调用；下次进入时 loadPlayUrl 会创建新的弹幕播放器
-            playerVm.danmakuPlayer?.release()
+        }
+    }
+
+    DisposableEffect(danmakuView) {
+        onDispose {
+            // release() 幂等（onDetachedFromWindow 也会触发一次）
+            danmakuView.release()
+            if (playerVm.danmakuView === danmakuView) playerVm.danmakuView = null
         }
     }
 
@@ -290,7 +297,7 @@ private fun DetailEmbeddedPlayer(
     BvPlayerHost(
         playerVm = playerVm,
         videoPlayer = videoPlayer,
-        danmakuPlayer = playerVm.danmakuPlayer.takeIf { it !== staleDanmaku },
+        danmakuView = danmakuView,
         cover = args.cover,
         isTv = false,
         isTablet = args.isTablet,
