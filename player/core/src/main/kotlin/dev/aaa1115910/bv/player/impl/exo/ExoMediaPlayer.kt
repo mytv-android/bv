@@ -15,7 +15,7 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
-import dev.aaa1115910.bv.player.OkHttpUtil
+import dev.aaa1115910.bv.player.PlayerHttpClient
 import dev.aaa1115910.bv.player.VideoPlayerOptions
 import dev.aaa1115910.bv.util.formatHourMinSec
 
@@ -29,7 +29,7 @@ class ExoMediaPlayer(
 
     @OptIn(UnstableApi::class)
     private val dataSourceFactory =
-        OkHttpDataSource.Factory(OkHttpUtil.generateCustomSslOkHttpClient(context)).apply {
+        OkHttpDataSource.Factory(PlayerHttpClient.get(context)).apply {
             options.userAgent?.let { setUserAgent(it) }
             options.referer?.let { setDefaultRequestProperties(mapOf("referer" to it)) }
         }
