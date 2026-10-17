@@ -100,6 +100,7 @@ class BVApp : Application() {
 
     private fun initWebCookieManager() {
         WebCookieManager.refreshTokenProvider = { Prefs.refreshToken }
+        WebCookieManager.midProvider = { Prefs.uid }
         WebCookieManager.cookieGetter = { name ->
             // buvid3 在引入 Web Cookie 之前就由 Prefs 生成并用于请求头，
             // 首次运行时用它兜底，保证与 finger/spi 返回的 buvid4 能配对

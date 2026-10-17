@@ -156,7 +156,8 @@ fun HttpClient.encApiSign() = plugin(HttpSend)
             // app 端如果既用到了 wbi get 接口，也用到了 token 去请求，那是先计算 wbi sign 还是 app sign？
             // 目前看来需要计算 wbi sign 的接口之前忘记计算 app sign 都通过校验了🤯
             HttpMethod.Get -> {
-                val isWbiRequest = request.url.encodedPath.contains("wbi")
+                val isWbiRequest = request.url.encodedPath.contains("wbi") ||
+                    request.url.encodedPath.contains("/xlive/web-room/v1/index/getDanmuInfo")
                 if (isWbiRequest) {
                     println("Enc wbi for get request: ${getUrlWithoutAccessToken(request.url)}")
                     request.encWbi()

@@ -17,6 +17,13 @@ import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.hls.HlsMediaSource
+import androidx.media3.exoplayer.hls.playlist.HlsMediaPlaylist
+import androidx.media3.exoplayer.hls.playlist.HlsMultivariantPlaylist
+import androidx.media3.exoplayer.hls.playlist.HlsPlaylist
+import androidx.media3.exoplayer.hls.playlist.HlsPlaylistParserFactory
+import androidx.media3.exoplayer.hls.playlist.DefaultHlsPlaylistParserFactory
+import androidx.media3.exoplayer.upstream.ParsingLoadable
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.PlayerHttpClient
 import dev.aaa1115910.bv.player.VideoPlayerOptions
@@ -26,13 +33,21 @@ import dev.aaa1115910.bv.player.entity.AudioBalanceLevel
 import dev.aaa1115910.bv.player.entity.AudioLoudness
 import dev.aaa1115910.bv.util.formatHourMinSec
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import java.net.URI
+import java.util.Locale
 
 /** 低于该倍速不启用跳过静音：压缩音频时间轴会让作为主时钟的音频位置快进，画面跟着跳帧 */
 private const val SKIP_SILENCE_MIN_SPEED = 2.5f
 
 /** 同一个视频最多自动切换 CDN 候选地址的次数（播放失败与频繁缓冲共用此预算） */
 private const val MAX_CDN_SWITCHES = 3
+
+/** BEHIND_LIVE_WINDOW 恢复的滑动窗口与限额：15 秒内最多 2 次，最小间隔 1.2 秒 */
+private const val BEHIND_LIVE_WINDOW_WINDOW_MS = 15_000L
+private const val BEHIND_LIVE_WINDOW_MIN_INTERVAL_MS = 1_200L
+private const val BEHIND_LIVE_WINDOW_MAX_RECOVERS = 2
 
 @OptIn(UnstableApi::class)
 class ExoMediaPlayer(
@@ -61,6 +76,11 @@ class ExoMediaPlayer(
     private var cdnFailoverEnabled = options.enableCdnFailover
 
     private val bufferingDetector = FrequentBufferingDetector()
+
+    // BEHIND_LIVE_WINDOW 恢复状态（直播 HLS 播放窗口滑动过快时触发）
+    private var behindLiveWindowWindowStartAtMs = 0L
+    private var behindLiveWindowLastRecoverAtMs = 0L
+    private var behindLiveWindowRecoverCount = 0
 
     @OptIn(UnstableApi::class)
     private val dataSourceFactory =
@@ -157,9 +177,22 @@ class ExoMediaPlayer(
     private fun List<String>.candidateAt(index: Int): String? =
         getOrNull(index) ?: lastOrNull()
 
-    private fun createMediaSource(url: String): MediaSource =
-        ProgressiveMediaSource.Factory(dataSourceFactory)
-            .createMediaSource(MediaItem.fromUri(url))
+    private fun createMediaSource(url: String): MediaSource {
+        val isHls = url
+            .substringBefore('?')
+            .trim()
+            .lowercase(Locale.US)
+            .endsWith(".m3u8")
+        return if (isHls) {
+            HlsMediaSource
+                .Factory(dataSourceFactory)
+                .setPlaylistParserFactory(ExtXStartStrippingHlsPlaylistParserFactory())
+                .createMediaSource(MediaItem.fromUri(url))
+        } else {
+            ProgressiveMediaSource.Factory(dataSourceFactory)
+                .createMediaSource(MediaItem.fromUri(url))
+        }
+    }
 
     override fun setCdnFailoverEnabled(enabled: Boolean) {
         cdnFailoverEnabled = enabled
@@ -230,6 +263,9 @@ class ExoMediaPlayer(
     override fun setAudioLoudness(loudness: AudioLoudness?) {
         volumeBalanceProcessor?.setLoudness(loudness)
     }
+
+    override val isLive: Boolean
+        get() = mPlayer?.isCurrentMediaItemLive == true
 
     override val tcpSpeed: Long
         get() = 0L
@@ -355,9 +391,52 @@ class ExoMediaPlayer(
         get() = mPlayer?.videoSize?.height ?: 0
 
     override fun onPlayerError(error: PlaybackException) {
+        // 直播 HLS 窗口滑动问题优先走专用恢复，不做 CDN 切换
+        if (error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW) {
+            tryRecoverBehindLiveWindow(error)
+            return
+        }
         // 播放失败先尝试下一个候选地址；候选耗尽或次数用尽才把错误抛给上层
         if (trySwitchToNextCdn("播放失败")) return
         mPlayerEventListener?.onError(error)
+    }
+
+    /**
+     * BEHIND_LIVE_WINDOW 两级恢复：第 1 次轻量恢复（seekToDefaultPosition + prepare），
+     * 第 2 次重建 MediaSource；15 秒滑动窗口内最多 2 次，最小间隔 1.2 秒，超限上报错误。
+     */
+    private fun tryRecoverBehindLiveWindow(error: PlaybackException) {
+        val player = mPlayer ?: run {
+            mPlayerEventListener?.onError(error)
+            return
+        }
+        val nowMs = SystemClock.elapsedRealtime()
+        if (behindLiveWindowWindowStartAtMs <= 0L ||
+            nowMs - behindLiveWindowWindowStartAtMs > BEHIND_LIVE_WINDOW_WINDOW_MS
+        ) {
+            behindLiveWindowWindowStartAtMs = nowMs
+            behindLiveWindowRecoverCount = 0
+        }
+        if (nowMs - behindLiveWindowLastRecoverAtMs < BEHIND_LIVE_WINDOW_MIN_INTERVAL_MS) return
+        if (behindLiveWindowRecoverCount >= BEHIND_LIVE_WINDOW_MAX_RECOVERS) {
+            mPlayerEventListener?.onError(error)
+            return
+        }
+        behindLiveWindowRecoverCount++
+        behindLiveWindowLastRecoverAtMs = nowMs
+        logger.warn { "BEHIND_LIVE_WINDOW 恢复（第 $behindLiveWindowRecoverCount 次）" }
+        if (behindLiveWindowRecoverCount == 1) {
+            player.seekToDefaultPosition()
+            player.prepare()
+            player.playWhenReady = true
+        } else {
+            mMediaSource?.let { source ->
+                player.stop()
+                player.setMediaSource(source)
+                player.prepare()
+                player.playWhenReady = true
+            } ?: mPlayerEventListener?.onError(error)
+        }
     }
 }
 
@@ -384,5 +463,45 @@ private class BvRenderersFactory(
             .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
         volumeBalanceProcessor?.let { builder.setAudioProcessors(arrayOf(it)) }
         return builder.build()
+    }
+}
+
+/**
+ * 剥离 `#EXT-X-START` 标签的 HLS playlist 解析器工厂。
+ *
+ * B 站直播 HLS playlist 带该标签时 ExoPlayer 会算错直播窗口起点，
+ * 起播几秒即报 ERROR_CODE_BEHIND_LIVE_WINDOW；解析前把这一行过滤掉。
+ */
+@OptIn(UnstableApi::class)
+private class ExtXStartStrippingHlsPlaylistParserFactory(
+    private val delegate: HlsPlaylistParserFactory = DefaultHlsPlaylistParserFactory(),
+) : HlsPlaylistParserFactory {
+    override fun createPlaylistParser(): ParsingLoadable.Parser<HlsPlaylist> =
+        ExtXStartStrippingParser(delegate.createPlaylistParser())
+
+    override fun createPlaylistParser(
+        multivariantPlaylist: HlsMultivariantPlaylist,
+        previousMediaPlaylist: HlsMediaPlaylist?,
+    ): ParsingLoadable.Parser<HlsPlaylist> =
+        ExtXStartStrippingParser(
+            delegate.createPlaylistParser(multivariantPlaylist, previousMediaPlaylist),
+        )
+}
+
+@OptIn(UnstableApi::class)
+private class ExtXStartStrippingParser(
+    private val delegate: ParsingLoadable.Parser<HlsPlaylist>,
+) : ParsingLoadable.Parser<HlsPlaylist> {
+    override fun parse(uri: android.net.Uri, inputStream: InputStream): HlsPlaylist {
+        val bytes = inputStream.readBytes()
+        val text = String(bytes, Charsets.UTF_8)
+        if (!text.contains("#EXT-X-START", ignoreCase = true)) {
+            return delegate.parse(uri, ByteArrayInputStream(bytes))
+        }
+        val filtered = text
+            .lineSequence()
+            .filterNot { it.trimStart().startsWith("#EXT-X-START", ignoreCase = true) }
+            .joinToString("\n")
+        return delegate.parse(uri, ByteArrayInputStream(filtered.toByteArray(Charsets.UTF_8)))
     }
 }

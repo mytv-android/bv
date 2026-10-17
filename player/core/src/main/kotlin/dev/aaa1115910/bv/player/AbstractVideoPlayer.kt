@@ -78,6 +78,10 @@ abstract class AbstractVideoPlayer {
      */
     open fun setAudioLoudness(loudness: AudioLoudness?) {}
 
+    /** 当前媒体是否为直播流（HLS 直播窗口等场景需要区分点播/直播行为） */
+    open val isLive: Boolean
+        get() = false
+
     /** 当前缓冲的网速 */
     abstract val tcpSpeed: Long
 
