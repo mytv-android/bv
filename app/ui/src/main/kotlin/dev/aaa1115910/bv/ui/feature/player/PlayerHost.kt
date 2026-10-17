@@ -9,7 +9,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -80,14 +79,7 @@ internal fun BvPlayerHost(
     val scope = rememberCoroutineScope()
     val themePrefs = LocalThemePrefs.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val view = LocalView.current
     val latestOnLoadNewVideo by rememberUpdatedState(onLoadNewVideo)
-
-    // 旧播放页 FLAG_KEEP_SCREEN_ON
-    DisposableEffect(view) {
-        view.keepScreenOn = true
-        onDispose { view.keepScreenOn = false }
-    }
 
     // 旧播放页 onPause：暂停视频和弹幕
     DisposableEffect(lifecycleOwner, videoPlayer) {

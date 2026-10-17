@@ -54,6 +54,9 @@ fun CommentItem(
     onPictureClick: ((pictures: List<Picture>, index: Int) -> Unit)? = null,
     onReplyClick: (() -> Unit)? = null,
     onAvatarClick: (() -> Unit)? = null,
+    /** 正文展开状态；为 null 时由组件内部托管（触屏点击「展开/收起」），电视端由评论面板托管以便遥控器触发。 */
+    textExpanded: Boolean? = null,
+    onToggleTextExpand: (() -> Unit)? = null,
 ) {
     Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         BvAvatar(
@@ -71,7 +74,7 @@ fun CommentItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            CommentText(comment.content, comment.emotes, maxLines)
+            CommentText(comment.content, comment.emotes, maxLines, textExpanded, onToggleTextExpand)
             if (comment.pictures.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     comment.pictures.take(3).forEachIndexed { index, picture ->
@@ -125,7 +128,13 @@ fun CommentItem(
 }
 
 @Composable
-private fun CommentText(content: List<String>, emotes: List<Comment.Emote>, maxLines: Int) {
+private fun CommentText(
+    content: List<String>,
+    emotes: List<Comment.Emote>,
+    maxLines: Int,
+    textExpanded: Boolean?,
+    onToggleTextExpand: (() -> Unit)?,
+) {
     val emoteNames = remember(emotes) { emotes.map { it.text }.toSet() }
     val inline = remember(emotes) {
         emotes.associate { emote ->
@@ -138,7 +147,8 @@ private fun CommentText(content: List<String>, emotes: List<Comment.Emote>, maxL
             ) { AsyncImage(model = emote.url, contentDescription = null) }
         }
     }
-    var expanded by remember { mutableStateOf(false) }
+    var internalExpanded by remember { mutableStateOf(false) }
+    val expanded = textExpanded ?: internalExpanded
     var overflow by remember { mutableStateOf(false) }
     Text(
         buildAnnotatedString {
@@ -154,7 +164,10 @@ private fun CommentText(content: List<String>, emotes: List<Comment.Emote>, maxL
     if (overflow) {
         Text(
             stringResource(if (expanded) R.string.ds_collapse else R.string.ds_expand),
-            modifier = Modifier.clickable { expanded = !expanded },
+            modifier = Modifier.clickable {
+                if (textExpanded == null) internalExpanded = !internalExpanded
+                else onToggleTextExpand?.invoke()
+            },
             style = BvType.Label.copy(fontWeight = FontWeight.Bold),
             color = MaterialTheme.colorScheme.primary,
         )

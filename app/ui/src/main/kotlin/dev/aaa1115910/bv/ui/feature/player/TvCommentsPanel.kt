@@ -2,6 +2,7 @@ package dev.aaa1115910.bv.ui.feature.player
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +24,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -56,6 +58,8 @@ internal fun TvCommentsPanel(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val firstRequester = remember { FocusRequester() }
+    // 长评论展开状态：按 rpid 记录，切换排序 / 加载更多后保持
+    val expandedComments = remember { mutableStateMapOf<Long, Boolean>() }
 
     BackHandler(onBack = onDismiss)
 
@@ -132,10 +136,19 @@ internal fun TvCommentsPanel(
                     items(commentVm.comments) { comment ->
                         CommentItem(
                             comment = comment,
+                            // clickable 让遥控器确认键展开 / 收起长评论（短评论不溢出，切换无变化）
                             modifier = Modifier
-                                .bvFocus(scale = 1f, corner = 16.dp, addFocusable = true)
+                                .bvFocus(scale = 1f, corner = 16.dp)
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    expandedComments[comment.rpid] = expandedComments[comment.rpid] != true
+                                }
                                 .padding(8.dp),
                             maxLines = 8,
+                            textExpanded = expandedComments[comment.rpid] == true,
+                            onToggleTextExpand = {
+                                expandedComments[comment.rpid] = expandedComments[comment.rpid] != true
+                            },
                         )
                     }
                     if (commentVm.updatingComments) {
