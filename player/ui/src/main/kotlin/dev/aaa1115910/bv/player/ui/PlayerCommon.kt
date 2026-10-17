@@ -56,6 +56,7 @@ import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoInfoData
 import dev.aaa1115910.bv.player.entity.VideoListItem
 import dev.aaa1115910.bv.player.entity.VideoListItemData
+import dev.aaa1115910.bv.player.entity.VideoListInteractiveNode
 import dev.aaa1115910.bv.player.entity.VideoListPart
 import dev.aaa1115910.bv.player.entity.VideoListPgcEpisode
 import dev.aaa1115910.bv.player.entity.VideoListUgcEpisode
@@ -79,6 +80,11 @@ internal fun VideoListItem.displayTitle(context: Context, inUgcSeason: Boolean):
     is VideoListPart -> (if (inUgcSeason) " - " else "") +
             context.getString(R.string.player_ui_part_label, index + 1, title)
 
+    is VideoListInteractiveNode -> context.getString(
+        R.string.player_ui_branch_label,
+        index + 1,
+        partTitle.ifBlank { context.getString(R.string.player_ui_branch_unnamed) }
+    )
     is VideoListUgcEpisode -> context.getString(R.string.player_ui_episode_label, index + 1, title)
     is VideoListPgcEpisode -> title
     is VideoListUgcEpisodeTitle -> context.getString(R.string.player_ui_episode_label, index + 1, title)

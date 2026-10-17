@@ -25,6 +25,9 @@ data class VideoDetail(
     val epid: Int?,
     val argueTip: String?,
     val tags: List<Tag>,
+    var isInteractive: Boolean = false,
+    var interactiveGraphVersion: Int? = null,
+    var interactiveNodes: List<InteractiveNode> = emptyList(),
     val userActions: UserActions,
     var history: History,
     var playerIcon: PlayerIcon? = null
@@ -51,6 +54,7 @@ data class VideoDetail(
                     }.getOrNull(),
                     argueTip = viewReply.argueMsg.takeIf { it.isNotEmpty() },
                     tags = viewReply.tagList.map { Tag.fromTag(it) },
+                    isInteractive = false,
                     userActions = UserActions.fromReqUser(viewReply.reqUser),
                     history = History.fromHistory(viewReply.history),
                     playerIcon = viewReply.playerIcon?.let { PlayerIcon.fromPlayerIcon(it) }
@@ -79,6 +83,7 @@ data class VideoDetail(
                     }.getOrNull(),
                     argueTip = viewReply.activitySeason.argueMsg.takeIf { it.isNotEmpty() },
                     tags = viewReply.tagList.map { Tag.fromTag(it) },
+                    isInteractive = false,
                     userActions = UserActions.fromReqUser(viewReply.activitySeason.reqUser),
                     history = History.fromHistory(viewReply.activitySeason.history),
                     playerIcon = viewReply.activitySeason.playerIcon?.let {
@@ -109,6 +114,7 @@ data class VideoDetail(
                 epid = videoDetail.view.redirectUrl?.split("ep", "?")?.get(1)?.toInt(),
                 argueTip = videoDetail.view.stat.argueMsg.takeIf { it.isNotEmpty() },
                 tags = videoDetail.tags.map { Tag.fromTag(it) },
+                isInteractive = videoDetail.view.isStory || videoDetail.view.rights.isSteinGate == 1,
                 userActions = UserActions(),
                 history = History(0, 0),
                 playerIcon = null

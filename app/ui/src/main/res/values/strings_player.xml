@@ -5,4 +5,10 @@
     <string name="player_screen_comments_empty">还没有评论</string>
     <string name="player_screen_sort_hot">最热</string>
     <string name="player_screen_sort_time">最新</string>
+
+    <!-- 互动视频选项弹窗 -->
+    <string name="player_screen_interactive_title">互动选项</string>
+    <string name="player_screen_interactive_description">当前片段播放完成，请选择下一个分支</string>
+    <string name="player_screen_interactive_exit">退出播放</string>
+    <string name="player_screen_interactive_option_fallback">选项 %1$d</string>
 </resources>

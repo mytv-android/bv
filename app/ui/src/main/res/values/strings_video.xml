@@ -24,6 +24,10 @@
     <string name="video_detail_related">相关推荐</string>
     <string name="video_detail_part_label">P%1$d %2$s</string>
     <string name="video_detail_part_short">P%d</string>
+    <string name="video_detail_interactive_badge">互动视频</string>
+    <string name="video_detail_interactive_branches">互动分支</string>
+    <string name="video_detail_branch_label">分支%1$d %2$s</string>
+    <string name="video_detail_branch_unnamed">未命名分支</string>
     <string name="video_detail_episode_number">第 %s 话</string>
     <string name="video_detail_season_feature">正片</string>
     <string name="video_detail_play">播放</string>

@@ -18,14 +18,17 @@ import dev.aaa1115910.bv.player.danmaku.DanmakuView
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerDanmakuMasksData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerHistoryData
+import dev.aaa1115910.bv.player.entity.LocalVideoPlayerInteractiveData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerLoadStateData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerLogsData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerPaymentData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekThumbData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoInfoData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoShotData
+import dev.aaa1115910.bv.player.entity.VideoListInteractiveNode
 import dev.aaa1115910.bv.player.entity.VideoListItemData
 import dev.aaa1115910.bv.player.entity.VideoPlayerConfigData
+import dev.aaa1115910.bv.player.entity.VideoPlayerInteractiveData
 import dev.aaa1115910.bv.player.entity.VideoPlayerDanmakuMasksData
 import dev.aaa1115910.bv.player.entity.VideoPlayerHistoryData
 import dev.aaa1115910.bv.player.entity.VideoPlayerLoadStateData
@@ -127,6 +130,11 @@ internal fun BvPlayerHost(
                     isPreviewPlayback = playerVm.isPreviewPlayback,
                     showPreviewTip = playerVm.showPreviewTip,
                 ),
+                LocalVideoPlayerInteractiveData provides VideoPlayerInteractiveData(
+                    isInteractive = playerVm.isInteractivePlayback,
+                    showDialog = playerVm.showInteractiveOptionDialog,
+                    options = playerVm.interactiveOptions,
+                ),
                 LocalVideoPlayerLoadStateData provides VideoPlayerLoadStateData(
                     loadState = playerVm.loadState,
                     errorMessage = playerVm.errorMessage,
@@ -207,18 +215,24 @@ internal fun BvPlayerHost(
                     onLoadNextVideo = { playerVm.playNextVideo() },
                     onLoadNewVideo = { videoListItem ->
                         if (videoListItem is VideoListItemData) {
-                            val override = latestOnLoadNewVideo
-                            if (override != null) {
-                                override(videoListItem)
+                            if (videoListItem is VideoListInteractiveNode) {
+                                // 互动分支：走状态机切换（记录节点路径、跳到节点起始位置），
+                                // 优先于页面自己的 override，避免重建选集列表破坏节点图
+                                playerVm.playInteractiveOption(videoListItem)
                             } else {
-                                playerVm.partTitle = videoListItem.title
-                                playerVm.loadPlayUrl(
-                                    avid = videoListItem.aid,
-                                    cid = videoListItem.cid,
-                                    epid = videoListItem.epid,
-                                    seasonId = videoListItem.seasonId,
-                                    continuePlayNext = true
-                                )
+                                val override = latestOnLoadNewVideo
+                                if (override != null) {
+                                    override(videoListItem)
+                                } else {
+                                    playerVm.partTitle = videoListItem.title
+                                    playerVm.loadPlayUrl(
+                                        avid = videoListItem.aid,
+                                        cid = videoListItem.cid,
+                                        epid = videoListItem.epid,
+                                        seasonId = videoListItem.seasonId,
+                                        continuePlayNext = true
+                                    )
+                                }
                             }
                         }
                     },
@@ -313,6 +327,20 @@ internal fun BvPlayerHost(
                     onRemoteControlHintDismiss = onRemoteControlHintDismiss,
                     reduceMotion = themePrefs.reduceMotion,
                 )
+                // 互动视频选项弹窗：节点播完弹出（Dialog 独立窗口，浮在播放器上）
+                val interactiveData = LocalVideoPlayerInteractiveData.current
+                if (interactiveData.isInteractive &&
+                    interactiveData.showDialog &&
+                    interactiveData.options.isNotEmpty()
+                ) {
+                    InteractiveOptionDialog(
+                        options = interactiveData.options,
+                        currentCid = playerVm.currentCid,
+                        onSelectOption = playerVm::playInteractiveOption,
+                        onDismiss = playerVm::dismissInteractiveOptionDialog,
+                        onExit = onExit,
+                    )
+                }
             }
         }
     }

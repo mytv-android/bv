@@ -55,6 +55,16 @@ data class VideoPlayerPaymentData(
     val showPreviewTip: Boolean = false,
 )
 
+/** 互动视频的选项数据（VideoPlayerV3ViewModel 的互动状态机透出）。 */
+data class VideoPlayerInteractiveData(
+    /** 当前在播互动视频 */
+    val isInteractive: Boolean = false,
+    /** 播完当前节点后显示选项对话框 */
+    val showDialog: Boolean = false,
+    /** 当前节点的选项（待选分支，或已走过的节点路径） */
+    val options: List<VideoListInteractiveNode> = emptyList(),
+)
+
 data class VideoPlayerLoadStateData(
     val loadState: RequestState = RequestState.Ready,
     val errorMessage: String = "",
@@ -125,6 +135,7 @@ val LocalVideoPlayerClockData = compositionLocalOf { VideoPlayerClockData() }
 val LocalVideoPlayerLogsData = compositionLocalOf { VideoPlayerLogsData() }
 val LocalVideoPlayerHistoryData = compositionLocalOf { VideoPlayerHistoryData() }
 val LocalVideoPlayerPaymentData = compositionLocalOf { VideoPlayerPaymentData() }
+val LocalVideoPlayerInteractiveData = compositionLocalOf { VideoPlayerInteractiveData() }
 val LocalVideoPlayerLoadStateData = compositionLocalOf { VideoPlayerLoadStateData() }
 val LocalVideoPlayerStateData = compositionLocalOf { VideoPlayerStateData() }
 val LocalVideoPlayerConfigData = compositionLocalOf { VideoPlayerConfigData() }

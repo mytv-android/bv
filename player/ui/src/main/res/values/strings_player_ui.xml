@@ -3,6 +3,8 @@
     <!-- 通用文案 -->
     <string name="player_ui_part_label">P%1$d %2$s</string>
     <string name="player_ui_episode_label">EP%1$d %2$s</string>
+    <string name="player_ui_branch_label">分支%1$d %2$s</string>
+    <string name="player_ui_branch_unnamed">未命名分支</string>
     <string name="player_ui_title_join">%1$s · %2$s</string>
     <string name="player_ui_speed_value">%1$s×</string>
     <string name="player_ui_area_full">全屏</string>

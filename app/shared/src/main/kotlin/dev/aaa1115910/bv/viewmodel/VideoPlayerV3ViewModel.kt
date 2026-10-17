@@ -15,6 +15,7 @@ import dev.aaa1115910.biliapi.entity.ApiType
 import dev.aaa1115910.biliapi.entity.PlayData
 import dev.aaa1115910.biliapi.entity.danmaku.DanmakuMaskSegment
 import dev.aaa1115910.biliapi.entity.video.HeartbeatVideoType
+import dev.aaa1115910.biliapi.entity.video.InteractiveNode
 import dev.aaa1115910.biliapi.entity.video.Subtitle
 import dev.aaa1115910.biliapi.entity.video.SubtitleAiStatus
 import dev.aaa1115910.biliapi.entity.video.SubtitleAiType
@@ -40,6 +41,7 @@ import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
 import dev.aaa1115910.bv.player.entity.VideoCodec
 import dev.aaa1115910.bv.player.entity.VideoListItemData
+import dev.aaa1115910.bv.player.entity.VideoListInteractiveNode
 import dev.aaa1115910.bv.player.entity.toAudioLoudness
 import dev.aaa1115910.bv.repository.PlayUrlResolver
 import dev.aaa1115910.bv.repository.VideoInfoRepository
@@ -188,6 +190,27 @@ class VideoPlayerV3ViewModel(
     var currentCid by mutableLongStateOf(0L)
     private var currentEpid = 0
 
+    // ---------------------------------------------------------------- 互动视频（stein gate）
+
+    /** 当前播放的是互动视频（节点图上下文已加载且 aid 匹配，避免残留上下文污染普通视频） */
+    val isInteractivePlayback
+        get() = videoInfoRepository.interactivePlaybackContext?.let { it.aid == currentAid } == true
+
+    /** 当前节点的选项：待选分支，或已走过的节点路径（叶子节点时，可回退） */
+    val interactiveOptions get() = availableVideoList.filterIsInstance<VideoListInteractiveNode>()
+
+    var showInteractiveOptionDialog by mutableStateOf(false)
+
+    /** 当前选项是否来自 question choices（false 表示是节点路径，不能作为「待选项」弹出） */
+    var interactiveOptionsFromQuestions by mutableStateOf(false)
+    private var pendingInteractiveOptionDialogRequest by mutableStateOf(false)
+
+    var currentInteractiveNodeId by mutableLongStateOf(0L)
+    var currentInteractiveEdgeId by mutableLongStateOf(0L)
+
+    /** 互动分支切换 / 回退时，新媒体准备完成后要跳到的位置（毫秒）；普通播放为 null */
+    private var pendingInitialSeekPositionMs: Long? = null
+
     /** 换集前清空上一集的弹幕数据（引擎保留，View 生命周期由播放页管理）。 */
     private suspend fun clearDanmakuView() = withContext(Dispatchers.Main) {
         danmakuView?.clearDanmakus()
@@ -204,11 +227,22 @@ class VideoPlayerV3ViewModel(
         cid: Long,
         epid: Int? = null,
         seasonId: Int? = null,
-        continuePlayNext: Boolean = false
+        continuePlayNext: Boolean = false,
+        initialSeekPositionMs: Long? = null,
     ) {
+        showInteractiveOptionDialog = false
+        pendingInitialSeekPositionMs = initialSeekPositionMs
+        if (continuePlayNext) {
+            lastPlayed = 0
+        }
         currentAid = avid
         currentCid = cid
         currentEpid = epid ?: 0
+        syncCurrentInteractivePointersFromList()
+        if (!isInteractivePlayback && availableVideoList.none { it is VideoListInteractiveNode }) {
+            currentInteractiveNodeId = 0L
+            currentInteractiveEdgeId = 0L
+        }
         // 换集后先清空上一集的片头片尾，避免新数据返回前用旧配置误跳
         clipInfoList = null
         epid?.let { this.epid = it }
@@ -230,6 +264,9 @@ class VideoPlayerV3ViewModel(
 
             updateSubtitle()
             loadPlayUrl(avid, cid, epid ?: 0, preferApi = Prefs.apiType, proxyArea = proxyArea)
+            if (isInteractivePlayback && (!interactiveOptionsFromQuestions || interactiveOptions.isEmpty())) {
+                refreshInteractiveBranches(currentInteractiveEdgeId.takeIf { it > 0L })
+            }
             addLogs("加载弹幕中")
             loadDanmaku(cid)
             updateDanmakuMask()
@@ -339,6 +376,144 @@ class VideoPlayerV3ViewModel(
             loadState = RequestState.Success
             logger.fInfo { "Load play url success" }
         }
+    }
+
+    // ---------------------------------------------------------------- 互动视频状态机
+
+    /**
+     * 刷新当前节点的互动分支（edgeinfo_v2）：普通节点取 question choices 作为待选项，
+     * 叶子节点没有待选项，取 story_list（已走过的节点路径）用于回退到上一节点。
+     * 拉到待选项后替换选集列表，同时处理挂起的选项弹窗请求。
+     */
+    fun refreshInteractiveBranches(edgeId: Long? = null) {
+        val interactiveContext = videoInfoRepository.interactivePlaybackContext ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                BiliHttpApi.getInteractiveEdgeInfo(
+                    bvid = interactiveContext.bvid,
+                    graphVersion = interactiveContext.graphVersion,
+                    edgeId = edgeId,
+                    sessData = Prefs.sessData.ifBlank { null },
+                ).getResponseData().let { response ->
+                    val questionNodes = response.edges?.questions
+                        ?.flatMap { question -> question.choices }
+                        ?.mapIndexed { index, choice ->
+                            InteractiveNode.fromChoice(choice, fallbackTitle = "")
+                        }
+                        .orEmpty()
+                    Triple(
+                        response.edgeId,
+                        if (questionNodes.isNotEmpty()) {
+                            questionNodes
+                        } else {
+                            response.storyList.map(InteractiveNode::fromStoryNode)
+                        },
+                        questionNodes.isNotEmpty(),
+                    )
+                }
+            }.onSuccess { (responseEdgeId, nodes, fromQuestionChoices) ->
+                if (nodes.isEmpty()) {
+                    logger.fWarn { "Refresh interactive branches returned empty nodes, edgeId=$edgeId" }
+                    withContext(Dispatchers.Main) {
+                        pendingInteractiveOptionDialogRequest = false
+                    }
+                    return@onSuccess
+                }
+
+                val interactiveVideoList = nodes.mapIndexed { index, node ->
+                    VideoListInteractiveNode(
+                        aid = currentAid,
+                        cid = node.cid,
+                        title = title,
+                        partTitle = node.title,
+                        index = index,
+                        nodeId = node.nodeId,
+                        edgeId = node.edgeId,
+                        startPos = node.startPos,
+                        isCurrent = node.isCurrent,
+                    )
+                }
+
+                withContext(Dispatchers.Main) {
+                    interactiveOptionsFromQuestions = fromQuestionChoices
+                    videoInfoRepository.videoList.clear()
+                    videoInfoRepository.videoList.addAll(interactiveVideoList)
+                    currentInteractiveNodeId = nodes.firstOrNull { it.isCurrent }?.nodeId
+                        ?: currentInteractiveNodeId
+                    currentInteractiveEdgeId = responseEdgeId
+                        ?: nodes.firstOrNull { it.isCurrent }?.edgeId
+                        ?: edgeId
+                        ?: currentInteractiveEdgeId
+
+                    if (pendingInteractiveOptionDialogRequest && fromQuestionChoices) {
+                        showInteractiveOptionDialog = true
+                    } else if (pendingInteractiveOptionDialogRequest) {
+                        showInteractiveOptionDialog = false
+                    }
+                    pendingInteractiveOptionDialogRequest = false
+                }
+            }.onFailure {
+                pendingInteractiveOptionDialogRequest = false
+                logger.fWarn { "Refresh interactive branches failed: ${it.stackTraceToString()}" }
+            }
+        }
+    }
+
+    /**
+     * 播完当前节点后请求弹出选项弹窗：待选项已就绪时立即弹出，
+     * 否则先刷新分支，拉到待选项后自动弹出；没有待选项（叶子节点）则不弹。
+     */
+    fun requestInteractiveOptionDialog(): Boolean {
+        if (!isInteractivePlayback) return false
+
+        pendingInteractiveOptionDialogRequest = true
+        syncCurrentInteractivePointersFromList()
+        val hasQuestionOptions = interactiveOptionsFromQuestions && interactiveOptions.isNotEmpty()
+        if (hasQuestionOptions) {
+            showInteractiveOptionDialog = true
+            pendingInteractiveOptionDialogRequest = false
+            return true
+        }
+
+        refreshInteractiveBranches(currentInteractiveEdgeId.takeIf { it > 0L })
+        return false
+    }
+
+    fun dismissInteractiveOptionDialog() {
+        showInteractiveOptionDialog = false
+        pendingInteractiveOptionDialogRequest = false
+    }
+
+    fun selectInteractiveNode(nodeId: Long) {
+        currentInteractiveNodeId = nodeId
+    }
+
+    /** 选择一个分支：切到对应 cid（播放地址 / 弹幕随之刷新），记录节点路径 */
+    fun playInteractiveOption(option: VideoListInteractiveNode) {
+        showInteractiveOptionDialog = false
+        pendingInteractiveOptionDialogRequest = false
+        interactiveOptionsFromQuestions = false
+        title = option.title
+        partTitle = option.partTitle
+        currentInteractiveEdgeId = option.edgeId ?: currentInteractiveEdgeId
+        selectInteractiveNode(option.nodeId)
+        loadPlayUrl(
+            avid = option.aid,
+            cid = option.cid,
+            epid = option.epid,
+            seasonId = option.seasonId,
+            continuePlayNext = true,
+            initialSeekPositionMs = option.startPos?.times(1000L),
+        )
+    }
+
+    /** 从选集列表同步当前节点的 id / edgeId（选集项可能被 UI 直接播放） */
+    private fun syncCurrentInteractivePointersFromList() {
+        val currentInteractiveOption = interactiveOptions.firstOrNull {
+            it.isCurrent || it.cid == currentCid || it.nodeId == currentInteractiveNodeId
+        } ?: return
+        currentInteractiveNodeId = currentInteractiveOption.nodeId
+        currentInteractiveEdgeId = currentInteractiveOption.edgeId ?: currentInteractiveEdgeId
     }
 
     private fun startShowPreviewTipCountdown() {
@@ -502,6 +677,15 @@ class VideoPlayerV3ViewModel(
             videoPlayer!!.playUrl(videoUrl, audioUrl)
             videoPlayer!!.prepare()
             showBuffering = true
+            // 互动分支切换 / 回退：新媒体从节点起始位置播（ExoPlayer 在准备完成后生效）
+            pendingInitialSeekPositionMs?.let { target ->
+                pendingInitialSeekPositionMs = null
+                if (target > 0L) {
+                    logger.info { "Set initial seek position: ${target}ms" }
+                    videoPlayer!!.seekTo(target)
+                    danmakuView?.notifySeek(target)
+                }
+            }
         }
     }
 
@@ -693,6 +877,12 @@ class VideoPlayerV3ViewModel(
 
     fun playNextVideo() {
         logger.fInfo { "Video finished" }
+        // 互动视频播完不自动连播：弹出选项（没有待选项的叶子节点不弹，等用户回退）
+        if (isInteractivePlayback) {
+            logger.info { "Interactive video finished, request option dialog" }
+            requestInteractiveOptionDialog()
+            return
+        }
         when (currentPlayMode) {
             PlayMode.Single -> {
                 logger.info { "Play mode: $currentPlayMode, do nothing" }
@@ -717,6 +907,11 @@ class VideoPlayerV3ViewModel(
     }
 
     private fun playNextVideoInList(loop: Boolean = false) {
+        if (isInteractivePlayback || availableVideoList.any { it is VideoListInteractiveNode }) {
+            logger.info { "Interactive branches detected, skip auto playing next branch" }
+            return
+        }
+
         val currentIndex = availableVideoList
             .indexOfFirst {
                 when (it) {

@@ -28,6 +28,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import dev.aaa1115910.biliapi.repositories.VideoDetailRepository
 import dev.aaa1115910.bv.player.danmaku.DanmakuView
 import dev.aaa1115910.bv.player.entity.VideoListItemData
+import dev.aaa1115910.bv.player.entity.VideoListInteractiveNode
 import dev.aaa1115910.bv.ui.designsystem.adaptive.DeviceLayout
 import dev.aaa1115910.bv.ui.feature.player.BvPlayerHost
 import dev.aaa1115910.bv.ui.feature.player.PlayRequest
@@ -269,7 +270,14 @@ private fun DetailEmbeddedPlayer(
                 .filterIsInstance<VideoListItemData>()
                 .firstOrNull { it.cid == lastCid }
             if (item != null) {
-                request.copy(aid = item.aid, cid = item.cid, epid = item.epid ?: request.epid, partTitle = item.title)
+                request.copy(
+                    aid = item.aid,
+                    cid = item.cid,
+                    epid = item.epid ?: request.epid,
+                    partTitle = (item as? VideoListInteractiveNode)?.partTitle?.takeIf { it.isNotBlank() }
+                        ?: item.title,
+                    startMs = (item as? VideoListInteractiveNode)?.startPos?.times(1000L) ?: 0L,
+                )
             } else request
         } else request
         startPlayback(

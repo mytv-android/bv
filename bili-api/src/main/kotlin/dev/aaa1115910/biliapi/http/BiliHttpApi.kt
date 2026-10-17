@@ -57,6 +57,7 @@ import dev.aaa1115910.biliapi.http.entity.video.CheckSentCoin
 import dev.aaa1115910.biliapi.http.entity.video.CheckVideoFavoured
 import dev.aaa1115910.biliapi.http.entity.video.GaiaVgateRegisterData
 import dev.aaa1115910.biliapi.http.entity.video.GaiaVgateValidateData
+import dev.aaa1115910.biliapi.http.entity.video.InteractiveEdgeInfo
 import dev.aaa1115910.biliapi.http.entity.video.PlayUrlData
 import dev.aaa1115910.biliapi.http.entity.video.PlayUrlV2Data
 import dev.aaa1115910.biliapi.http.entity.video.PopularVideoData
@@ -70,6 +71,7 @@ import dev.aaa1115910.biliapi.http.entity.video.TimelineAppData
 import dev.aaa1115910.biliapi.http.entity.video.VideoDetail
 import dev.aaa1115910.biliapi.http.entity.video.VideoInfo
 import dev.aaa1115910.biliapi.http.entity.video.VideoMoreInfo
+import dev.aaa1115910.biliapi.http.entity.video.VideoPlayerInfo
 import dev.aaa1115910.biliapi.http.entity.video.VideoShot
 import dev.aaa1115910.biliapi.http.entity.web.NavResponseData
 import dev.aaa1115910.biliapi.http.plugins.BiliUserAgent
@@ -225,6 +227,37 @@ object BiliHttpApi {
         parameter("aid", av)
         parameter("bvid", bv)
         sessData?.let { header("Cookie", "SESSDATA=$sessData;") }
+    }.body()
+
+    /**
+     * 获取播放器信息（互动视频的 graph_version 在这里下发）
+     */
+    suspend fun getVideoPlayerInfo(
+        av: Long? = null,
+        bv: String? = null,
+        cid: Long,
+        sessData: String? = null,
+    ): BiliResponse<VideoPlayerInfo> = client.get("/x/player/v2") {
+        parameter("aid", av)
+        parameter("bvid", bv)
+        parameter("cid", cid)
+        sessData?.let { header("Cookie", "SESSDATA=$sessData;") }
+    }.body()
+
+    /**
+     * 获取互动视频节点信息
+     */
+    suspend fun getInteractiveEdgeInfo(
+        bvid: String,
+        graphVersion: Int,
+        edgeId: Long? = null,
+        sessData: String? = null,
+    ): BiliResponse<InteractiveEdgeInfo> = client.get("/x/stein/edgeinfo_v2") {
+        parameter("bvid", bvid)
+        parameter("graph_version", graphVersion)
+        parameter("edge_id", edgeId)
+        sessData?.let { header("Cookie", "SESSDATA=$sessData;") }
+        header("referer", "https://www.bilibili.com")
     }.body()
 
     /**

@@ -20,6 +20,7 @@ import dev.aaa1115910.biliapi.entity.video.VideoPage
 import dev.aaa1115910.biliapi.repositories.VideoDetailRepository
 import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.player.entity.VideoListItemData
+import dev.aaa1115910.bv.player.entity.VideoListInteractiveNode
 import dev.aaa1115910.bv.player.entity.VideoListPart
 import dev.aaa1115910.bv.repository.VideoInfoRepository
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
@@ -157,7 +158,10 @@ fun VideoDetailScreen(nav: NavController, route: VideoRoute) {
             if (d != null) {
                 playVideoList(d, episode.cid)
                 val ugc = d.ugcSeason
-                val start = if (episode.cid == holder.lastPlayedCid) holder.lastPlayedTimeSec * 1000L else 0L
+                // 互动分支从节点起始位置播；其余保持历史记录 / 从头播
+                val nodeStartMs = d.interactiveNodes
+                    .firstOrNull { it.cid == episode.cid }?.startPos?.times(1000L)
+                val start = if (episode.cid == holder.lastPlayedCid) holder.lastPlayedTimeSec * 1000L else nodeStartMs ?: 0L
                 val request = PlayRequest(
                     aid = episode.aid,
                     cid = episode.cid,
@@ -249,9 +253,11 @@ private fun VideoListItemData.toRequest(d: VideoDetail?) = PlayRequest(
     aid = aid,
     cid = cid,
     title = d?.title.orEmpty(),
-    partTitle = title,
+    partTitle = (this as? VideoListInteractiveNode)?.partTitle?.takeIf { it.isNotBlank() } ?: title,
     epid = epid,
     seasonId = seasonId,
+    // 互动分支从节点起始位置播
+    startMs = (this as? VideoListInteractiveNode)?.startPos?.times(1000L) ?: 0L,
     playerIconIdle = d?.playerIcon?.idle ?: "",
     playerIconMoving = d?.playerIcon?.moving ?: "",
 )
@@ -270,6 +276,26 @@ private fun applyVideoList(
     detailVm: VideoDetailViewModel,
     videoInfoRepository: VideoInfoRepository,
 ) {
+    // 互动视频：选集列表换成节点（初始节点 / 上次走到的路径）
+    if (d.isInteractive && d.interactiveNodes.isNotEmpty()) {
+        videoInfoRepository.videoList.clear()
+        videoInfoRepository.videoList.addAll(
+            d.interactiveNodes.mapIndexed { index, node ->
+                VideoListInteractiveNode(
+                    aid = d.aid,
+                    cid = node.cid,
+                    title = d.title,
+                    partTitle = node.title,
+                    index = index,
+                    nodeId = node.nodeId,
+                    edgeId = node.edgeId,
+                    startPos = node.startPos,
+                    isCurrent = node.isCurrent,
+                )
+            }
+        )
+        return
+    }
     val ugc = d.ugcSeason
     if (ugc != null && ugc.sections.isNotEmpty() && detailVm.videoDetail === d) {
         val index = ugc.sections.indexOfFirst { section ->
@@ -305,6 +331,35 @@ private fun buildVideoDetailUi(
     val date = formatShortDate(d.publishDate)
 
     val rows = buildList<DetailEpisodeRow> {
+        // 互动分支行（fantasy 版同款：节点即分 P，点击从节点起始位置播）
+        if (d.isInteractive && d.interactiveNodes.isNotEmpty()) {
+            add(
+                DetailEpisodeRow(
+                    key = "interactive",
+                    title = context.getString(R.string.video_detail_interactive_branches),
+                    action = null,
+                    episodes = d.interactiveNodes.mapIndexed { index, node ->
+                        val durationSec = d.pages.firstOrNull { it.cid == node.cid }?.duration ?: 0
+                        DetailEpisode(
+                            aid = d.aid,
+                            cid = node.cid,
+                            epid = null,
+                            title = node.title,
+                            label = context.getString(
+                                R.string.video_detail_branch_label,
+                                index + 1,
+                                node.title.ifBlank { context.getString(R.string.video_detail_branch_unnamed) },
+                            ),
+                            cover = node.cover?.takeIf { it.isNotBlank() } ?: d.cover,
+                            durationMs = durationSec * 1000L,
+                            progress = if (node.cid == lastPlayedCid) {
+                                watchedFraction(lastPlayedTimeSec, durationSec)
+                            } else null,
+                        )
+                    },
+                )
+            )
+        }
         if (d.pages.size > 1) {
             add(
                 DetailEpisodeRow(
@@ -359,6 +414,7 @@ private fun buildVideoDetailUi(
     }
 
     val eyebrow = buildList<String> {
+        if (d.isInteractive) add(context.getString(R.string.video_detail_interactive_badge))
         d.tags.take(2).forEach { add(it.name) }
         if (d.pages.size > 1) add("${d.pages.size}P")
     }.joinToString(" · ")
