@@ -70,6 +70,21 @@ class ToViewRepository(
         ).checkSuccess()
     }
 
+    /**
+     * 清空稍后再看（Web 登录 Cookie）。失败时抛出异常，消息为服务端提示
+     */
+    suspend fun clearToView(
+        preferApiType: ApiType = ApiType.Web
+    ) {
+        val sessData = authRepository.sessionData?.takeIf { it.isNotBlank() }
+        val csrf = authRepository.biliJct?.takeIf { it.isNotBlank() }
+        if (sessData == null || csrf == null) throw AuthFailureException("not logged in")
+        BiliHttpApi.clearToView(
+            csrf = csrf,
+            sessData = sessData
+        ).checkSuccess()
+    }
+
     private fun BiliResponseWithoutData.checkSuccess() {
         when (code) {
             0 -> {}

@@ -10,8 +10,13 @@ import dev.aaa1115910.biliapi.entity.season.FollowingSeason
 import dev.aaa1115910.biliapi.entity.season.FollowingSeasonStatus
 import dev.aaa1115910.biliapi.entity.season.FollowingSeasonType
 import dev.aaa1115910.biliapi.repositories.SeasonRepository
+import dev.aaa1115910.biliapi.repositories.UserRepository
+import dev.aaa1115910.bv.BVApp
+import dev.aaa1115910.bv.R
 import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.fInfo
+import dev.aaa1115910.bv.util.fWarn
+import dev.aaa1115910.bv.util.toast
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -20,7 +25,8 @@ import org.koin.android.annotation.KoinViewModel
 
 @KoinViewModel
 class FollowingSeasonViewModel(
-    private val seasonRepository: SeasonRepository
+    private val seasonRepository: SeasonRepository,
+    private val userRepository: UserRepository
 ) : ViewModel() {
     companion object {
         private val logger = KotlinLogging.logger { }
@@ -34,6 +40,8 @@ class FollowingSeasonViewModel(
     private var pageSize = 30
     var noMore by mutableStateOf(false)
     var updating by mutableStateOf(false)
+    var deleting by mutableStateOf(false)
+        private set
 
     init {
         followingSeasonType = FollowingSeasonType.Bangumi
@@ -76,6 +84,38 @@ class FollowingSeasonViewModel(
             logger.fInfo { "Update following seasons failed: ${it.stackTraceToString()}" }
         }
         updating = false
+    }
+
+    /** 取消追番[seasonId]。成功后立即从列表里删掉 */
+    fun unfollowSeason(seasonId: Int) {
+        if (deleting) return
+        deleting = true
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                userRepository.delSeasonFollow(
+                    seasonId = seasonId,
+                    preferApiType = Prefs.apiType
+                )
+            }.onSuccess {
+                withContext(Dispatchers.Main) {
+                    followingSeasons.removeAll { it.seasonId == seasonId }
+                }
+                logger.fInfo { "Unfollow season success: seasonId=$seasonId" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.following_season_delete_success)
+                        .toast(BVApp.context)
+                }
+            }.onFailure {
+                logger.fWarn { "Unfollow season failed: ${it.stackTraceToString()}" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.following_season_delete_failed)
+                        .toast(BVApp.context)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                deleting = false
+            }
+        }
     }
 }
 

@@ -20,4 +20,11 @@
     <string name="ds_load_failed">加载失败</string>
     <string name="ds_retry">重试</string>
     <string name="ds_empty">这里还没有内容</string>
+    <!-- 列表删除模式 -->
+    <string name="ds_delete">删除</string>
+    <string name="ds_delete_confirm">删除</string>
+    <string name="ds_cancel">取消</string>
+    <string name="ds_delete_mode_enter_hint">菜单键或长按确认键进入删除模式</string>
+    <string name="ds_delete_mode_clear_hint">点击删除，长按清空，返回退出</string>
+    <string name="ds_delete_mode_delete_hint">点击删除，长按直接删除，返回退出</string>
 </resources>

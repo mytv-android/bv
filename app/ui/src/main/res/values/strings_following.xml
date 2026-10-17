@@ -5,4 +5,7 @@
     <string name="following_empty">还没有关注 UP 主</string>
     <string name="following_seasons_title">追番追剧</string>
     <string name="following_seasons_empty">这里还没有追的番剧</string>
+    <!-- 取消追番 -->
+    <string name="following_season_delete_confirm_title">取消追番？</string>
+    <string name="following_season_delete_confirm_text">将取消追番「%s」，此操作不可撤销。</string>
 </resources>

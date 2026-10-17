@@ -451,6 +451,47 @@ object BiliHttpApi {
     }.body()
 
     /**
+     * 删除历史记录中的单条记录
+     *
+     * @param kid 格式为 business_oid，如 archive_123
+     * @param csrf bili_jct
+     * @param sessData SESSDATA
+     */
+    suspend fun deleteHistory(
+        kid: String,
+        csrf: String,
+        sessData: String
+    ): BiliResponseWithoutData = client.post("/x/v2/history/delete") {
+        setBody(
+            FormDataContent(
+                Parameters.build {
+                    append("kid", kid)
+                    append("csrf", csrf)
+                }
+            ))
+        header("Cookie", "SESSDATA=$sessData; bili_jct=$csrf;")
+    }.body()
+
+    /**
+     * 清空历史记录
+     *
+     * @param csrf bili_jct
+     * @param sessData SESSDATA
+     */
+    suspend fun clearHistory(
+        csrf: String,
+        sessData: String
+    ): BiliResponseWithoutData = client.post("/x/v2/history/clear") {
+        setBody(
+            FormDataContent(
+                Parameters.build {
+                    append("csrf", csrf)
+                }
+            ))
+        header("Cookie", "SESSDATA=$sessData; bili_jct=$csrf;")
+    }.body()
+
+    /**
      * 获取稍后再看列表
      */
 
@@ -1891,6 +1932,25 @@ object BiliHttpApi {
             FormDataContent(
                 Parameters.build {
                     append("aid", "$avid")
+                    append("csrf", csrf)
+                }
+            ))
+        header("Cookie", "SESSDATA=$sessData; bili_jct=$csrf;")
+    }.body()
+
+    /**
+     * 清空稍后再看
+     *
+     * @param csrf bili_jct
+     * @param sessData SESSDATA
+     */
+    suspend fun clearToView(
+        csrf: String,
+        sessData: String
+    ): BiliResponseWithoutData = client.post("/x/v2/history/toview/clear") {
+        setBody(
+            FormDataContent(
+                Parameters.build {
                     append("csrf", csrf)
                 }
             ))

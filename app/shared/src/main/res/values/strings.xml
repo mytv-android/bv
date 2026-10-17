@@ -119,6 +119,20 @@
     <string name="play_time_finish">已看完</string>
     <string name="play_time_history">%1$s / %2$s</string>
 
+    <!-- 历史 / 稍后再看 / 收藏 / 追番 的删除结果提示 -->
+    <string name="history_delete_success">已删除历史记录</string>
+    <string name="history_delete_failed">删除历史记录失败</string>
+    <string name="history_clear_success">已清空历史记录</string>
+    <string name="history_clear_failed">清空历史记录失败</string>
+    <string name="toview_delete_success">已从稍后再看移除</string>
+    <string name="toview_delete_failed">从稍后再看移除失败</string>
+    <string name="toview_clear_success">已清空稍后再看</string>
+    <string name="toview_clear_failed">清空稍后再看失败</string>
+    <string name="favorite_delete_success">已取消收藏</string>
+    <string name="favorite_delete_failed">取消收藏失败</string>
+    <string name="following_season_delete_success">已取消追番</string>
+    <string name="following_season_delete_failed">取消追番失败</string>
+
     <string name="player_controller_menu_danmaku_disabled">关闭</string>
     <string name="player_controller_menu_danmaku_enabled">开启</string>
     <string name="player_controller_menu_danmaku_webmark_disabled">关闭</string>

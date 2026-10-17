@@ -40,6 +40,8 @@ class ToViewViewModel(
 
     private var cursor = 0L
     private var updating = false
+    var deleting by mutableStateOf(false)
+        private set
 
     fun update() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -97,5 +99,65 @@ class ToViewViewModel(
             }
         }
         updating = false
+    }
+
+    fun deleteToView(item: VideoCardData) {
+        if (deleting) return
+        deleting = true
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                ToViewRepository.delToView(item.avid)
+            }.onSuccess {
+                withContext(Dispatchers.Main) {
+                    histories.removeAll { it.avid == item.avid }
+                }
+                logger.fInfo { "Delete toview success: avid=${item.avid}" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.toview_delete_success)
+                        .toast(BVApp.context)
+                }
+            }.onFailure {
+                logger.fWarn { "Delete toview failed: ${it.stackTraceToString()}" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.toview_delete_failed)
+                        .toast(BVApp.context)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                deleting = false
+            }
+        }
+    }
+
+    fun clearToView() {
+        if (deleting) return
+        deleting = true
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                ToViewRepository.clearToView(
+                    preferApiType = Prefs.apiType
+                )
+            }.onSuccess {
+                withContext(Dispatchers.Main) {
+                    histories.clear()
+                    cursor = 0L
+                    noMore = false
+                }
+                logger.fInfo { "Clear toview success" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.toview_clear_success)
+                        .toast(BVApp.context)
+                }
+            }.onFailure {
+                logger.fWarn { "Clear toview failed: ${it.stackTraceToString()}" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.toview_clear_failed)
+                        .toast(BVApp.context)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                deleting = false
+            }
+        }
     }
 }

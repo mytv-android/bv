@@ -53,7 +53,7 @@ data class HistoryItem(
                 oid = item.history.oid,
                 bvid = item.history.bvid,
                 cid = item.history.cid,
-                kid = 0,
+                kid = item.kid,
                 epid = item.history.epid,
                 seasonId = null,
                 title = item.title,

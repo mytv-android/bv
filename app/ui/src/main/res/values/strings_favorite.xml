@@ -4,4 +4,7 @@
     <string name="favorite_title">收藏夹</string>
     <string name="favorite_empty">这个收藏夹里还没有视频</string>
     <string name="favorite_no_folder">没有找到收藏夹</string>
+    <!-- 取消收藏 -->
+    <string name="favorite_delete_confirm_title">取消收藏？</string>
+    <string name="favorite_delete_confirm_text">将「%s」从当前收藏夹移除，此操作不可撤销。</string>
 </resources>

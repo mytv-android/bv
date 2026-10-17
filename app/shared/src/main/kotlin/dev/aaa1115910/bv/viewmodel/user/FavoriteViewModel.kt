@@ -9,11 +9,14 @@ import androidx.lifecycle.viewModelScope
 import dev.aaa1115910.biliapi.entity.FavoriteFolderMetadata
 import dev.aaa1115910.biliapi.entity.FavoriteItemType
 import dev.aaa1115910.biliapi.repositories.FavoriteRepository
+import dev.aaa1115910.bv.BVApp
+import dev.aaa1115910.bv.R
 import dev.aaa1115910.bv.entity.carddata.VideoCardData
 import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.util.addWithMainContext
 import dev.aaa1115910.bv.util.fInfo
 import dev.aaa1115910.bv.util.fWarn
+import dev.aaa1115910.bv.util.toast
 import dev.aaa1115910.bv.util.swapList
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +44,8 @@ class FavoriteViewModel(
 
     var updatingFolders by mutableStateOf(false)
     var updatingFolderItems by mutableStateOf(false)
+    var deleting by mutableStateOf(false)
+        private set
 
     init {
         updateFoldersInfo()
@@ -118,5 +123,39 @@ class FavoriteViewModel(
     fun resetPageNumber() {
         pageNumber = 1
         hasMore = true
+    }
+
+    /** 把视频[item]从当前收藏夹中移除（取消收藏）。成功后立即从列表里删掉 */
+    fun deleteFavorite(item: VideoCardData) {
+        if (deleting) return
+        val folderId = currentFavoriteFolderMetadata?.id ?: return
+        deleting = true
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                favoriteRepository.delVideoFromFavoriteFolder(
+                    aid = item.avid,
+                    delMediaIds = listOf(folderId),
+                    preferApiType = Prefs.apiType
+                )
+            }.onSuccess {
+                withContext(Dispatchers.Main) {
+                    favorites.removeAll { it.avid == item.avid }
+                }
+                logger.fInfo { "Delete favorite success: avid=${item.avid}, folderId=$folderId" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.favorite_delete_success)
+                        .toast(BVApp.context)
+                }
+            }.onFailure {
+                logger.fWarn { "Delete favorite failed: ${it.stackTraceToString()}" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.favorite_delete_failed)
+                        .toast(BVApp.context)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                deleting = false
+            }
+        }
     }
 }

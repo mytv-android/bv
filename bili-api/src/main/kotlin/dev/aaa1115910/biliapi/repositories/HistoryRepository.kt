@@ -6,6 +6,8 @@ import bilibili.app.interfaces.v1.cursorV2Req
 import dev.aaa1115910.biliapi.entity.ApiType
 import dev.aaa1115910.biliapi.entity.user.HistoryData
 import dev.aaa1115910.biliapi.http.BiliHttpApi
+import dev.aaa1115910.biliapi.http.entity.AuthFailureException
+import dev.aaa1115910.biliapi.http.entity.BiliResponseWithoutData
 import org.koin.core.annotation.Single
 
 @Single
@@ -40,6 +42,48 @@ class HistoryRepository(
                 })
                 HistoryData.fromHistoryResponse(reply!!)
             }
+        }
+    }
+
+    /**
+     * 删除单条历史记录（Web 登录 Cookie）。[kid] 为列表项的目标 id，[business] 为业务类型（archive / pgc）。
+     * 失败时抛出异常，消息为服务端提示
+     */
+    suspend fun deleteHistory(
+        business: String,
+        kid: Long,
+        preferApiType: ApiType = ApiType.Web
+    ) {
+        val sessData = authRepository.sessionData?.takeIf { it.isNotBlank() }
+        val csrf = authRepository.biliJct?.takeIf { it.isNotBlank() }
+        if (sessData == null || csrf == null) throw AuthFailureException("not logged in")
+        BiliHttpApi.deleteHistory(
+            kid = "${business}_$kid",
+            csrf = csrf,
+            sessData = sessData
+        ).checkSuccess()
+    }
+
+    /**
+     * 清空历史记录（Web 登录 Cookie）。失败时抛出异常，消息为服务端提示
+     */
+    suspend fun clearHistory(
+        preferApiType: ApiType = ApiType.Web
+    ) {
+        val sessData = authRepository.sessionData?.takeIf { it.isNotBlank() }
+        val csrf = authRepository.biliJct?.takeIf { it.isNotBlank() }
+        if (sessData == null || csrf == null) throw AuthFailureException("not logged in")
+        BiliHttpApi.clearHistory(
+            csrf = csrf,
+            sessData = sessData
+        ).checkSuccess()
+    }
+
+    private fun BiliResponseWithoutData.checkSuccess() {
+        when (code) {
+            0 -> {}
+            -101 -> throw AuthFailureException(message)
+            else -> throw IllegalStateException(message)
         }
     }
 }

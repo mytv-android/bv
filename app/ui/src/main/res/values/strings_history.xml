@@ -9,4 +9,9 @@
     <string name="history_filter_all">全部</string>
     <string name="history_filter_video">视频</string>
     <string name="history_filter_pgc">番剧</string>
+    <!-- 删除 / 清空 -->
+    <string name="history_delete_confirm_title">删除这条历史记录？</string>
+    <string name="history_delete_confirm_text">将从历史记录中删除「%s」，此操作不可撤销。</string>
+    <string name="history_clear_confirm_title">清空历史记录？</string>
+    <string name="history_clear_confirm_text">将清空全部历史记录，此操作不可撤销。</string>
 </resources>

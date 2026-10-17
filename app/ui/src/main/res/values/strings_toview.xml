@@ -6,4 +6,9 @@
     <string name="toview_remove">从稍后再看移除</string>
     <string name="toview_removed">已从稍后再看移除</string>
     <string name="toview_remove_failed">移除失败：%s</string>
+    <!-- 删除 / 清空 -->
+    <string name="toview_delete_confirm_title">从稍后再看移除？</string>
+    <string name="toview_delete_confirm_text">将「%s」从稍后再看移除，此操作不可撤销。</string>
+    <string name="toview_clear_confirm_title">清空稍后再看？</string>
+    <string name="toview_clear_confirm_text">将清空稍后再看的全部视频，此操作不可撤销。</string>
 </resources>

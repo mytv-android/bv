@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.aaa1115910.biliapi.entity.user.HistoryItemType
 import dev.aaa1115910.biliapi.http.entity.AuthFailureException
 import dev.aaa1115910.biliapi.repositories.HistoryRepository
 import dev.aaa1115910.bv.BVApp
@@ -40,6 +41,8 @@ class HistoryViewModel(
 
     private var cursor = 0L
     var updating by mutableStateOf(false)
+    var deleting by mutableStateOf(false)
+        private set
 
     fun update() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -69,7 +72,13 @@ class HistoryViewModel(
                             R.string.play_time_history,
                             (historyItem.progress * 1000L).formatHourMinSec(),
                             (historyItem.duration * 1000L).formatHourMinSec()
-                        )
+                        ),
+                        historyBusiness = when (historyItem.type) {
+                            HistoryItemType.Archive -> "archive"
+                            HistoryItemType.Pgc -> "pgc"
+                            HistoryItemType.Unknown -> null
+                        },
+                        historyKid = historyItem.kid
                     )
                 )
             }
@@ -97,5 +106,69 @@ class HistoryViewModel(
             }
         }
         updating = false
+    }
+
+    fun deleteHistory(business: String?, kid: Long?) {
+        if (deleting || business == null || kid == null) return
+        deleting = true
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                historyRepository.deleteHistory(
+                    business = business,
+                    kid = kid,
+                    preferApiType = Prefs.apiType
+                )
+            }.onSuccess {
+                withContext(Dispatchers.Main) {
+                    histories.removeAll { it.historyBusiness == business && it.historyKid == kid }
+                }
+                logger.fInfo { "Delete history success: business=$business, kid=$kid" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.history_delete_success)
+                        .toast(BVApp.context)
+                }
+            }.onFailure {
+                logger.fWarn { "Delete history failed: ${it.stackTraceToString()}" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.history_delete_failed)
+                        .toast(BVApp.context)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                deleting = false
+            }
+        }
+    }
+
+    fun clearHistory() {
+        if (deleting) return
+        deleting = true
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                historyRepository.clearHistory(
+                    preferApiType = Prefs.apiType
+                )
+            }.onSuccess {
+                withContext(Dispatchers.Main) {
+                    histories.clear()
+                    cursor = 0L
+                    noMore = false
+                }
+                logger.fInfo { "Clear history success" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.history_clear_success)
+                        .toast(BVApp.context)
+                }
+            }.onFailure {
+                logger.fWarn { "Clear history failed: ${it.stackTraceToString()}" }
+                withContext(Dispatchers.Main) {
+                    BVApp.context.getString(R.string.history_clear_failed)
+                        .toast(BVApp.context)
+                }
+            }
+            withContext(Dispatchers.Main) {
+                deleting = false
+            }
+        }
     }
 }

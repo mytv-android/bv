@@ -20,6 +20,10 @@ data class VideoCardData(
     val pubTime: Int? = null,
     var pubTimeString: String = "",
     val upMid: Long? = null,
+    /** 历史记录条目才有：删除历史时传给 /x/v2/history/delete 的业务类型（archive / pgc） */
+    val historyBusiness: String? = null,
+    /** 历史记录条目才有：删除历史时传给 /x/v2/history/delete 的目标 id */
+    val historyKid: Long? = null,
 ) {
     init {
         play?.let {
