@@ -134,6 +134,7 @@ internal fun SearchTv(nav: NavController, state: SearchUiState, follow: FollowSt
                 openers = openers,
                 lastArea = lastArea,
                 onArea = { lastArea = it },
+                onEnterFull = { full = true },
             )
         }
     }
@@ -146,6 +147,7 @@ private fun SearchTvInput(
     openers: SearchOpeners,
     lastArea: TvFocusArea,
     onArea: (TvFocusArea) -> Unit,
+    onEnterFull: () -> Unit,
 ) {
     val context = LocalContext.current
     val keyword = state.input.keyword
@@ -322,6 +324,8 @@ private fun SearchTvInput(
             SectionHeader(
                 title = stringResource(R.string.search_results_for, state.submitted),
                 modifier = Modifier.padding(start = 4.dp, end = 48.dp),
+                action = stringResource(R.string.search_tv_full_results),
+                onAction = onEnterFull,
             )
             when {
                 cards.isEmpty() && state.isLoading(SearchType.Video) -> Box(

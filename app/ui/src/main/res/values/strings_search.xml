@@ -61,4 +61,5 @@
     <string name="search_tv_delete">删除</string>
     <string name="search_tv_clear">清空</string>
     <string name="search_tv_voice">按住遥控器语音键说话</string>
+    <string name="search_tv_full_results">全屏结果 · 筛选</string>
 </resources>
