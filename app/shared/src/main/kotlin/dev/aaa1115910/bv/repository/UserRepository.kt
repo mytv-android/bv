@@ -23,6 +23,10 @@ class UserRepository(
 ) {
     companion object {
         private val logger = KotlinLogging.logger { }
+
+        /** cookie 续期下发的账号级 cookie，只走 [applyWebCookieRefresh]，不写入 webExtraCookies */
+        val AUTH_COOKIE_NAMES =
+            setOf("SESSDATA", "bili_jct", "refresh_token", "DedeUserID__ckMd5", "sid")
     }
 
     var isLogin by mutableStateOf(Prefs.isLogin)
@@ -113,6 +117,8 @@ class UserRepository(
     private fun updateAuthRepository() {
         authRepository.sessionData = sessData
         authRepository.biliJct = biliJct
+        authRepository.dedeUserIDCkMd5 = uidCkMd5
+        authRepository.sid = sid
         authRepository.accessToken = accessToken
         authRepository.mid = uid
         authRepository.buvid3 = Prefs.buvid3
@@ -177,6 +183,20 @@ class UserRepository(
 
     suspend fun findUserByUid(uid: Long): UserDB? {
         return db.userDao().findUserByUid(uid)
+    }
+
+    /**
+     * 应用 Web Cookie 每日续期的结果（SESSDATA/bili_jct/refresh_token 等）。
+     */
+    suspend fun applyWebCookieRefresh(updated: Map<String, String>) {
+        updated["SESSDATA"]?.takeIf { it.isNotBlank() }?.let { sessData = it }
+        updated["bili_jct"]?.takeIf { it.isNotBlank() }?.let { biliJct = it }
+        updated["refresh_token"]?.takeIf { it.isNotBlank() }?.let { refreshToken = it }
+        updated["DedeUserID__ckMd5"]?.takeIf { it.isNotBlank() }?.let { uidCkMd5 = it }
+        updated["sid"]?.takeIf { it.isNotBlank() }?.let { sid = it }
+        if (updated.keys.any { it in AUTH_COOKIE_NAMES }) {
+            saveToPrefs()
+        }
     }
 
     suspend fun updateUser(user: UserDB){

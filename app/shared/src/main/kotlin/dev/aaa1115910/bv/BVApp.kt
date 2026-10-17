@@ -14,6 +14,7 @@ import dev.aaa1115910.biliapi.http.BiliHttpApi
 import dev.aaa1115910.biliapi.http.BiliHttpProxyApi
 import dev.aaa1115910.biliapi.http.util.BiliAppConf
 import dev.aaa1115910.biliapi.http.util.BiliWebConf
+import dev.aaa1115910.biliapi.http.util.WebCookieManager
 import dev.aaa1115910.biliapi.repositories.AuthRepository
 import dev.aaa1115910.biliapi.repositories.BiliApiModule
 import dev.aaa1115910.biliapi.repositories.ChannelRepository
@@ -22,6 +23,7 @@ import dev.aaa1115910.bv.entity.AuthData
 import dev.aaa1115910.bv.entity.db.UserDB
 import dev.aaa1115910.bv.network.HttpServer
 import dev.aaa1115910.bv.player.PlayerHttpClient
+import dev.aaa1115910.bv.repository.UserRepository
 import dev.aaa1115910.bv.util.BlacklistUtil
 import dev.aaa1115910.bv.util.FirebaseUtil
 import dev.aaa1115910.bv.util.LogCatcherUtil
@@ -93,6 +95,34 @@ class BVApp : Application() {
             WebViewCompat.getCurrentLoadedWebViewPackage()!!.versionName!!
                 .substringBefore(".").toInt()
         }.getOrDefault(144)
+        initWebCookieManager()
+    }
+
+    private fun initWebCookieManager() {
+        WebCookieManager.refreshTokenProvider = { Prefs.refreshToken }
+        WebCookieManager.cookieGetter = { name ->
+            // buvid3 在引入 Web Cookie 之前就由 Prefs 生成并用于请求头，
+            // 首次运行时用它兜底，保证与 finger/spi 返回的 buvid4 能配对
+            Prefs.getWebCookie(name) ?: if (name == "buvid3") Prefs.buvid3 else null
+        }
+        WebCookieManager.onCookiesUpdated = { updated ->
+            // 账号级 cookie 交给 UserRepository 落盘，写进 webExtraCookies 会在登出后继续被注入
+            Prefs.setWebCookies(updated.filterKeys { it !in UserRepository.AUTH_COOKIE_NAMES })
+            // 请求头里用的 buvid3 必须与 buvid4 同源
+            updated["buvid3"]?.takeIf { it.isNotBlank() }?.let { buvid3 ->
+                Prefs.buvid3 = buvid3
+                runCatching { koinApplication.koin.get<AuthRepository>().buvid3 = buvid3 }
+            }
+            val authUpdated = updated.filterKeys { it in UserRepository.AUTH_COOKIE_NAMES }
+            if (authUpdated.isNotEmpty()) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    runCatching {
+                        koinApplication.koin.get<UserRepository>()
+                            .applyWebCookieRefresh(authUpdated)
+                    }
+                }
+            }
+        }
     }
 
     fun initRepository() {
@@ -102,10 +132,13 @@ class BVApp : Application() {
         val authRepository by koinApplication.koin.inject<AuthRepository>()
         authRepository.sessionData = Prefs.sessData.takeIf { it.isNotEmpty() }
         authRepository.biliJct = Prefs.biliJct.takeIf { it.isNotEmpty() }
+        authRepository.dedeUserIDCkMd5 = Prefs.uidCkMd5.takeIf { it.isNotEmpty() }
+        authRepository.sid = Prefs.sid.takeIf { it.isNotEmpty() }
         authRepository.accessToken = Prefs.accessToken.takeIf { it.isNotEmpty() }
         authRepository.mid = Prefs.uid.takeIf { it != 0L }
         authRepository.buvid3 = Prefs.buvid3
         authRepository.buvid = Prefs.buvid
+        authRepository.bindWebCookieManager()
     }
 
     fun initProxy() {
@@ -125,6 +158,9 @@ class BVApp : Application() {
 
     private fun warmUpApi() {
         CoroutineScope(Dispatchers.IO).launch {
+            // 无网络或接口报错时保持静默，不能影响启动；
+            // cookie 维护涉及多次网络请求，单独并发，避免拖慢后面的预热
+            launch { runCatching { WebCookieManager.initialize() } }
             BiliHttpApi.warmUpClient()
             PlayerHttpClient.preheat(this@BVApp)
         }
