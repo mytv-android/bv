@@ -22,7 +22,7 @@
     <string name="settings_cat_account">账号与安全</string>
     <string name="settings_cat_account_desc">多账号、用户锁、无痕模式</string>
     <string name="settings_cat_storage">存储</string>
-    <string name="settings_cat_storage_desc">图片缓存、日志</string>
+    <string name="settings_cat_storage_desc">缓存上限、自动清理、日志</string>
     <string name="settings_cat_about">关于</string>
     <string name="settings_cat_about_desc">版本、更新、解码器信息</string>
 
@@ -113,6 +113,10 @@
     <string name="settings_account_incognito_desc">开启后不上报播放进度和历史记录</string>
 
     <!-- 存储 -->
+    <string name="settings_store_threshold">缓存上限</string>
+    <string name="settings_store_threshold_unlimited">不限制</string>
+    <string name="settings_store_auto_clean">自动清理缓存</string>
+    <string name="settings_store_auto_clean_desc">缓存超过上限时自动清理最旧的文件，待安装的更新包不会被删除</string>
     <string name="settings_store_group_cache">缓存</string>
     <string name="settings_store_group_logs">日志</string>
     <string name="settings_store_image">图片缓存</string>

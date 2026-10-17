@@ -35,6 +35,7 @@ import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.network.GithubApi
 import dev.aaa1115910.bv.network.entity.Release
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
+import dev.aaa1115910.bv.util.CacheManager
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.content.ProgressListener
 import kotlinx.coroutines.Dispatchers
@@ -112,7 +113,7 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
             scope.launch {
                 val result = withContext(Dispatchers.IO) {
                     runCatching {
-                        val dir = File(context.cacheDir, "update_downloader")
+                        val dir = File(context.cacheDir, CacheManager.UPDATE_CACHE_DIR)
                         if (!dir.exists()) dir.mkdirs()
                         val file = File(dir, "${UUID.randomUUID()}.apk")
                         file.createNewFile()
@@ -135,6 +136,10 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
                 result
                     .onSuccess { file ->
                         if (active) {
+                            // 缓存写入后检查阈值；preserve 保护刚下载的安装包不被清理
+                            withContext(Dispatchers.IO) {
+                                runCatching { CacheManager(context).checkCache(preserve = file) }
+                            }
                             status = UpdateStatus.Installing
                             if (!installApk(context, file)) status = UpdateStatus.InstallError
                         }
