@@ -2,6 +2,9 @@ package dev.aaa1115910.bv.ui.feature.settings
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,6 +45,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.security.MessageDigest
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 import java.util.UUID
 
 private val updateLogger = KotlinLogging.logger("BvUpdateDialog")
@@ -53,7 +59,8 @@ private enum class UpdateStatus {
 
 /** 用 FileProvider 打开下载好的 APK（旧 UpdateDialog.installUpdate）。 */
 private fun installApk(context: Context, file: File): Boolean = runCatching {
-    val uri = FileProvider.getUriForFile(context, "${BuildConfig.APPLICATION_ID}.provider", file)
+    // 必须用实际 applicationId（debug 包带 .debug 后缀），BuildConfig.APPLICATION_ID 是 app:shared 里写死的
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
     val intent = Intent(Intent.ACTION_VIEW).apply {
         addCategory(Intent.CATEGORY_DEFAULT)
         setDataAndType(uri, "application/vnd.android.package-archive")
@@ -62,6 +69,57 @@ private fun installApk(context: Context, file: File): Boolean = runCatching {
     }
     context.startActivity(intent)
 }.isSuccess
+
+private val signatureFlags: Int
+    get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        PackageManager.GET_SIGNING_CERTIFICATES
+    } else {
+        @Suppress("DEPRECATION")
+        PackageManager.GET_SIGNATURES
+    }
+
+/** 签名证书公钥的 SHA-256；多个签名者用逗号分隔，读不到返回 null。 */
+private fun PackageInfo.signerDigest(): String? = runCatching {
+    val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+        signingInfo?.apkContentsSigners
+    } else {
+        @Suppress("DEPRECATION")
+        signatures
+    }
+    signatures?.joinToString(",") { signature ->
+        val cert = CertificateFactory.getInstance("X.509")
+            .generateCertificate(signature.toByteArray().inputStream()) as X509Certificate
+        MessageDigest.getInstance("SHA-256").digest(cert.publicKey.encoded)
+            .joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
+    }
+}.getOrNull()
+
+/**
+ * 更新包与本机签名不一致时，系统安装器只会给一句「应用未安装」。
+ * 提前判断并说明原因（本地 debug 包装 CI 包就是这种情况）；读不到签名时放行，交给系统兜底。
+ */
+private fun signatureMatches(context: Context, apk: File): Boolean {
+    val pm = context.packageManager
+    val flags = signatureFlags
+    val installed = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageInfo(context.packageName, flags)
+        }
+    }.getOrNull()?.signerDigest()
+    val archive = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.getPackageArchiveInfo(apk.absolutePath, PackageManager.PackageInfoFlags.of(flags.toLong()))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.getPackageArchiveInfo(apk.absolutePath, flags)
+        }
+    }.getOrNull()?.signerDigest()
+    if (installed.isNullOrEmpty() || archive.isNullOrEmpty()) return true
+    return installed.equals(archive, ignoreCase = true)
+}
 
 /**
  * 检查更新对话框：逻辑照抄 app/shared 的旧 UpdateDialog（GithubApi 取最新构建 → 比较 revision →
@@ -78,15 +136,18 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
     var total by remember { mutableLongStateOf(0L) }
     var targetProgress by remember { mutableFloatStateOf(0f) }
     val progress by animateFloatAsState(targetProgress, MaterialTheme.motionScheme.defaultEffectsSpec(), label = "updateProgress")
+    var errorDetail by remember { mutableStateOf<String?>(null) }
     var active by remember { mutableStateOf(true) }
 
     val checkUpdate: () -> Unit = {
         status = UpdateStatus.UpdatingInfo
+        errorDetail = null
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     val latest = GithubApi.getLatestBuild()
-                    val revision = latest.assets.first { it.name.startsWith("BV") }.name.split("_")[1].toInt()
+                    val revision = latest.revision
+                        ?: throw IllegalStateException("无法从发布信息中解析版本号")
                     latest to (revision > BuildConfig.VERSION_CODE)
                 }
             }
@@ -98,6 +159,7 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
                 }
                 .onFailure {
                     updateLogger.warn(it) { "Failed to get latest version" }
+                    errorDetail = it.message ?: it::class.simpleName
                     status = UpdateStatus.CheckError
                 }
         }
@@ -107,6 +169,7 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
         val latest = release
         if (latest != null) {
             status = UpdateStatus.Downloading
+            errorDetail = null
             downloaded = 0L
             total = 0L
             targetProgress = 0f
@@ -140,12 +203,22 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
                             withContext(Dispatchers.IO) {
                                 runCatching { CacheManager(context).checkCache(preserve = file) }
                             }
-                            status = UpdateStatus.Installing
-                            if (!installApk(context, file)) status = UpdateStatus.InstallError
+                            val signatureOk = withContext(Dispatchers.IO) { signatureMatches(context, file) }
+                            if (!signatureOk) {
+                                errorDetail = "更新包签名与当前应用不一致，无法覆盖安装"
+                                status = UpdateStatus.InstallError
+                            } else {
+                                status = UpdateStatus.Installing
+                                if (!installApk(context, file)) {
+                                    errorDetail = "没有权限打开安装程序，请允许本应用安装未知应用"
+                                    status = UpdateStatus.InstallError
+                                }
+                            }
                         }
                     }
                     .onFailure {
                         updateLogger.warn(it) { "Failed to download update" }
+                        errorDetail = it.message ?: it::class.simpleName
                         status = UpdateStatus.DownloadError
                     }
             }
@@ -209,19 +282,24 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
                 )
             }
 
-            else -> Text(
-                stringResource(
-                    when (status) {
-                        UpdateStatus.Installing -> R.string.settings_update_body_installing
-                        UpdateStatus.DownloadError -> R.string.settings_update_body_download_error
-                        UpdateStatus.InstallError -> R.string.settings_update_body_install_error
-                        UpdateStatus.CheckError -> R.string.settings_update_body_check_error
-                        else -> R.string.settings_update_body_none
-                    }
-                ),
-                style = BvType.Body,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            else -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    stringResource(
+                        when (status) {
+                            UpdateStatus.Installing -> R.string.settings_update_body_installing
+                            UpdateStatus.DownloadError -> R.string.settings_update_body_download_error
+                            UpdateStatus.InstallError -> R.string.settings_update_body_install_error
+                            UpdateStatus.CheckError -> R.string.settings_update_body_check_error
+                            else -> R.string.settings_update_body_none
+                        }
+                    ),
+                    style = BvType.Body,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                errorDetail?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = BvType.Small, color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
         SettingsDialogActions(
             confirm = when (status) {

@@ -38,6 +38,15 @@ data class Release(
     val isPreRelease = prerelease
     val isRelease = !prerelease
 
+    /** 资产文件名形如 BV_<versionCode>_<versionName>.<buildType>_<flavor>_<abi>.apk。 */
+    val revision: Int?
+        get() = assets.mapNotNull { it.versionCode }.maxOrNull()
+            ?: Regex("r(\\d+)").find(tagName)?.groupValues?.get(1)?.toIntOrNull()
+
+    fun downloadAsset(isDebug: Boolean): Asset? =
+        if (isDebug) assets.firstOrNull { it.name.contains(".debug_") }
+        else assets.firstOrNull { it.name.contains(".alpha_") || it.name.contains(".release_") }
+
     @Serializable
     data class Asset(
         @SerialName("browser_download_url")
@@ -58,8 +67,16 @@ data class Release(
         @SerialName("updated_at")
         val updatedAt: String,
         val uploader: User,
-        val url: String
-    )
+        val url: String,
+        val digest: String? = null,
+    ) {
+        val versionCode: Int?
+            get() = Regex("^BV_(\\d+)_").find(name)?.groupValues?.get(1)?.toIntOrNull()
+
+        /** GitHub 的 digest 形如 "sha256:<hex>"，旧资产或旧 API 没有这个字段。 */
+        val sha256: String?
+            get() = digest?.removePrefix("sha256:")?.lowercase()?.takeIf { it.length == 64 }
+    }
 
     @Serializable
     data class User(
