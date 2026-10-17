@@ -290,6 +290,16 @@ object Prefs {
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefPreferOfficialCdnRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPreferOfficialCdn, value) }
 
+    /** 起播时对候选 CDN 地址测速并按吞吐排序；默认关闭 */
+    var autoSelectCdn: Boolean
+        get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefAutoSelectCdnRequest).first() }
+        set(value) = runBlocking { dsm.editPreference(PrefKeys.prefAutoSelectCdnKey, value) }
+
+    /** 播放失败/频繁缓冲时自动切到下一个候选 CDN 地址；默认开启 */
+    var enableCdnFailover: Boolean
+        get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefEnableCdnFailoverRequest).first() }
+        set(value) = runBlocking { dsm.editPreference(PrefKeys.prefEnableCdnFailoverKey, value) }
+
     var defaultDanmakuMask: Boolean
         get() = runBlocking {
             dsm.getPreferenceFlow(PrefKeys.prefDefaultDanmakuMaskRequest).first()
@@ -414,6 +424,8 @@ object PrefKeys {
     val prefLastVersionCodeKey = intPreferencesKey("last_version_code")
     val prefShowedRemoteControllerPanelDemoKey = booleanPreferencesKey("showed_rcpd")
     val prefPreferOfficialCdn = booleanPreferencesKey("prefer_official_cdn")
+    val prefAutoSelectCdnKey = booleanPreferencesKey("auto_select_cdn")
+    val prefEnableCdnFailoverKey = booleanPreferencesKey("enable_cdn_failover")
     val prefDefaultDanmakuMask = booleanPreferencesKey("prefer_enable_webmark")
     val prefEnableFfmpegAudioRenderer = booleanPreferencesKey("enable_ffmpeg_audio_renderer")
     val prefBlacklistUserKey = booleanPreferencesKey("blacklist_user")
@@ -474,6 +486,8 @@ object PrefKeys {
     val prefShowedRemoteControllerPanelDemoRequest =
         PreferenceRequest(prefShowedRemoteControllerPanelDemoKey, false)
     val prefPreferOfficialCdnRequest = PreferenceRequest(prefPreferOfficialCdn, false)
+    val prefAutoSelectCdnRequest = PreferenceRequest(prefAutoSelectCdnKey, false)
+    val prefEnableCdnFailoverRequest = PreferenceRequest(prefEnableCdnFailoverKey, true)
     val prefDefaultDanmakuMaskRequest = PreferenceRequest(prefDefaultDanmakuMask, false)
     val prefEnableFfmpegEndererRequest = PreferenceRequest(prefEnableFfmpegAudioRenderer, false)
     val prefBlacklistUserRequest = PreferenceRequest(prefBlacklistUserKey, false)
