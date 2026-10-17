@@ -327,6 +327,24 @@ object Prefs {
         }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayModeKey, value.ordinal) }
 
+    /** 缓存阈值（MB，0 = 不限制，默认不限制）。 */
+    var cacheThreshold: Int
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefCacheThresholdRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefCacheThresholdKey, value)
+        }
+
+    /** 缓存自动清理开关（默认开启，但阈值为「不限制」时不会清理）。 */
+    var cacheAutoClean: Boolean
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefCacheAutoCleanRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefCacheAutoCleanKey, value)
+        }
+
     val themePrefsFlow: Flow<ThemePrefs>
         get() = combine(
             dsm.getPreferenceFlow(PrefKeys.prefThemeSourceRequest),
@@ -401,6 +419,8 @@ object PrefKeys {
     val prefBlacklistUserKey = booleanPreferencesKey("blacklist_user")
     val prefThemeTypeKey = intPreferencesKey("theme_type")
     val prefPlayModeKey = intPreferencesKey("play_mode")
+    val prefCacheThresholdKey = intPreferencesKey("cache_threshold")
+    val prefCacheAutoCleanKey = booleanPreferencesKey("cache_auto_clean")
 
     val prefIsLoginRequest = PreferenceRequest(prefIsLoginKey, false)
     val prefUidRequest = PreferenceRequest(prefUidKey, 0)
@@ -459,6 +479,8 @@ object PrefKeys {
     val prefBlacklistUserRequest = PreferenceRequest(prefBlacklistUserKey, false)
     val prefThemeTypeRequest = PreferenceRequest(prefThemeTypeKey, ThemeType.Auto.ordinal)
     val prefPlayModeRequest = PreferenceRequest(prefPlayModeKey, PlayMode.Sequential.ordinal)
+    val prefCacheThresholdRequest = PreferenceRequest(prefCacheThresholdKey, 0)
+    val prefCacheAutoCleanRequest = PreferenceRequest(prefCacheAutoCleanKey, true)
 
     val prefThemeSourceKey = intPreferencesKey("bv_theme_source")
     val prefSeedColorKey = intPreferencesKey("bv_seed_color")
