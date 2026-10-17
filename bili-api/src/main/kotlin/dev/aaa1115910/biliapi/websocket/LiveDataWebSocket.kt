@@ -67,8 +67,10 @@ object LiveDataWebSocket {
     private val json = Json { ignoreUnknownKeys = true }
 
     private val wsClient by lazy {
+        // B 站 comet 服务器不回 WebSocket 协议层 pong（保活靠应用层 OP=2 心跳），
+        // 配 pingInterval 会在 30s 后误判超时并每 60s 断线重连
         OkHttpClient.Builder()
-            .pingInterval(30, TimeUnit.SECONDS)
+            .pingInterval(0, TimeUnit.MILLISECONDS)
             .build()
     }
 
