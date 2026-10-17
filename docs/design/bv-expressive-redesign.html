@@ -398,6 +398,19 @@ kbd { font: 600 12px var(--font-mono); padding: 1px 6px; border-radius: 6px; bac
 .m-heart svg { width: 100%; height: 100%; fill: currentColor; filter: drop-shadow(0 6px 16px rgb(0 0 0 / .4)); }
 @keyframes m-pop { 0% { transform: scale(0) rotate(-12deg); opacity: 0; } 30% { transform: scale(1.15) rotate(6deg); opacity: 1; } 70% { transform: scale(1) rotate(0); opacity: 1; } 100% { transform: translateY(-60px) scale(.9); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .m-heart { animation-duration: .01s; } .f, .m-tvrail { transition: none !important; } }
+/* search results: filter chips (FilterChip, dropdown / selected-with-check), collapsing top bar, vertical pivot containers */
+.m-chip.dd, .m-chip.ck { display: inline-flex; align-items: center; gap: 4px; }
+.m-chip.dd { padding-right: 8px; }
+.m-chip.ck { padding-left: 10px; }
+.m-chip .i { width: 18px; height: 18px; }
+.m-cnt { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--primary); color: var(--on-primary); font: 700 11px/18px var(--font-display); text-align: center; }
+.m-scroll { overflow-y: auto; scrollbar-width: none; overscroll-behavior: contain; }
+.m-scroll::-webkit-scrollbar { display: none; }
+.m-appbar { position: absolute; left: 0; right: 0; z-index: 3; background: var(--surface); transition: transform var(--spring-default-dur) var(--spring-default); }
+.m-appbar.hide { transform: translateY(-100%); }
+.tvv { overflow: hidden; }
+.scr [data-go] { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) { .m-appbar { transition: none; } }
 </style>
 
 <div class="toc">
@@ -468,6 +481,7 @@ kbd { font: 600 12px var(--font-mono); padding: 1px 6px; border-radius: 6px; bac
           <tr><td>动态列表 / 动态详情 + 评论</td><td class="yes">有 / 有</td><td class="yes">有 / <span class="no">无</span></td><td>大屏用列表-详情双栏</td></tr>
           <tr><td>视频评论</td><td class="yes">有</td><td class="no">无</td><td>手机用底部抽屉，平板侧栏，电视右侧面板</td></tr>
           <tr><td>搜索结果分类</td><td>只有视频</td><td>视频 / 番剧 / 影视 / UP 主</td><td>四类全做，电视加屏幕键盘</td></tr>
+          <tr><td>搜索结果筛选（排序 · 时长 · 分区 · 子分区）</td><td class="no">无</td><td class="yes">有（长按结果，仅 Web 接口）</td><td>三端都有：筛选条 + 手机底部抽屉 / 平板侧边面板 / 电视右侧两栏菜单；电视结果可全屏</td></tr>
           <tr><td>稍后再看 · Tag 页 · UP 主关注</td><td class="no">无（按钮无效）</td><td class="yes">有</td><td>收进「我的」和详情页操作组</td></tr>
           <tr><td>字幕显示 · 播放心跳 · 画面比例</td><td class="no">无</td><td class="yes">有</td><td>统一播放器控制层，三端共用菜单数据</td></tr>
           <tr><td>点赞 / 投币</td><td class="no">无</td><td class="no">无</td><td>接口已有（<code>sendVideoLike</code> / <code>sendVideoCoin</code>），接入操作组</td></tr>
@@ -682,8 +696,11 @@ kbd { font: 600 12px var(--font-mono); padding: 1px 6px; border-radius: 6px; bac
     </div>
     <div style="display:grid;gap:14px;margin-bottom:24px">
       <div class="seg" id="screenSeg" role="group" aria-label="界面" style="overflow-x:auto;flex-wrap:nowrap;max-width:100%"></div>
-      <div class="seg" id="deviceSeg" role="group" aria-label="设备">
-        <button type="button" data-dev="phone" aria-pressed="false">手机</button><button type="button" data-dev="tablet" aria-pressed="false">平板</button><button type="button" data-dev="tv" aria-pressed="true">电视</button>
+      <div style="display:flex;flex-wrap:wrap;gap:14px">
+        <div class="seg" id="deviceSeg" role="group" aria-label="设备">
+          <button type="button" data-dev="phone" aria-pressed="false">手机</button><button type="button" data-dev="tablet" aria-pressed="false">平板</button><button type="button" data-dev="tv" aria-pressed="true">电视</button>
+        </div>
+        <div class="seg" id="stateSeg" role="group" aria-label="状态" style="display:none"></div>
       </div>
     </div>
     <div class="split" style="grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)">
@@ -863,6 +880,8 @@ const ICONS = {
   palette: 'M12 3a9 9 0 0 0 0 18c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
   up: 'M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z',
   down: 'M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z',
+  drop: 'M7 10l5 5 5-5z',
+  close: 'M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z',
   check: 'M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z',
   add: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
   explore: 'M12 10.9c-.61 0-1.1.49-1.1 1.1s.49 1.1 1.1 1.1c.61 0 1.1-.49 1.1-1.1s-.49-1.1-1.1-1.1zM12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm2.19 12.19L6 18l3.81-8.19L18 6l-3.81 8.19z',
@@ -1199,15 +1218,67 @@ const hotList = n => HOT.slice(0, n).map((h, i) => `<div style="display:flex;gap
 const SUG = ['极光 4K', '极光 冰岛 自驾', '极光 延时摄影', '极光 预报 Kp 指数'];
 function searchPhone() {
   return sb() + `<div style="padding:6px 12px 8px;display:flex;gap:6px;align-items:center"><span class="m-ib">${ic('back')}</span><div class="m-search m-fill" style="background:var(--surface-container-highest)"><span style="color:var(--on-surface)">极光<b style="color:var(--primary);font-weight:400">|</b></span><span class="m-ib" style="width:36px;height:36px">${ic('mic')}</span></div></div>
-  <div style="display:flex;flex-direction:column;padding:0 4px">${SUG.map(s => `<div class="m-li" style="padding:10px 16px">${ic('search')}<span class="tx"><b style="font-weight:400">${s.replace('极光', '<b>极光</b>')}</b></span></div>`).join('')}</div>
+  <div style="display:flex;flex-direction:column;padding:0 4px">${SUG.map(s => `<div class="m-li" data-go="result" style="padding:10px 16px">${ic('search')}<span class="tx"><b style="font-weight:400">${s.replace('极光', '<b>极光</b>')}</b></span></div>`).join('')}</div>
   <div style="padding:12px 16px;display:flex;flex-direction:column;gap:12px"><div class="m-h">搜索历史 <small>清除</small></div><div class="m-chips" style="flex-wrap:wrap">${['芙莉莲', '冰岛', 'Compose 弹幕', '自由潜'].map(c => `<span class="m-chip">${c}</span>`).join('')}</div>
   <div class="m-h" style="margin-top:6px">大家都在搜</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px 12px">${hotList(6)}</div></div>`;
 }
+/* 结果与筛选：筛选项与旧电视版 SearchResultVideoFilter 一致（SearchFilterOrderType.webFilters / SearchFilterDuration / PartitionUtil） */
+const S_CATS = ['综合', '视频', '番剧', '影视', 'UP 主'];
+const S_ORDER = ['综合排序', '最多点击', '最新发布', '最多弹幕', '最多收藏'];
+const S_DUR = ['全部时长', '10 分钟以下', '10–30 分钟', '30–60 分钟', '60 分钟以上'];
+const S_PART = ['全部分区', '动画', '番剧', '国创', '音乐', '舞蹈', '游戏', '知识', '科技', '运动', '汽车', '生活', '美食', '动物圈', '鬼畜', '时尚', '资讯', '娱乐', '影视', '纪录片', '电影', '电视剧'];
+const S_SUB = ['全部', '科学科普', '社科·法律·心理', '人文历史', '财经商业', '校园学习', '职业职场', '设计·创意', '野生技术协会'];
+const S_PICK = { order: '最多点击', dur: '10–30 分钟', part: '知识', sub: '科学科普' };
+const S_SUMMARY = '最多点击 · 10–30 分钟 · 知识 / 科学科普';
+const RES = [0, 6, 5, 3, 2, 4, 1, 7];
+const byState = map => st => (map[st] || Object.values(map)[0])();
+const tvhintL = t => tvhint(t).replace('class="m-tvhint"', 'class="m-tvhint" style="right:auto;left:96px;z-index:6"');
+const catChips = (active, tv) => S_CATS.map(c => `<span class="m-chip${tv ? ' f' : ''}${c === active ? ' on' : ''}"${tv ? ' data-f' : ''}>${c}</span>`).join('');
+const ddChip = (label, on) => `<span class="m-chip dd${on ? ' on' : ''}" data-go="filter">${label}${ic('drop')}</span>`;
+const filterBar = () => `<span class="m-chip ck" data-go="filter" style="color:var(--on-surface)">${ic('tune')}筛选<span class="m-cnt">2</span></span>${ddChip(S_PICK.order)}${ddChip(S_PICK.dur, 1)}${ddChip('知识 · 科学科普', 1)}`;
+const fChips = (list, pick) => list.map(t => t === pick ? `<span class="m-chip ck on">${ic('check')}${t}</span>` : `<span class="m-chip">${t}</span>`).join('');
+const fGroup = (label, chips, extra = '') => `<div class="m-col" style="gap:10px"><div class="m-eyebrow">${label}</div><div class="m-chips" style="flex-wrap:wrap">${chips}</div>${extra}</div>`;
+const filterGroups = parts => fGroup('排序', fChips(S_ORDER, S_PICK.order)) + fGroup('时长', fChips(S_DUR, S_PICK.dur))
+  + fGroup('分区', fChips(S_PART.slice(0, parts), S_PICK.part), parts < S_PART.length ? `<span style="display:inline-flex;align-items:center;gap:2px;font:600 13px var(--font-body);color:var(--primary)">展开全部 ${S_PART.length - 1} 个分区${ic('down')}</span>` : '')
+  + fGroup('子分区 · 知识', fChips(S_SUB.slice(0, parts < S_PART.length ? 6 : S_SUB.length), S_PICK.sub));
+const filterHead = close => `<div class="m-col" style="gap:4px"><div style="display:flex;justify-content:space-between;align-items:center"><b style="font:800 20px var(--font-display)">筛选视频</b>${close ? `<span class="m-ib" data-go="result">${ic('close')}</span>` : '<span style="font:600 14px var(--font-body);color:var(--primary)">重置</span>'}</div><span class="m-meta" style="white-space:normal">选中即生效，结果在后面同步刷新 · 只作用于视频结果</span></div>`;
+function searchResultPhone() {
+  const rows = [...RES, ...RES.slice().reverse()].map(i => listRow(VIDS[i])).join('');
+  return `<div class="m-abs" style="left:0;right:0;top:0;z-index:4;background:var(--surface)">${sb()}</div>
+  <div class="m-appbar" data-collapse style="top:28px">
+    <div style="padding:6px 12px 8px;display:flex;gap:6px;align-items:center"><span class="m-ib">${ic('back')}</span><div class="m-search m-fill" data-go="input">${ic('search')}<span style="color:var(--on-surface)">极光</span><span class="m-ib" style="width:36px;height:36px">${ic('close')}</span></div></div>
+    <div class="m-chips" style="padding:0 16px">${catChips('视频')}</div>
+    <div class="m-chips" style="padding:10px 16px">${filterBar()}</div></div>
+  <div class="m-abs m-scroll" data-scroll style="left:0;right:0;top:28px;bottom:0;padding:160px 16px 0"><div class="m-col" style="gap:14px">${rows}</div><div style="padding:18px 0 22px;text-align:center;font-size:12px;color:var(--on-surface-variant)">正在加载更多…</div></div>`;
+}
+function searchFilterPhone() {
+  return searchResultPhone() + `<div class="m-abs" data-go="result" style="inset:0;z-index:5;background:rgb(0 0 0 / .32)"></div>
+  <div class="m-abs" style="left:0;right:0;bottom:0;z-index:6;border-radius:28px 28px 0 0;background:var(--surface-container-low);padding:10px 20px 20px;display:flex;flex-direction:column;gap:16px">
+    <span style="align-self:center;width:32px;height:4px;border-radius:2px;background:var(--outline-variant)"></span>
+    ${filterHead()}${filterGroups(8)}<span class="m-btn fill lg" data-go="result" style="width:100%">完成</span></div>`;
+}
 function searchTablet() {
-  return `<div style="display:flex;height:100%">${rail('')}<div class="m-fill m-col" style="padding:20px 28px 0 8px;gap:18px;overflow:hidden">
-    <div style="display:flex;gap:16px;align-items:center"><div class="m-search" style="width:560px;background:var(--surface-container-highest)">${ic('search')}<span style="color:var(--on-surface)">极光</span><span class="m-ib">${ic('mic')}</span></div><div class="m-chips"><span class="m-chip on">综合</span><span class="m-chip">视频</span><span class="m-chip">番剧</span><span class="m-chip">影视</span><span class="m-chip">UP 主</span></div></div>
+  return `<div style="display:flex;height:100%">${rail('')}<div class="m-fill" style="padding:20px 28px 0 8px;display:flex;gap:24px;align-items:flex-start">
+    <div style="width:560px;flex:none;border-radius:28px;background:var(--surface-container-high);box-shadow:0 14px 36px -18px rgb(0 0 0 / .5);overflow:hidden">
+      <div class="m-search" style="background:none">${ic('search')}<span style="color:var(--on-surface)">极光<b style="color:var(--primary);font-weight:400">|</b></span><span class="m-ib">${ic('mic')}</span></div>
+      <div style="height:1px;background:var(--outline-variant)"></div>
+      <div class="m-col" style="padding:6px 0">${SUG.map(s => `<div class="m-li" data-go="result" style="padding:12px 20px">${ic('search')}<span class="tx"><b style="font-weight:400">${s.replace('极光', '<b>极光</b>')}</b></span></div>`).join('')}</div>
+      <div style="padding:6px 20px 20px;display:flex;flex-direction:column;gap:12px"><div class="m-h">搜索历史 <small>清除</small></div><div class="m-chips" style="flex-wrap:wrap">${['芙莉莲', '冰岛', 'Compose 弹幕', '自由潜'].map(c => `<span class="m-chip">${c}</span>`).join('')}</div></div></div>
+    <div class="m-col m-fill" style="gap:16px;padding:20px 22px;border-radius:28px;background:var(--surface-container-low)"><div class="m-h">大家都在搜</div><div style="display:grid;gap:16px">${hotList(6)}</div></div>
+  </div></div>`;
+}
+function searchFilterTablet() {
+  return searchResultTablet() + `<div class="m-abs" data-go="result" style="inset:0;z-index:4;background:rgb(0 0 0 / .32)"></div>
+  <div class="m-abs" style="top:16px;right:16px;bottom:16px;width:380px;z-index:5;border-radius:28px;background:var(--surface-container-low);padding:22px 24px 24px;display:flex;flex-direction:column;gap:20px">
+    ${filterHead(1)}<div class="m-col m-fill m-scroll" style="gap:18px;min-height:0">${filterGroups(S_PART.length)}</div>
+    <div style="display:flex;gap:12px"><span class="m-btn o" style="flex:1">重置</span><span class="m-btn fill" data-go="result" style="flex:1">完成</span></div></div>`;
+}
+function searchResultTablet() {
+  return `<div style="display:flex;height:100%">${rail('')}<div class="m-fill m-col" style="padding:20px 28px 0 8px;gap:16px;overflow:hidden">
+    <div style="display:flex;gap:16px;align-items:center"><div class="m-search" data-go="input" style="width:560px;background:var(--surface-container-highest)">${ic('search')}<span style="color:var(--on-surface)">极光</span><span class="m-ib">${ic('close')}</span></div><div class="m-chips">${catChips('综合')}</div></div>
+    <div style="display:flex;gap:8px;align-items:center">${filterBar()}<span class="m-meta" style="margin-left:auto">排序和筛选只作用于视频</span></div>
     <div style="display:flex;gap:16px;align-items:center;padding:16px;border-radius:24px;background:var(--surface-container)"><div class="m-av p lg">阿</div><div class="m-col m-fill" style="gap:4px"><b style="font-size:16px">旅行的阿树</b><span class="m-meta">粉丝 58.2万 · 216 个视频 · 极光、冰岛、北欧自驾</span></div><span class="m-btn fill">${ic('add')}关注</span><div class="m-row" style="gap:10px">${[0, 5, 3].map(i => `<div class="m-cv" style="width:120px">${img(i)}</div>`).join('')}</div></div>
-    <div class="m-h">视频 <small>按播放量 ›</small></div>
+    <div class="m-h">视频 <small>全部视频 ›</small></div>
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px">${[0, 2, 5, 6].map(i => vcard(VIDS[i], { stat: 1 })).join('')}</div>
     <div class="m-h">影视</div><div style="display:flex;gap:16px">${[1, 3].map(i => `<div style="display:flex;gap:14px;padding:12px;border-radius:20px;background:var(--surface-container-low);width:420px">${poster(PGCS[i], { w: 96 })}<div class="m-col" style="gap:6px"><b>${PGCS[i].t}</b><span class="m-meta">${PGCS[i].s}</span><span class="m-btn fill" style="height:34px;margin-top:8px;align-self:flex-start">${ic('play')}立即观看</span></div></div>`).join('')}</div>
   </div></div>`;
@@ -1221,7 +1292,30 @@ function searchTv() {
     <div class="m-btn t f" data-f style="justify-content:flex-start">${ic('mic')}按住遥控器语音键说话</div></div>
   <div class="m-abs" style="left:430px;top:27px;width:190px;display:flex;flex-direction:column;gap:4px;z-index:2"><div class="m-eyebrow" style="padding:4px 12px 8px">联想</div>${SUG.map(s => `<div class="m-li f" data-f style="padding:9px 12px"><span class="tx"><b style="font-weight:500;font-size:13px">${s}</b></span></div>`).join('')}</div>
   <div class="m-abs" style="left:650px;top:27px;width:262px;display:flex;flex-direction:column;gap:12px;z-index:2"><div class="m-eyebrow">热搜</div>${hotList(6)}</div>
-  <div class="m-abs" style="left:430px;right:0;top:330px;z-index:2"><div class="m-h" style="font-size:15px">“极光”的结果</div><div class="m-row tvrow" style="gap:16px;overflow:hidden;padding:12px 48px 12px 4px">${[0, 2, 5, 6, 3].map(i => vcard(VIDS[i], { w: 180, f: 1, noMeta: true })).join('')}</div></div>` + tvhint();
+  <div class="m-abs" style="left:430px;right:0;top:316px;z-index:2"><div class="m-h" style="font-size:15px;padding-right:48px">“极光”的结果<span class="m-chip ck f" data-f data-go="result" data-menu="result">${ic('full')}全屏结果 · 筛选</span></div><div class="m-row tvrow" style="gap:16px;overflow:hidden;padding:12px 48px 12px 4px">${[0, 2, 5, 6, 3].map(i => vcard(VIDS[i], { w: 180, f: 1, noMeta: true })).join('')}</div></div>` + tvhintL('方向键移动焦点 · 菜单键进入全屏结果');
+}
+function searchResultTv() {
+  const cards = [...RES, 0, 6, 5, 3].map((i, k) => vcard(VIDS[i], { f: 1 }).replace(' data-f', k ? ' data-f' : ' data-f data-start')).join('');
+  return `<div data-back="input">${tvrail('搜索')}
+  <div class="m-abs" style="left:96px;right:48px;top:27px;display:flex;gap:12px;align-items:center;z-index:2">
+    <div class="m-search f g" data-f data-go="input" style="width:210px;height:44px;flex:none;background:var(--surface-container-highest)">${ic('search')}<span style="color:var(--on-surface);font-size:15px">极光</span></div>
+    <div class="m-chips" style="overflow:visible">${catChips('视频', 1)}</div><div class="m-fill"></div>
+    <span class="m-btn t f" data-f data-go="filter" data-menu="filter">${ic('tune')}筛选<span class="m-cnt">2</span></span></div>
+  <div class="m-abs m-meta" style="left:96px;right:48px;top:84px;font-size:12px;z-index:2"><b style="color:var(--on-surface)">视频</b><span>·</span><span>${S_SUMMARY}</span></div>
+  <div class="m-abs tvv" style="left:84px;right:36px;top:100px;bottom:0;z-index:1"><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:22px 18px;padding:12px 12px 48px">${cards}</div></div></div>`
+    + tvhint('↑ 分类与筛选 · 菜单键筛选 · 返回键回到键盘');
+}
+function searchFilterTv() {
+  const bg = searchResultTv().replace(/ data-(?:f|start|go|menu|back)(?:="[^"]*")?/g, '').replace(/<div class="m-tvhint">.*?<\/div>/, '');
+  const cat = (t, v, on) => `<div class="m-li f${on ? ' on' : ''}" data-f style="padding:8px 12px;flex-direction:column;align-items:flex-start;gap:1px"><b style="font-size:13px">${t}</b><span style="font-size:11px;opacity:.75">${v}</span></div>`;
+  const opt = t => `<div class="m-li f${t === S_PICK.part ? ' on' : ''}" data-f${t === S_PICK.part ? ' data-start' : ''} style="padding:7px 12px">${t === S_PICK.part ? ic('check') : '<span style="width:24px;flex:none"></span>'}<span class="tx"><b style="font-size:13px">${t}</b></span></div>`;
+  return bg + `<div class="m-abs" style="inset:0;z-index:4;background:rgb(0 0 0 / .5)"></div>
+  <div class="m-abs" data-back="result" style="top:16px;right:16px;bottom:16px;width:360px;z-index:5;border-radius:28px;background:var(--surface-container);display:flex;flex-direction:column;overflow:hidden;color:var(--on-surface)">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:18px 22px 12px"><b style="font:800 18px var(--font-display)">筛选视频</b><span class="m-meta">选中即刷新结果</span></div>
+    <div style="display:flex;flex:1;min-height:0">
+      <div class="m-col" style="width:118px;padding:10px 8px;gap:4px;background:var(--surface-container-high);border-radius:0 20px 0 0">${cat('排序', S_PICK.order)}${cat('时长', S_PICK.dur)}${cat('分区', S_PICK.part, 1)}${cat('子分区', S_PICK.sub)}<div class="m-fill"></div><div class="m-li f" data-f style="padding:8px 12px;justify-content:center;font-size:13px">重置</div></div>
+      <div class="m-col m-fill tvv" style="position:relative;padding:8px 20px 16px 16px;gap:2px">${S_PART.map(opt).join('')}</div></div></div>`
+    + tvhintL('← → 切换栏 · 确认键选中并刷新 · 返回键关闭');
 }
 
 /* ---------- PGC 影视 ---------- */
@@ -1365,11 +1459,21 @@ const SCREENS = [
     rules: { phone: ['横屏全屏：顶部标题和字幕 / 弹幕开关，底部波浪进度条、倍速、画质、选集。', '拖动进度时上方显示预览缩略图（videoshot）。', '暂停时中间按钮是圆角方形，播放时变回圆形。'],
              tablet: ['菜单从右侧滑出为侧边面板，不遮挡画面主体。', '弹幕设置用 Expressive 滑块，开关就在面板标题旁。'],
              tv: ['控制层只在按键后出现 3 秒；长按确认键或菜单键打开右侧菜单。', '菜单三栏：分类 / 项目 / 选项，沿用现有 MenuController 的数据结构。'] } },
-  { id: 'search', name: '搜索', fn: { phone: searchPhone, tablet: searchTablet, tv: searchTv },
-    comps: ['ExpandedFullScreenSearchBar', 'DockedSearchBar', 'FilterChip', 'ListItem'],
-    rules: { phone: ['全屏搜索：输入时显示联想，空闲时显示历史和热搜。', '热搜前三名用 primary / tertiary / secondary 三种强调色。'],
-             tablet: ['结果页顶部一排分类：综合、视频、番剧、影视、UP 主。', '综合结果把匹配的 UP 主和影视单独成块，视频 4 列。'],
-             tv: ['左侧屏幕键盘（拼音首字母），中间联想，右侧热搜。', '下方实时出结果，按 ↓ 直接进入结果行。', '支持遥控器语音键。'] } },
+  { id: 'search', name: '搜索', states: [['input', '输入'], ['result', '结果'], ['filter', '筛选']],
+    fn: { phone: byState({ input: searchPhone, result: searchResultPhone, filter: searchFilterPhone }),
+          tablet: byState({ input: searchTablet, result: searchResultTablet, filter: searchFilterTablet }),
+          tv: byState({ input: searchTv, result: searchResultTv, filter: searchFilterTv }) },
+    comps: ['ExpandedFullScreenSearchBar', 'DockedSearchBar', 'FilterChip（下拉 / 单选）', 'ModalBottomSheet', 'SideSheet', 'DropdownMenu', 'TopAppBar enterAlways', 'ListItem'],
+    rules: {
+      input: { phone: ['全屏搜索：输入时显示联想，空闲时显示历史和热搜。', '热搜前三名用 primary / tertiary / secondary 三种强调色。', '提交后同一路由切到「结果」，不另开页面；在结果页重新编辑时，返回键先回到结果，再离开搜索。'],
+               tablet: ['DockedSearchBar：搜索框原地展开成下拉卡片，联想在上、搜索历史在下。', '右侧同时显示热搜，不必再点一次。', '回车或点联想后下拉收起，进入结果。'],
+               tv: ['左侧屏幕键盘（拼音首字母），中间联想，右侧热搜。', '下方实时出结果，按 ↓ 直接进入结果行。', '结果行上方的「全屏结果 · 筛选」或遥控器菜单键进入全屏结果页。', '支持遥控器语音键。'] },
+      result: { phone: ['结果占满整屏：搜索是独立路由，不显示底部导航。', '往下滚动时搜索栏、分类和筛选条一起收起，只留状态栏；稍微上滑立刻回来（enterAlways）。原型可以直接滚动试。', '分类：综合 / 视频 / 番剧 / 影视 / UP 主。筛选条只在「综合」和「视频」出现：排序、时长、分区三个下拉 chip，改过的项高亮并写出当前值；最左的「筛选」带已改项数。', '点任意筛选 chip 打开底部抽屉，并滚到对应的那一组。'],
+                tablet: ['顶部是搜索框和分类，下面一行是筛选条，规则和手机相同。', '单个下拉 chip 弹出该项的 DropdownMenu，改一项不必开整个面板；「筛选」打开右侧完整面板。', '综合结果把匹配的 UP 主和影视单独成块，视频 4 列；「全部视频 ›」切到视频分类，网格 5 列铺满。', '滚动时搜索栏和筛选条一起收起，结果占满内容区。'],
+                tv: ['从输入页进来后，键盘、联想、热搜都让出位置，结果占满整屏，4 列网格纵向枢轴滚动（焦点保持在 30% 高度）。', '顶部：搜索框（确认键回到键盘）、分类标签（聚焦即切换）、「筛选」按钮（带已改项数）。下面一行写出当前排序和筛选条件。', '返回键回到键盘，已输入的内容和结果都保留。'] },
+      filter: { phone: ['ModalBottomSheet，四组单选 FilterChip：排序、时长、分区、子分区，选中项带对勾。', '选中即生效，背后的结果立刻刷新（和旧电视版 SearchResultVideoFilter 相同）；「重置」恢复默认，「完成」收起。', '21 个分区默认显示两行，可展开；选了分区才出现子分区，换分区时子分区重置为「全部」。', '筛选只作用于视频。App 接口只支持排序（综合 / 最多点击 / 最新发布 / 最多评论 / 最多点赞），时长和分区置灰，并提示切换到 Web 接口。'],
+                tablet: ['右侧模态 SideSheet，内容和手机的底部抽屉相同；分区全部展开，结果在左侧实时刷新。', '底部「重置」和「完成」，点遮罩或右上角关闭也会保留已选的条件。'],
+                tv: ['右侧面板，沿用播放器菜单的两栏结构：左栏是筛选项和当前值，右栏是选项。', '← → 在两栏之间移动，确认键选中并立即刷新结果；返回键关闭面板，焦点回到「筛选」按钮。', '右栏选项多时纵向枢轴滚动；换分区时子分区重置为「全部」。'] } } },
   { id: 'pgc', name: '影视', fn: { phone: pgcPhone, tablet: pgcTablet, tv: pgcTv },
     comps: ['HorizontalMultiBrowseCarousel', 'ButtonGroup', 'FilterChip', 'Card'],
     rules: { phone: ['一级入口，包含番剧、国创、电影、电视剧、纪录片、综艺。', '竖海报轮播 + 一周时间表，今天的日期按钮是圆角方形。'],
@@ -1443,6 +1547,7 @@ const CONTENT = {
   compRows: [
     ['ShortNavigationBar / WideNavigationRail', '应用外壳', '按 DeviceProfile 自动切换；电视用收起的导航轨，焦点进入时展开为模态'],
     ['AppBarWithSearch / ExpandedFullScreenSearchBar', '首页顶部、搜索', '手机全屏展开搜索，平板用 Docked 形式'],
+    ['FilterChip + ModalBottomSheet / SideSheet', '搜索结果筛选', '常用项放在结果上方的筛选条；完整筛选手机用底部抽屉，平板用侧边面板，电视用右侧两栏菜单'],
     ['ButtonGroup + ToggleButton', '视频详情操作区、设置里的单选', '点赞、投币、收藏连成一组，选中项变胶囊形'],
     ['HorizontalFloatingToolbar / VerticalFloatingToolbar', '刷刷操作列、平板播放控制', '悬浮在画面上，不占布局'],
     ['FloatingActionButtonMenu', '动态页、收藏夹', '发动态、新建收藏夹等次要操作收进一个 FAB'],
@@ -1457,7 +1562,7 @@ const CONTENT = {
     ['MainActivity（手机） / MainActivity（电视）', 'MainActivity + Home', '一个 Activity，两个启动类别；电视的用户锁解锁页作为启动时的覆盖层'],
     ['VideoPlayerActivity / VideoInfoActivity / VideoPlayerV3Activity', 'Video(bvid) · Player(bvid, cid)', '手机和平板详情页内嵌播放器；电视从详情页进全屏 Player'],
     ['SeasonInfoActivity', 'Season(seasonId | epId)', '番剧详情，选集和季度选择器沿用电视版逻辑'],
-    ['SearchInputActivity / SearchResultActivity', 'Search(query?)', '输入和结果是同一路由的两个状态'],
+    ['SearchInputActivity / SearchResultActivity', 'Search(query?)', '输入、结果、筛选是同一路由的三个状态；电视的结果可以切到全屏'],
     ['DynamicDetailActivity', 'Dynamic(id)', '大屏是列表-详情的右栏'],
     ['UserSpaceActivity / UpInfoActivity', 'Space(mid)', ''],
     ['History / Favorite / ToView / FollowingSeason / Follow(ing)User', 'Me.History / Me.Favorite / Me.ToView / Me.Bangumi / Me.Following', '「我的」下的子路由'],
@@ -1651,19 +1756,33 @@ const CONTENT = {
     const fr = fit.firstElementChild; fr.style.transform = `scale(${s})`; fr.style.left = ((w - fw * s) / 2) + 'px';
     fit.style.height = (fh * s) + 'px';
   }
-  function mount(fit, id, dev) {
+  function mount(fit, id, dev, st) {
     const sc = SCREENS.find(s => s.id === id);
     const key = id === 'player' && dev === 'phone' ? 'phoneL' : dev;
     const [w, h] = DEV[key], pad = PAD[key];
     const cinema = dev === 'tv' || id === 'player' || id === 'shorts';
     const frameCls = dev === 'phone' ? 'phone' : dev;
-    fit.innerHTML = `<div class="frame ${frameCls}"><div class="viewport"><div class="scr ${dev}${cinema ? ' cinema' : ''}" data-screen="${id}" style="width:${w}px;height:${h}px"${dev === 'tv' ? ' tabindex="0" role="application" aria-label="电视界面原型：点击后用方向键移动焦点"' : ''}>${sc.fn[dev]()}</div></div></div>`;
+    fit.innerHTML = `<div class="frame ${frameCls}"><div class="viewport"><div class="scr ${dev}${cinema ? ' cinema' : ''}" data-screen="${id}" style="width:${w}px;height:${h}px"${dev === 'tv' ? ' tabindex="0" role="application" aria-label="电视界面原型：点击后用方向键移动焦点"' : ''}>${sc.fn[dev](st)}</div></div></div>`;
     fit._dims = [w + pad * 2, h + pad * 2]; fit._w = -1;
     fitFrame(fit); ro.observe(fit);
     applyScopes(fit);
     const scr = $('.scr', fit);
     if (dev === 'tv') initTv(scr);
+    else if (sc.states) scr.addEventListener('click', e => { const g = e.target.closest('[data-go]'); if (g) goState(g.dataset.go); });
     if (id === 'shorts' && dev !== 'tv') initFeed(scr);
+    initCollapse(scr);
+  }
+
+  /* ---------- phone results: top bar collapses on scroll down, returns on scroll up (enterAlways) ---------- */
+  function initCollapse(scr) {
+    const list = $('[data-scroll]', scr), bar = $('[data-collapse]', scr);
+    if (!list || !bar) return;
+    list.style.paddingTop = (bar.offsetHeight + 4) + 'px';
+    let last = 0;
+    list.addEventListener('scroll', () => {
+      const y = list.scrollTop, d = y - last; last = y;
+      if (Math.abs(d) > 2) bar.classList.toggle('hide', d > 0 && y > 40);
+    }, { passive: true });
   }
 
   /* ---------- TV focus engine: 2D focus search like Compose's FocusOwner ---------- */
@@ -1678,8 +1797,15 @@ const CONTENT = {
       if (rail) rail.classList.toggle('open', rail.contains(n));
       const row = n.closest('.tvrow');
       if (row) row.scrollTo({ left: Math.max(0, n.offsetLeft - row.clientWidth * .15), behavior: reduced ? 'auto' : 'smooth' });
+      const col = n.closest('.tvv');
+      if (col) col.scrollTo({ top: Math.max(0, n.offsetTop - col.clientHeight * .3), behavior: reduced ? 'auto' : 'smooth' });
     }
     scr.addEventListener('keydown', e => {
+      /* 搜索的输入 / 结果 / 筛选状态：确认键走 data-go，返回（Esc / Backspace）走 data-back，菜单键（M）走 data-menu */
+      const hop = e.key === 'Enter' ? cur && cur.dataset.go
+        : e.key === 'Escape' || e.key === 'Backspace' ? $$('[data-back]', scr).pop()?.dataset.back
+        : e.key === 'm' || e.key === 'M' || e.key === 'ContextMenu' ? $('[data-menu]', scr)?.dataset.menu : null;
+      if (hop) { e.preventDefault(); goState(hop); return; }
       const dir = { ArrowLeft: 'l', ArrowRight: 'r', ArrowUp: 'u', ArrowDown: 'd' }[e.key];
       if (!dir && e.key !== 'Enter' && e.key !== ' ') return;
       e.preventDefault();
@@ -1732,17 +1858,30 @@ const CONTENT = {
 
   /* ---------- screens section ---------- */
   const DEV_NAMES = { phone: ['phone', '手机 · Compact'], tablet: ['tablet', '平板 · Expanded'], tv: ['tv', '电视 · Far + 方向键'] };
-  let curScreen = 'home', curDev = 'tv';
+  let curScreen = 'home', curDev = 'tv', curState = null;
   $('#screenSeg').innerHTML = SCREENS.map(s => `<button type="button" data-id="${s.id}" aria-pressed="${s.id === curScreen}">${s.name}</button>`).join('');
   function renderScreen() {
-    const s = SCREENS.find(x => x.id === curScreen), stage = $('#screenStage');
+    const s = SCREENS.find(x => x.id === curScreen), stage = $('#screenStage'), seg = $('#stateSeg');
+    if (s.states && !s.states.some(([k]) => k === curState)) curState = s.states[0][0];
+    seg.style.display = s.states ? '' : 'none';
+    seg.innerHTML = s.states ? s.states.map(([k, n]) => `<button type="button" data-st="${k}" aria-pressed="${k === curState}">${n}</button>`).join('') : '';
     stage.dataset.maxh = curDev === 'phone' ? 680 : '';
-    mount(stage, curScreen, curDev);
-    $('#screenCap').innerHTML = `${s.name} · <b>${DEV_NAMES[curDev][1]}</b>${curDev === 'tv' ? ' · 点击画面后用方向键' : ''}`;
+    mount(stage, curScreen, curDev, s.states ? curState : undefined);
+    const stName = s.states ? ' · ' + s.states.find(([k]) => k === curState)[1] : '';
+    const tip = curDev === 'tv' ? ' · 点击画面后用方向键' + (s.states ? '，确认键进入，Esc 返回，M 代替菜单键' : '') : s.states ? ' · 点搜索框、筛选条或遮罩可以切换状态' : '';
+    $('#screenCap').innerHTML = `${s.name}${stName} · <b>${DEV_NAMES[curDev][1]}</b>${tip}`;
+    const rules = s.states ? s.rules[curState] : s.rules;
     $('#screenRules').innerHTML = `<div class="card" style="gap:12px"><span class="eyebrow">用到的组件</span><div style="display:flex;flex-wrap:wrap;gap:6px">${s.comps.map(c => `<span class="pill o">${c}</span>`).join('')}</div></div>`
-      + ['phone', 'tablet', 'tv'].map(d => `<div class="card${d === curDev ? ' cur' : ''}"><h3 style="font-size:16px"><span class="ico">${ic(DEV_NAMES[d][0])}</span>${DEV_NAMES[d][1]}</h3>${UL(s.rules[d])}</div>`).join('');
+      + ['phone', 'tablet', 'tv'].map(d => `<div class="card${d === curDev ? ' cur' : ''}"><h3 style="font-size:16px"><span class="ico">${ic(DEV_NAMES[d][0])}</span>${DEV_NAMES[d][1]}</h3>${UL(rules[d])}</div>`).join('');
   }
-  $('#screenSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; curScreen = b.dataset.id; $$('button', $('#screenSeg')).forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderScreen(); });
+  function goState(st) {
+    const stage = $('#screenStage'), hadFocus = stage.contains(document.activeElement);
+    curState = st;
+    renderScreen();
+    if (hadFocus) $('.scr', stage).focus({ preventScroll: true });
+  }
+  $('#screenSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; curScreen = b.dataset.id; curState = null; $$('button', $('#screenSeg')).forEach(x => x.setAttribute('aria-pressed', String(x === b))); renderScreen(); });
+  $('#stateSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (b) goState(b.dataset.st); });
   bindSeg('#deviceSeg', 'dev', d => { curDev = d; renderScreen(); });
 
   /* ---------- shapes + loader + focus demo ---------- */
