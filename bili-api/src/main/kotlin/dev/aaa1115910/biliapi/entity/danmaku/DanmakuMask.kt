@@ -49,6 +49,15 @@ data class DanmakuMobMaskFrame(
     }
 }
 
+/**
+ * 返回结束时间延伸到 [end] 的帧副本，仅用于补齐段尾空洞（见 [DanmakuMask.fromBinary]）。
+ */
+private fun DanmakuMaskFrame.withEnd(end: Long): DanmakuMaskFrame =
+    when (this) {
+        is DanmakuWebMaskFrame -> copy(range = range.first until end)
+        is DanmakuMobMaskFrame -> copy(range = range.first until end)
+    }
+
 data class DanmakuMask(
     val type: DanmakuMaskType,
     val segments: List<DanmakuMaskSegment>
@@ -131,6 +140,16 @@ data class DanmakuMask(
 
                 val startTime = segLastTime
                 val endTime = if (i == size - 1) Long.MAX_VALUE else times[i + 1]
+
+                // 关闭段尾空洞：每段约 10s，末帧结束时间通常比下一段起点早约一帧（~40ms），
+                // 消费端在该空洞内取不到蒙版帧，表现为每段边界周期性闪一下。
+                // 末段（endTime 为 Long.MAX_VALUE）不延伸，避免蒙版在数据结束后一直残留。
+                if (i != size - 1 && frameList.isNotEmpty()) {
+                    val lastFrame = frameList.last()
+                    frameList[frameList.lastIndex] =
+                        lastFrame.withEnd(maxOf(lastFrame.range.last + 1, endTime))
+                }
+
                 danmakuMaskSegments.add(
                     DanmakuMaskSegment(range = startTime..<endTime, frames = frameList)
                 )

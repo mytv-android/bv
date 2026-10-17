@@ -76,6 +76,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.plugins.HttpRequestRetry
+import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.plugins.compression.ContentEncoding
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
@@ -93,9 +94,7 @@ import io.ktor.http.URLProtocol
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.InternalAPI
 import io.ktor.utils.io.jvm.javaio.toInputStream
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -104,8 +103,17 @@ import javax.xml.parsers.DocumentBuilderFactory
 
 @Suppress("SpellCheckingInspection")
 object BiliHttpApi {
+    /** 单次 HTTP 请求的整体超时（毫秒），防止慢速滴流响应永久挂起。 */
+    private const val REQUEST_TIMEOUT_MS = 20_000L
+
+    /** 建立连接超时（毫秒）。 */
+    private const val CONNECT_TIMEOUT_MS = 10_000L
+
+    /** 单次 socket 读写超时（毫秒）。 */
+    private const val SOCKET_TIMEOUT_MS = 20_000L
+
     private var endPoint: String = "api.bilibili.com"
-    private lateinit var client: HttpClient
+    private val client: HttpClient by lazy { createClient() }
 
     private val json = Json {
         coerceInputValues = true
@@ -117,15 +125,19 @@ object BiliHttpApi {
     var wbiSubKey: String? = null
     private var wbiLastRefreshDate = 0L
 
-    init {
-        createClient()
-        CoroutineScope(Dispatchers.IO).launch {
-            updateWbi()
-        }
+    /**
+     * 预热 [client] 与 WBI keys。
+     *
+     * 供应用启动时在后台协程调用：返回时 client 已创建、WBI keys 已尝试刷新，
+     * 首次网络请求无需再等初始化。
+     */
+    suspend fun warmUpClient() {
+        client // 触发懒初始化
+        updateWbi()
     }
 
-    private fun createClient() {
-        client = HttpClient(OkHttp) {
+    private fun createClient(): HttpClient {
+        return HttpClient(OkHttp) {
             BiliUserAgent()
             install(ContentNegotiation) {
                 json(json)
@@ -136,6 +148,12 @@ object BiliHttpApi {
             }
             install(HttpRequestRetry) {
                 retryOnException(maxRetries = 2)
+            }
+            // OkHttp 引擎默认无整体超时，慢速滴流的响应可能永久挂起
+            install(HttpTimeout) {
+                requestTimeoutMillis = REQUEST_TIMEOUT_MS
+                connectTimeoutMillis = CONNECT_TIMEOUT_MS
+                socketTimeoutMillis = SOCKET_TIMEOUT_MS
             }
             install(JsoupPlugin)
             defaultRequest {
