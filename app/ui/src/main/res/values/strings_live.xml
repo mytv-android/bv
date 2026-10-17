@@ -6,7 +6,24 @@
     <string name="live_tab_area">分区</string>
     <string name="live_login_required">登录后查看关注的主播</string>
     <string name="live_area_all">全部</string>
-    <!-- 直播间占位页（BvLivePlayerScreen 就绪后替换） -->
-    <string name="live_room_title">直播间 %1$d</string>
-    <string name="live_player_placeholder">直播间页面建设中</string>
+    <!-- 直播间播放页 -->
+    <string name="live_player_back">返回</string>
+    <string name="live_player_refresh">刷新</string>
+    <string name="live_player_fullscreen">全屏</string>
+    <string name="live_player_retry">重试</string>
+    <string name="live_player_load_failed">加载直播间失败：%1$s</string>
+    <string name="live_player_play_failed">播放出错，请重试</string>
+    <string name="live_player_not_living">未开播或暂无可用线路</string>
+    <string name="live_player_menu_title">播放设置</string>
+    <string name="live_player_menu_close">关闭</string>
+    <string name="live_player_menu_quality">画质</string>
+    <string name="live_player_menu_line">线路</string>
+    <string name="live_player_menu_danmaku">弹幕</string>
+    <string name="live_player_menu_empty">暂无可选项</string>
+    <string name="live_player_line_label">线路 %1$d</string>
+    <string name="live_player_danmaku_on">弹幕开</string>
+    <string name="live_player_danmaku_off">弹幕关</string>
+    <string name="live_player_switched_quality">已切换到画质 %1$s</string>
+    <string name="live_player_switched_line">已切换到%1$s</string>
+    <string name="live_player_popularity">人气 %1$s</string>
 </resources>

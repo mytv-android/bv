@@ -159,6 +159,33 @@ class LivePlayerViewModel(
         }
     }
 
+    /**
+     * 重新请求当前画质 / 线路的流地址（刷新按钮、播放出错重试用）。加载中忽略。
+     * 成功后 playInfo 整体替换，UI 以 url 变化为准重新起播。
+     */
+    fun refreshStream() {
+        if (loading || playInfo == null) return
+        val qn = currentQn
+        val lineIndex = currentLineIndex
+        loading = true
+        viewModelScope.launch {
+            try {
+                logger.fInfo { "Refresh live stream [roomId=$roomId, qn=$qn, line=$lineIndex]" }
+                val play = liveRepository.getRoomPlayInfo(roomId, qn)
+                withContext(Dispatchers.Main) {
+                    playInfo = play
+                    currentQn = play.currentQn
+                    currentLineIndex = lineIndex.coerceAtMost((play.lines.size - 1).coerceAtLeast(0))
+                }
+            } catch (e: Exception) {
+                logger.fError { "Refresh live stream failed: ${e.stackTraceToString()}" }
+                withContext(Dispatchers.Main) { "刷新播放失败: ${e.localizedMessage}".toast(BVApp.context) }
+            } finally {
+                loading = false
+            }
+        }
+    }
+
     /** 连接弹幕 WebSocket，收集进 StateFlow；重新加载时先断开旧连接。 */
     private fun startDanmaku(realRoomId: Int) {
         danmakuJob?.cancel()

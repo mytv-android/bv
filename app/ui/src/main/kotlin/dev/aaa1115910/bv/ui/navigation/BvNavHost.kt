@@ -31,7 +31,7 @@ import dev.aaa1115910.bv.ui.feature.following.FollowingScreen
 import dev.aaa1115910.bv.ui.feature.following.FollowingSeasonScreen
 import dev.aaa1115910.bv.ui.feature.history.HistoryScreen
 import dev.aaa1115910.bv.ui.feature.home.HomeScreen
-import dev.aaa1115910.bv.ui.feature.live.LivePlayerPlaceholder
+import dev.aaa1115910.bv.ui.feature.live.LivePlayerScreen
 import dev.aaa1115910.bv.ui.feature.live.LiveScreen
 import dev.aaa1115910.bv.ui.feature.login.LoginScreen
 import dev.aaa1115910.bv.ui.feature.me.MeScreen
@@ -112,7 +112,7 @@ fun BvNavHost(nav: NavHostController, modifier: Modifier = Modifier) {
         composable<ShortsRoute> { Screen { ShortsScreen(nav, it.toRoute()) } }
         composable<PgcRoute> { Screen { PgcScreen(nav) } }
         composable<LiveRoute> { Screen { LiveScreen(nav) } }
-        composable<LivePlayerRoute> { Screen { LivePlayerPlaceholder(nav, it.toRoute()) } }
+        composable<LivePlayerRoute> { Screen { LivePlayerScreen(nav, it.toRoute()) } }
         composable<DynamicRoute> { Screen { DynamicScreen(nav) } }
         composable<MeRoute> { Screen { MeScreen(nav) } }
         composable<SearchRoute> { Screen { SearchScreen(nav, it.toRoute()) } }
