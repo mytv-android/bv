@@ -13,6 +13,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -35,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import com.kuaishou.akdanmaku.DanmakuConfig
@@ -197,11 +199,7 @@ fun BvPlayerScreen(
     var aspectRatioSetting by remember { mutableStateOf(configData.currentVideoAspectRatio) }
     var defaultAspectRatio by remember { mutableFloatStateOf(16 / 9f) }
     val aspectRatio by animateFloatAsState(
-        targetValue = when (aspectRatioSetting) {
-            VideoAspectRatio.Default -> defaultAspectRatio
-            VideoAspectRatio.FourToThree -> 4 / 3f
-            VideoAspectRatio.SixteenToNine -> 16 / 9f
-        },
+        targetValue = aspectRatioSetting.resolveAspectRatio(defaultAspectRatio),
         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
         label = "aspectRatio",
     )
@@ -363,6 +361,13 @@ fun BvPlayerScreen(
     }
 
     // ---------------------------------------------------------------- 副作用
+
+    // 播放/缓冲时保持屏幕常亮；暂停、结束、出错后允许熄屏
+    val view = LocalView.current
+    DisposableEffect(view, isPlaying, isBuffering, isError) {
+        view.keepScreenOn = !isError && (isPlaying || isBuffering)
+        onDispose { view.keepScreenOn = false }
+    }
 
     // updateBackToHistory() 中使用 videoPlayerHistoryData.lastPlayed 无法获取到新值
     LaunchedEffect(historyData.lastPlayed) {
@@ -588,10 +593,23 @@ fun BvPlayerScreen(
             }
         }
 
-        BvVideoPlayer(
-            modifier = Modifier
+        // 等宽：宽度铺满、高度按比例；等高：高度铺满、宽度按比例；拉伸：直接铺满整个容器
+        val videoModifier = when (aspectRatioSetting) {
+            VideoAspectRatio.EqualWidth -> Modifier
+                .fillMaxWidth()
                 .aspectRatio(aspectRatio)
-                .align(Alignment.Center),
+
+            VideoAspectRatio.EqualHeight -> Modifier
+                .fillMaxHeight()
+                .aspectRatio(aspectRatio, matchHeightConstraintsFirst = true)
+
+            VideoAspectRatio.Stretch -> Modifier.fillMaxSize()
+
+            else -> Modifier.aspectRatio(aspectRatio)
+        }
+
+        BvVideoPlayer(
+            modifier = videoModifier.align(Alignment.Center),
             videoPlayer = videoPlayer,
             playerListener = videoPlayerListener,
         )
