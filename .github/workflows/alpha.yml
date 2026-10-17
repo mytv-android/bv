@@ -85,7 +85,8 @@ jobs:
           RANGE="${PREV_TAG:+$PREV_TAG..}HEAD"
           {
             echo "changelog<<EOF"
-            git log --pretty=format:"- %s (%h)" $RANGE
+            # format 输出末尾无换行，必须经命令替换让 EOF 独立成行，否则 GITHUB_ENV 解析失败
+            echo "$(git log --pretty=format:"- %s (%h)" $RANGE)"
             echo "EOF"
           } >> "$GITHUB_ENV"
 
