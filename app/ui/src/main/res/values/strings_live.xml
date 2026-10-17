@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 直播首页（推荐 / 关注 / 分区） -->
+    <string name="live_tab_recommend">推荐</string>
+    <string name="live_tab_following">关注</string>
+    <string name="live_tab_area">分区</string>
+    <string name="live_login_required">登录后查看关注的主播</string>
+    <string name="live_area_all">全部</string>
+    <!-- 直播间占位页（BvLivePlayerScreen 就绪后替换） -->
+    <string name="live_room_title">直播间 %1$d</string>
+    <string name="live_player_placeholder">直播间页面建设中</string>
+</resources>

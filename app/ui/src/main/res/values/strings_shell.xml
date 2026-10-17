@@ -4,6 +4,7 @@
     <string name="nav_home">首页</string>
     <string name="nav_shorts">刷刷</string>
     <string name="nav_pgc">影视</string>
+    <string name="nav_live">直播</string>
     <string name="nav_dynamic">动态</string>
     <string name="nav_me">我的</string>
     <string name="nav_search">搜索</string>

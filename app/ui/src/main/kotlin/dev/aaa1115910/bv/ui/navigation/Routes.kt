@@ -5,6 +5,10 @@ import kotlinx.serialization.Serializable
 @Serializable data object HomeRoute
 @Serializable data class ShortsRoute(val startAid: Long? = null)
 @Serializable data object PgcRoute
+@Serializable data object LiveRoute
+
+/** [roomId] 支持短号（load 时先经 room_init 换成长号）。 */
+@Serializable data class LivePlayerRoute(val roomId: Int)
 @Serializable data object DynamicRoute
 @Serializable data object MeRoute
 @Serializable data class SearchRoute(val query: String = "")
