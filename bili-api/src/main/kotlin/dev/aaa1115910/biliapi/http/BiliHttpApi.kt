@@ -72,6 +72,7 @@ import dev.aaa1115910.biliapi.http.entity.web.NavResponseData
 import dev.aaa1115910.biliapi.http.plugins.BiliUserAgent
 import dev.aaa1115910.biliapi.http.util.BiliAppConf
 import dev.aaa1115910.biliapi.http.util.encApiSign
+import dev.aaa1115910.biliapi.http.util.skipAddBuvid3Cookie
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.engine.okhttp.OkHttp
@@ -1323,6 +1324,7 @@ object BiliHttpApi {
     ): BiliResponse<PgcFeedV3Data> = client.get("/pgc/page/web/v3/feed") {
         parameter("name", name)
         parameter("coursor", cursor)
+        skipAddBuvid3Cookie()
     }.body()
 
     /**
@@ -1335,6 +1337,7 @@ object BiliHttpApi {
         parameter("name", name)
         parameter("coursor", cursor)
         parameter("new_cursor_status", true)
+        skipAddBuvid3Cookie()
     }.body()
 
 

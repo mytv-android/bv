@@ -231,6 +231,35 @@ object Prefs {
         }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefBuvid3Key, value) }
 
+    /**
+     * Web 指纹/票据 cookie（buvid3、buvid4、b_nut、bili_ticket 等），
+     * 以 "name=value;name=value;" 格式存储。账号级 cookie 不放这里，避免登出后仍被注入。
+     */
+    var webExtraCookies: String
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefWebExtraCookiesRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefWebExtraCookiesKey, value)
+        }
+
+    fun getWebCookie(name: String): String? = webCookieMap(webExtraCookies)[name]
+
+    fun setWebCookies(map: Map<String, String>) {
+        webExtraCookies = buildString {
+            (webCookieMap(webExtraCookies) + map).forEach { (key, value) ->
+                if (value.isNotBlank()) append("$key=$value;")
+            }
+        }
+    }
+
+    private fun webCookieMap(raw: String): Map<String, String> =
+        raw.split(";").mapNotNull { part ->
+            val index = part.indexOf("=")
+            if (index <= 0) return@mapNotNull null
+            part.substring(0, index).trim() to part.substring(index + 1).trim()
+        }.toMap()
+
     var playerType: PlayerType
         get() = runBlocking {
             runCatching {
@@ -412,6 +441,7 @@ object PrefKeys {
     val prefShowFpsKey = booleanPreferencesKey("sf")
     val prefBuvidKey = stringPreferencesKey("random_buvid")
     val prefBuvid3Key = stringPreferencesKey("random_buvid3")
+    val prefWebExtraCookiesKey = stringPreferencesKey("web_extra_cookies")
     val prefPlayerTypeKey = intPreferencesKey("pt")
     val prefDensityKey = floatPreferencesKey("density")
     val prefAlphaKey = booleanPreferencesKey("alpha")
@@ -466,6 +496,7 @@ object PrefKeys {
     val prefShowFpsRequest = PreferenceRequest(prefShowFpsKey, false)
     val prefBuvidRequest = PreferenceRequest(prefBuvidKey, "")
     val prefBuvid3Request = PreferenceRequest(prefBuvid3Key, "")
+    val prefWebExtraCookiesRequest = PreferenceRequest(prefWebExtraCookiesKey, "")
     val prefPlayerTypeRequest = PreferenceRequest(prefPlayerTypeKey, PlayerType.Media3.ordinal)
     val prefDensityRequest =
         PreferenceRequest(

@@ -9,14 +9,23 @@ import io.ktor.client.request.forms.FormDataContent
 import io.ktor.client.request.parameter
 import io.ktor.client.request.setBody
 import io.ktor.client.utils.EmptyContent
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
 import io.ktor.http.Parameters
 import io.ktor.http.URLBuilder
 import io.ktor.http.clone
 import io.ktor.http.encodedPath
 import io.ktor.http.plus
+import io.ktor.util.AttributeKey
 import java.net.URLEncoder
 import java.security.MessageDigest
+
+private val SkipAddBuvid3CookieKey = AttributeKey<Boolean>("SkipAddBuvid3Cookie")
+
+/** 标记不需要自动附加 buvid3/Web 指纹 cookie 的请求。 */
+fun HttpRequestBuilder.skipAddBuvid3Cookie() {
+    attributes.put(SkipAddBuvid3CookieKey, true)
+}
 
 private const val APP_KEY = "dfca71928277209b"
 private const val APP_SEC = "b5475a8825547a4fc26c7d518eaaa02e"
@@ -111,13 +120,43 @@ fun HttpClient.encApiSign() = plugin(HttpSend)
             }.toString()
         }
 
+        // access_key 可能出现在 query 或 form body 里，两种都视为 App 请求
+        val hasAccessKeyInBody =
+            (request.body as? FormDataContent)?.formData?.contains("access_key") == true
+        val isAppRequest = request.url.parameters.contains("access_key") ||
+            request.url.host == "app.bilibili.com" ||
+            hasAccessKeyInBody
+        val skipBuvid3Cookie = request.attributes.getOrNull(SkipAddBuvid3CookieKey) == true
+        // Web 接口（含 WBI 签名接口）需要与 Web 端一致的 buvid 指纹，
+        // 否则同一个账号在 App 与 Web 之间来回请求会触发风控
+        if (!isAppRequest && !skipBuvid3Cookie) {
+            val extraCookies = WebCookieManager.cookieHeader()
+                ?.split(";")
+                ?.map { it.trim() }
+                ?.filter { it.isNotBlank() }
+                .orEmpty()
+            if (extraCookies.isNotEmpty()) {
+                val existingCookie = request.headers[HttpHeaders.Cookie].orEmpty()
+                val existingNames = existingCookie.split(";")
+                    .map { it.trim().substringBefore("=") }
+                    .filter { it.isNotBlank() }
+                    .toSet()
+                val missingCookies = extraCookies.filter { it.substringBefore("=") !in existingNames }
+                if (missingCookies.isNotEmpty()) {
+                    request.headers[HttpHeaders.Cookie] = if (existingCookie.isBlank()) {
+                        missingCookies.joinToString("; ")
+                    } else {
+                        "${missingCookies.joinToString("; ")}; $existingCookie"
+                    }
+                }
+            }
+        }
+
         when (request.method) {
             // app 端如果既用到了 wbi get 接口，也用到了 token 去请求，那是先计算 wbi sign 还是 app sign？
             // 目前看来需要计算 wbi sign 的接口之前忘记计算 app sign 都通过校验了🤯
             HttpMethod.Get -> {
                 val isWbiRequest = request.url.encodedPath.contains("wbi")
-                val isAppRequest =
-                    request.url.parameters.contains("access_key") || request.url.host == "app.bilibili.com"
                 if (isWbiRequest) {
                     println("Enc wbi for get request: ${getUrlWithoutAccessToken(request.url)}")
                     request.encWbi()
