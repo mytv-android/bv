@@ -69,6 +69,7 @@
     <string name="player_ui_error_face">_(:з」∠)_</string>
     <string name="player_ui_error_message">错误信息：%1$s</string>
     <string name="player_ui_pay_title">请先购买影片</string>
+    <string name="player_ui_preview_tip">当前为付费内容试看片段</string>
     <string name="player_ui_pay_face">(・∀・)つ㊿</string>
     <string name="player_ui_back_to_history_tv">上次看到 %1$s 点击确认键跳转</string>
     <string name="player_ui_back_to_history_touch">上次看到 %1$s，点击跳转</string>

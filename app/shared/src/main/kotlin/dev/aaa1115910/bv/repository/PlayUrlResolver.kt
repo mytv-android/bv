@@ -377,7 +377,8 @@ class PlayUrlResolver(
             preferCodec = preferredCodec,
             proxyArea = proxyArea
         )
-        if (playData.needPay) throw NeedPayException()
+        // 只有没有任何可播放流时才拦截；付费/充电视频未购买时会下发试看片段
+        if (playData.needPay && playData.dashVideos.isEmpty()) throw NeedPayException()
 
         val qualities = getAvailableQualities(playData)
         val audios = getAvailableAudios(playData)

@@ -123,6 +123,8 @@ internal fun BvPlayerHost(
                 LocalVideoPlayerPaymentData provides VideoPlayerPaymentData(
                     needPay = playerVm.needPay,
                     epid = playerVm.epid,
+                    isPreviewPlayback = playerVm.isPreviewPlayback,
+                    showPreviewTip = playerVm.showPreviewTip,
                 ),
                 LocalVideoPlayerLoadStateData provides VideoPlayerLoadStateData(
                     loadState = playerVm.loadState,

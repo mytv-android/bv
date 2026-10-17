@@ -93,6 +93,7 @@ import dev.aaa1115910.bv.player.ui.BufferingTip
 import dev.aaa1115910.bv.player.ui.PaidRequireTip
 import dev.aaa1115910.bv.player.ui.PlayErrorTip
 import dev.aaa1115910.bv.player.ui.PlayerController
+import dev.aaa1115910.bv.player.ui.PreviewTip
 import dev.aaa1115910.bv.player.ui.R
 import dev.aaa1115910.bv.player.ui.SeekPreviewRow
 import dev.aaa1115910.bv.player.ui.design.BvKey
@@ -628,7 +629,12 @@ internal fun TvController(
                     exception = stateData.exception,
                 )
             }
-            if (paymentData.needPay) {
+            if (paymentData.isPreviewPlayback) {
+                PreviewTip(
+                    show = paymentData.showPreviewTip,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            } else if (paymentData.needPay) {
                 PaidRequireTip(
                     modifier = Modifier.align(Alignment.Center),
                     epid = paymentData.epid,

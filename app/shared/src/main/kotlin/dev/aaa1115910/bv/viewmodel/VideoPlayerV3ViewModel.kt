@@ -54,6 +54,8 @@ import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.koin.android.annotation.KoinViewModel
@@ -123,6 +125,14 @@ class VideoPlayerV3ViewModel(
     var proxyArea by mutableStateOf(ProxyArea.MainLand)
 
     var needPay by mutableStateOf(false)
+
+    /** 当前播放的是试看片段（needPay 且仍有可播放流） */
+    var isPreviewPlayback by mutableStateOf(false)
+
+    /** 试看提示在起播后短暂显示 */
+    var showPreviewTip by mutableStateOf(false)
+
+    private var previewTipJob: Job? = null
 
     var logs by mutableStateOf("")
     var lastChangedLog by mutableLongStateOf(System.currentTimeMillis())
@@ -210,9 +220,13 @@ class VideoPlayerV3ViewModel(
                 proxyArea = proxyArea
             )
 
-            //检查是否需要购买，如果未购买，则正片返回的dash为null，非正片例如可以免费观看的预告片等则会返回数据，此时不做提示
-            withContext(Dispatchers.Main) { needPay = playData.needPay }
-            if (needPay) return@runCatching
+            // 付费/充电视频未购买时接口会下发试看片段：有可播放流就继续播并给出提示
+            val previewPlayback = playData.needPay && playData.dashVideos.isNotEmpty()
+            withContext(Dispatchers.Main) {
+                needPay = playData.needPay
+                isPreviewPlayback = previewPlayback
+            }
+            if (playData.needPay && !previewPlayback) return@runCatching
 
             withContext(Dispatchers.Main) {
                 this@VideoPlayerV3ViewModel.playData = playData
@@ -254,6 +268,8 @@ class VideoPlayerV3ViewModel(
 
             playQuality(qn = currentQuality.code, codec = currentVideoCodec)
 
+            if (previewPlayback) startShowPreviewTipCountdown()
+
         }.onFailure {
             addLogs("加载视频地址失败：${it.localizedMessage}")
             errorMessage = it.localizedMessage ?: "Unknown error"
@@ -263,6 +279,15 @@ class VideoPlayerV3ViewModel(
             addLogs("加载视频地址成功")
             loadState = RequestState.Success
             logger.fInfo { "Load play url success" }
+        }
+    }
+
+    private fun startShowPreviewTipCountdown() {
+        previewTipJob?.cancel()
+        previewTipJob = viewModelScope.launch {
+            showPreviewTip = true
+            delay(5000)
+            showPreviewTip = false
         }
     }
 

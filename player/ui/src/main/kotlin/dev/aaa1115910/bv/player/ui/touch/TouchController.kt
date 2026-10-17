@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerHistoryData
+import dev.aaa1115910.bv.player.entity.LocalVideoPlayerPaymentData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerStateData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoInfoData
@@ -61,6 +62,7 @@ import dev.aaa1115910.bv.player.ui.BottomSubtitle
 import dev.aaa1115910.bv.player.ui.BufferingTip
 import dev.aaa1115910.bv.player.ui.PlayErrorTip
 import dev.aaa1115910.bv.player.ui.PlayerController
+import dev.aaa1115910.bv.player.ui.PreviewTip
 import dev.aaa1115910.bv.player.ui.R
 import dev.aaa1115910.bv.player.ui.formatSpeed
 import dev.aaa1115910.bv.player.ui.nextAfter
@@ -99,6 +101,7 @@ internal fun TouchController(
     val videoInfoData = LocalVideoPlayerVideoInfoData.current
     val videoShotData = LocalVideoPlayerVideoShotData.current
     val historyData = LocalVideoPlayerHistoryData.current
+    val paymentData = LocalVideoPlayerPaymentData.current
     val menuState = controller.menuState
 
     var showControls by remember { mutableStateOf(false) }
@@ -290,6 +293,18 @@ internal fun TouchController(
                         .align(Alignment.Center)
                         .padding(horizontal = 24.dp),
                     exception = stateData.exception,
+                )
+            }
+            // 试看可播时短暂提示；完全不可播（needPay 且无流）才显示购买提示
+            if (paymentData.isPreviewPlayback) {
+                PreviewTip(
+                    show = paymentData.showPreviewTip,
+                    modifier = Modifier.align(Alignment.Center),
+                )
+            } else if (paymentData.needPay) {
+                PaidRequireTip(
+                    modifier = Modifier.align(Alignment.Center),
+                    epid = paymentData.epid,
                 )
             }
 

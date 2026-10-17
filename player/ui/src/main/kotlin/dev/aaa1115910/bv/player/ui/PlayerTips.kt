@@ -9,6 +9,8 @@ package dev.aaa1115910.bv.player.ui
 
 import android.graphics.BitmapFactory
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -51,6 +53,30 @@ private val TipShape = RoundedCornerShape(28.dp)
 @Composable
 internal fun BufferingTip(modifier: Modifier = Modifier) {
     LoadingIndicator(modifier = modifier.size(120.dp))
+}
+
+/** 付费内容试看提示：起播后短暂显示。 */
+@Composable
+internal fun PreviewTip(
+    show: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = show,
+        enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
+        exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
+        modifier = modifier,
+    ) {
+        Text(
+            text = stringResource(R.string.player_ui_preview_tip),
+            modifier = Modifier
+                .clip(TipShape)
+                .background(MaterialTheme.colorScheme.surfaceContainer)
+                .padding(horizontal = 20.dp, vertical = 10.dp),
+            style = PlayerType.Body,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
 /** 播放出错提示（文案照搬旧电视版 PlayErrorTip），样式：surfaceContainer 圆角 28。 */

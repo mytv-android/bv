@@ -48,6 +48,10 @@ data class VideoPlayerHistoryData(
 data class VideoPlayerPaymentData(
     val needPay: Boolean = false,
     val epid: Int = 0,
+    /** 正在播放可试看的付费内容 */
+    val isPreviewPlayback: Boolean = false,
+    /** 起播后短暂显示「试看」提示 */
+    val showPreviewTip: Boolean = false,
 )
 
 data class VideoPlayerLoadStateData(
