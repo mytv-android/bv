@@ -38,6 +38,7 @@ import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoAspectRatio
 import dev.aaa1115910.bv.player.entity.VideoCodec
 import dev.aaa1115910.bv.player.entity.VideoListItemData
+import dev.aaa1115910.bv.player.entity.toAudioLoudness
 import dev.aaa1115910.bv.repository.PlayUrlResolver
 import dev.aaa1115910.bv.repository.VideoInfoRepository
 import dev.aaa1115910.bv.util.Prefs
@@ -317,6 +318,8 @@ class VideoPlayerV3ViewModel(
             currentVideoWidth = streams.video?.width ?: 0
             logger.info { "Video url: $videoUrl" }
             logger.info { "Audio url: $audioUrl" }
+            // 换集/换源后重新推一次：null（如 gRPC PGC）表示保持原音量
+            videoPlayer!!.setAudioLoudness(playData?.volume?.toAudioLoudness())
             videoPlayer!!.playUrl(videoUrl, audioUrl)
             videoPlayer!!.prepare()
             showBuffering = true

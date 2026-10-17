@@ -6,6 +6,7 @@ import bilibili.pgc.gateway.player.v2.dolbyOrNull
 import bilibili.playershared.dashVideoOrNull
 import bilibili.playershared.dolbyOrNull
 import bilibili.playershared.lossLessItemOrNull
+import bilibili.playershared.volumeOrNull
 
 data class PlayData(
     val dashVideos: List<DashVideo>,
@@ -14,6 +15,8 @@ data class PlayData(
     val flac: DashAudio? = null,
     val codec: Map<Int, List<String>> = emptyMap(),
     val needPay: Boolean = false,
+    /** 响度元数据；为 null 表示服务端未提供（gRPC PGC 的 proto 没有该字段），播放器应保持原音量 */
+    val volume: VolumeInfo? = null,
 ) {
     companion object {
         fun fromPlayViewUniteReply(playViewUniteReply: PlayViewUniteReply): PlayData {
@@ -72,7 +75,8 @@ data class PlayData(
                 dolby = dolby,
                 flac = flac,
                 codec = codecs,
-                needPay = false
+                needPay = false,
+                volume = playViewUniteReply.vodInfo.volumeOrNull?.toVolumeInfo()
             )
         }
 
@@ -116,6 +120,7 @@ data class PlayData(
                 )
             }
 
+            // gRPC PGC 的 proto VideoInfo 没有 volume 字段，无法提供响度元数据
             return PlayData(
                 dashVideos = dashVideos,
                 dashAudios = dashAudios,
@@ -180,7 +185,8 @@ data class PlayData(
                 dolby = dolby,
                 flac = flac,
                 codec = codec,
-                needPay = needPay
+                needPay = needPay,
+                volume = playUrlData.volume
             )
         }
 
@@ -238,7 +244,8 @@ data class PlayData(
                 dolby = dolby,
                 flac = flac,
                 codec = codec,
-                needPay = needPay
+                needPay = needPay,
+                volume = playUrlData.volume
             )
         }
 
@@ -296,7 +303,8 @@ data class PlayData(
                 dolby = dolby,
                 flac = flac,
                 codec = codec,
-                needPay = needPay
+                needPay = needPay,
+                volume = playUrlData.volume
             )
         }
     }
@@ -316,7 +324,8 @@ data class PlayData(
                     .distinct()
                     .filter { it != "none" }
             }.toMap(),
-            needPay = needPay || other.needPay
+            needPay = needPay || other.needPay,
+            volume = volume ?: other.volume
         )
     }
 }
@@ -355,4 +364,21 @@ data class DashAudio(
     val bandwidth: Int,
     val codecId: Int,
     val backUrl: List<String>
+)
+
+/**
+ * gRPC 的 VolumeInfo 没有 multi_scene_args，两挡目标响度会退化成共用 [VolumeInfo.targetI]。
+ *
+ * `targetOffset` 原样带过来仅作留档：增益策略不使用它（见 player 的 `AudioBalanceGain`），
+ * 因此 proto3 把它读成 0.0 也不会影响结果。
+ */
+internal fun bilibili.playershared.VolumeInfo.toVolumeInfo() = VolumeInfo(
+    measuredI = measuredI,
+    measuredLra = measuredLra,
+    measuredTp = measuredTp,
+    measuredThreshold = measuredThreshold,
+    targetOffset = targetOffset,
+    targetI = targetI,
+    targetTp = targetTp,
+    multiSceneArgs = null,
 )

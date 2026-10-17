@@ -63,6 +63,7 @@
     <string name="settings_play_quality">默认画质</string>
     <string name="settings_play_codec">默认视频编码</string>
     <string name="settings_play_audio">默认音质</string>
+    <string name="settings_play_audio_balance">音量均衡</string>
     <string name="settings_play_speed">默认倍速</string>
     <string name="settings_play_speed_value">%1$sx</string>
     <string name="settings_play_mode">播放模式</string>

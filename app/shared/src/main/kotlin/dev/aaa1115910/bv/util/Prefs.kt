@@ -25,6 +25,7 @@ import dev.aaa1115910.bv.entity.ThemePrefs
 import dev.aaa1115910.bv.entity.ThemeSource
 import dev.aaa1115910.bv.entity.ThemeType
 import dev.aaa1115910.bv.player.entity.Audio
+import dev.aaa1115910.bv.player.entity.AudioBalanceLevel
 import dev.aaa1115910.bv.player.entity.DanmakuType
 import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.Resolution
@@ -346,6 +347,17 @@ object Prefs {
             )
         }
 
+    /** 音量均衡挡位，默认关闭；只在新播放器创建时读取 */
+    var playerAudioBalanceLevel: AudioBalanceLevel
+        get() = runBlocking {
+            AudioBalanceLevel.entries.getOrElse(
+                dsm.getPreferenceFlow(PrefKeys.prefPlayerAudioBalanceLevelRequest).first()
+            ) { AudioBalanceLevel.Off }
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefPlayerAudioBalanceLevelKey, value.ordinal)
+        }
+
     var blacklistUser: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefBlacklistUserRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefBlacklistUserKey, value) }
@@ -458,6 +470,7 @@ object PrefKeys {
     val prefEnableCdnFailoverKey = booleanPreferencesKey("enable_cdn_failover")
     val prefDefaultDanmakuMask = booleanPreferencesKey("prefer_enable_webmark")
     val prefEnableFfmpegAudioRenderer = booleanPreferencesKey("enable_ffmpeg_audio_renderer")
+    val prefPlayerAudioBalanceLevelKey = intPreferencesKey("player_audio_balance_level")
     val prefBlacklistUserKey = booleanPreferencesKey("blacklist_user")
     val prefThemeTypeKey = intPreferencesKey("theme_type")
     val prefPlayModeKey = intPreferencesKey("play_mode")
@@ -521,6 +534,8 @@ object PrefKeys {
     val prefEnableCdnFailoverRequest = PreferenceRequest(prefEnableCdnFailoverKey, true)
     val prefDefaultDanmakuMaskRequest = PreferenceRequest(prefDefaultDanmakuMask, false)
     val prefEnableFfmpegEndererRequest = PreferenceRequest(prefEnableFfmpegAudioRenderer, false)
+    val prefPlayerAudioBalanceLevelRequest =
+        PreferenceRequest(prefPlayerAudioBalanceLevelKey, AudioBalanceLevel.Off.ordinal)
     val prefBlacklistUserRequest = PreferenceRequest(prefBlacklistUserKey, false)
     val prefThemeTypeRequest = PreferenceRequest(prefThemeTypeKey, ThemeType.Auto.ordinal)
     val prefPlayModeRequest = PreferenceRequest(prefPlayModeKey, PlayMode.Sequential.ordinal)

@@ -1,5 +1,7 @@
 package dev.aaa1115910.bv.player
 
+import dev.aaa1115910.bv.player.entity.AudioLoudness
+
 abstract class AbstractVideoPlayer {
     /** 播放器事件回调 */
     protected var mPlayerEventListener: VideoPlayerListener? = null
@@ -67,6 +69,14 @@ abstract class AbstractVideoPlayer {
 
     /** 播放速度 */
     abstract var speed: Float
+
+    /**
+     * 推入本集的响度元数据，null 表示没有元数据（旁路）。
+     *
+     * 换集/换清晰度后都必须重新推一次：处理器按当前元数据算静态增益，
+     * 不推会沿用上一集的值。
+     */
+    open fun setAudioLoudness(loudness: AudioLoudness?) {}
 
     /** 当前缓冲的网速 */
     abstract val tcpSpeed: Long

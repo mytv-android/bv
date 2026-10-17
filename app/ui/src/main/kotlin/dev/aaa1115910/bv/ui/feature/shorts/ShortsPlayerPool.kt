@@ -46,6 +46,7 @@ import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.entity.ShortsItem
 import dev.aaa1115910.bv.player.VideoPlayerOptions
 import dev.aaa1115910.bv.player.entity.Resolution
+import dev.aaa1115910.bv.player.entity.toAudioLoudness
 import dev.aaa1115910.bv.player.impl.exo.ExoMediaPlayer
 import dev.aaa1115910.bv.repository.PlayUrlResolver
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
@@ -208,7 +209,8 @@ internal class ShortsPlayerPool(
                 ApiType.Web -> context.getString(SharedR.string.video_player_referer)
                 ApiType.App -> null
             },
-            enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer
+            enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
+            audioBalanceLevel = Prefs.playerAudioBalanceLevel
         )
     }
 
@@ -419,6 +421,8 @@ internal class ShortsPlayerPool(
                     slot.videoWidth = url.width
                     slot.videoHeight = url.height
                 }
+                // 每条视频有自己的响度元数据；没有元数据时处理器旁路
+                player.setAudioLoudness(url.playData.volume?.toAudioLoudness())
                 player.playUrl(url.videoUrl, url.audioUrl)
                 player.prepare()
                 slot.state = SlotState.Preparing

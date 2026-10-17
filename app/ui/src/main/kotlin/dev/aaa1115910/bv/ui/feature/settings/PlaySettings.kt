@@ -11,6 +11,7 @@ import androidx.compose.ui.res.stringResource
 import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.entity.PlayerType
 import dev.aaa1115910.bv.player.entity.Audio
+import dev.aaa1115910.bv.player.entity.AudioBalanceLevel
 import dev.aaa1115910.bv.player.entity.PlayMode
 import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoCodec
@@ -37,6 +38,7 @@ internal fun PlaySettings() {
     var speed by remember { mutableFloatStateOf(Prefs.defaultPlaySpeed) }
     var playMode by remember { mutableStateOf(Prefs.defaultPlayMode) }
     var playerType by remember { mutableStateOf(Prefs.playerType) }
+    var audioBalance by remember { mutableStateOf(Prefs.playerAudioBalanceLevel) }
     var ffmpegAudio by remember { mutableStateOf(Prefs.enableFfmpegAudioRenderer) }
 
     SettingChoiceGroup(
@@ -68,6 +70,16 @@ internal fun PlaySettings() {
         onSelect = {
             audio = it
             Prefs.defaultAudio = it
+        },
+    )
+    SettingChoiceGroup(
+        label = stringResource(R.string.settings_play_audio_balance),
+        options = AudioBalanceLevel.entries.toList(),
+        isSelected = { it == audioBalance },
+        optionLabel = { it.getDisplayName(context) },
+        onSelect = {
+            audioBalance = it
+            Prefs.playerAudioBalanceLevel = it
         },
     )
     SettingChoiceGroup(

@@ -12,13 +12,18 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
 import dev.aaa1115910.bv.player.PlayerHttpClient
 import dev.aaa1115910.bv.player.VideoPlayerOptions
+import dev.aaa1115910.bv.player.audio.VolumeBalanceAudioProcessor
 import dev.aaa1115910.bv.player.cdn.FrequentBufferingDetector
+import dev.aaa1115910.bv.player.entity.AudioBalanceLevel
+import dev.aaa1115910.bv.player.entity.AudioLoudness
 import dev.aaa1115910.bv.util.formatHourMinSec
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.net.URI
@@ -66,13 +71,24 @@ class ExoMediaPlayer(
 
     private var skipSilenceEnabled = options.enableSkipSilence
 
+    /**
+     * 音量均衡处理器：只有开启挡位时才创建并插入音频渲染链，关闭时整条链路与原来完全一致。
+     * 没有元数据时处理器内部旁路（整块搬运），不会改变音量。
+     */
+    private val volumeBalanceProcessor: VolumeBalanceAudioProcessor? =
+        if (options.audioBalanceLevel != AudioBalanceLevel.Off) {
+            VolumeBalanceAudioProcessor(options.audioBalanceLevel)
+        } else {
+            null
+        }
+
     init {
         initPlayer()
     }
 
     @OptIn(UnstableApi::class)
     override fun initPlayer() {
-        val renderersFactory = DefaultRenderersFactory(context).apply {
+        val renderersFactory = BvRenderersFactory(context, volumeBalanceProcessor).apply {
             setExtensionRendererMode(
                 when (options.enableFfmpegAudioRenderer) {
                     // 用 PREFER 而不是 ON：ON 会对所有轨道强制走扩展渲染器，
@@ -211,6 +227,10 @@ class ExoMediaPlayer(
         mPlayer?.setSkipSilenceEnabled(skipSilenceEnabled && speed >= SKIP_SILENCE_MIN_SPEED)
     }
 
+    override fun setAudioLoudness(loudness: AudioLoudness?) {
+        volumeBalanceProcessor?.setLoudness(loudness)
+    }
+
     override val tcpSpeed: Long
         get() = 0L
 
@@ -338,5 +358,31 @@ class ExoMediaPlayer(
         // 播放失败先尝试下一个候选地址；候选耗尽或次数用尽才把错误抛给上层
         if (trySwitchToNextCdn("播放失败")) return
         mPlayerEventListener?.onError(error)
+    }
+}
+
+/**
+ * 渲染器工厂：把音量均衡处理器插到音频 sink 的 processor 链里。
+ *
+ * media3 的 `DefaultRenderersFactory.createRenderers` 只调用一次 [buildAudioSink]，
+ * 并把同一个 sink 同时交给 `MediaCodecAudioRenderer` 和扩展的 `FfmpegAudioRenderer`，
+ * 所以这个覆盖对硬解与 FFmpeg 音频软解两条分支都生效。
+ * 处理器为 null（关闭挡位）时不设置 audio processors，链路与原来一致。
+ */
+@OptIn(UnstableApi::class)
+private class BvRenderersFactory(
+    context: Context,
+    private val volumeBalanceProcessor: VolumeBalanceAudioProcessor?
+) : DefaultRenderersFactory(context) {
+    override fun buildAudioSink(
+        context: Context,
+        enableFloatOutput: Boolean,
+        enableAudioTrackPlaybackParams: Boolean
+    ): AudioSink {
+        val builder = DefaultAudioSink.Builder(context)
+            .setEnableFloatOutput(enableFloatOutput)
+            .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+        volumeBalanceProcessor?.let { builder.setAudioProcessors(arrayOf(it)) }
+        return builder.build()
     }
 }

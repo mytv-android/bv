@@ -33,7 +33,8 @@ internal fun createVideoPlayer(context: Context): AbstractVideoPlayer {
             ApiType.Web -> context.getString(BvR.string.video_player_referer)
             ApiType.App -> null
         },
-        enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer
+        enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
+        audioBalanceLevel = Prefs.playerAudioBalanceLevel
     )
     return when (Prefs.playerType) {
         PlayerType.Media3 -> ExoPlayerFactory().create(context, options)
