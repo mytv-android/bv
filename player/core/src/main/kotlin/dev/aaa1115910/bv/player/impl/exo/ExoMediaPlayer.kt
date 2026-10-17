@@ -15,9 +15,12 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import dev.aaa1115910.bv.player.AbstractVideoPlayer
-import dev.aaa1115910.bv.player.OkHttpUtil
+import dev.aaa1115910.bv.player.PlayerHttpClient
 import dev.aaa1115910.bv.player.VideoPlayerOptions
 import dev.aaa1115910.bv.util.formatHourMinSec
+
+/** 低于该倍速不启用跳过静音：压缩音频时间轴会让作为主时钟的音频位置快进，画面跟着跳帧 */
+private const val SKIP_SILENCE_MIN_SPEED = 2.5f
 
 @OptIn(UnstableApi::class)
 class ExoMediaPlayer(
@@ -29,10 +32,12 @@ class ExoMediaPlayer(
 
     @OptIn(UnstableApi::class)
     private val dataSourceFactory =
-        OkHttpDataSource.Factory(OkHttpUtil.generateCustomSslOkHttpClient(context)).apply {
+        OkHttpDataSource.Factory(PlayerHttpClient.get(context)).apply {
             options.userAgent?.let { setUserAgent(it) }
             options.referer?.let { setDefaultRequestProperties(mapOf("referer" to it)) }
         }
+
+    private var skipSilenceEnabled = options.enableSkipSilence
 
     init {
         initPlayer()
@@ -132,7 +137,19 @@ class ExoMediaPlayer(
         get() = mPlayer?.playbackParameters?.speed ?: 1f
         set(value) {
             mPlayer?.setPlaybackSpeed(value)
+            applySkipSilence()
         }
+
+    /** 运行时开关；实际是否生效还取决于当前播放速度，需达到 [SKIP_SILENCE_MIN_SPEED] 才真正开启 */
+    fun setSkipSilenceEnabled(enabled: Boolean) {
+        skipSilenceEnabled = enabled
+        applySkipSilence()
+    }
+
+    private fun applySkipSilence() {
+        mPlayer?.setSkipSilenceEnabled(skipSilenceEnabled && speed >= SKIP_SILENCE_MIN_SPEED)
+    }
+
     override val tcpSpeed: Long
         get() = 0L
 
