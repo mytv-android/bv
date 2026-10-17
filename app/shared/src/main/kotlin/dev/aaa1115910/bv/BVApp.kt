@@ -9,6 +9,8 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.webkit.WebViewCompat
+import coil.Coil
+import coil.ImageLoader
 import de.schnettler.datastore.manager.DataStoreManager
 import dev.aaa1115910.biliapi.http.BiliHttpApi
 import dev.aaa1115910.biliapi.http.BiliHttpProxyApi
@@ -59,6 +61,7 @@ class BVApp : Application() {
         context = this.applicationContext
         HandroidLoggerAdapter.DEBUG = BuildConfig.DEBUG
         dataStoreManager = DataStoreManager(applicationContext.dataStore)
+        initImageLoader()
         if (Prefs.blacklistUser) {
             R.string.blacklist_user_toast.toast(context)
             return
@@ -78,6 +81,18 @@ class BVApp : Application() {
         updateMigration()
         HttpServer.startServer()
         updateBlacklist()
+    }
+
+    /**
+     * 全局 Coil ImageLoader：封面等图片到达时 150ms 淡入（内存缓存命中不会重复淡入），
+     * 避免图片突兀跳出造成「应用反应慢」的观感。内存 / 磁盘缓存都用 Coil 默认策略。
+     */
+    private fun initImageLoader() {
+        Coil.setImageLoader(
+            ImageLoader.Builder(this)
+                .crossfade(150)
+                .build()
+        )
     }
 
     private fun initFirebase() {

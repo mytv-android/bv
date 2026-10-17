@@ -1,10 +1,9 @@
 package dev.aaa1115910.bv.util
 
 fun String.resizedImageUrl(size: ImageSize): String {
-    return when (size) {
-        ImageSize.Default -> this
-        else -> "$this@${size.sizeString}.webp"
-    }
+    // 已带处理参数（如「…@466h_622w.webp」）的 URL 不再追加，避免二次后缀导致 404
+    if (size == ImageSize.Default || contains('@')) return this
+    return "$this@${size.sizeString}.webp"
 }
 
 enum class ImageSize(val sizeString: String) {

@@ -53,6 +53,8 @@ import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.designsystem.focus.focusRing
 import dev.aaa1115910.bv.ui.designsystem.focus.rememberCardFocus
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
+import dev.aaa1115910.bv.util.ImageSize
+import dev.aaa1115910.bv.util.resizedImageUrl
 
 /** 视频卡长按菜单的动作（「从这里开始刷」「稍后再看」「UP 主主页」），由应用外壳提供。 */
 @Stable
@@ -233,7 +235,8 @@ fun CardFrame(
         ) {
             if (!cover.isNullOrEmpty()) {
                 AsyncImage(
-                    model = cover,
+                    // 卡片封面按 640w 小图加载（原图可能 2K/4K）；已带处理参数的 URL 不会二次追加
+                    model = cover.resizedImageUrl(ImageSize.SmallVideoCardCover),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize(),
@@ -282,7 +285,7 @@ fun VideoRow(
                 .indication(interaction, ripple())
         ) {
             AsyncImage(
-                model = data.cover,
+                model = data.cover.resizedImageUrl(ImageSize.SmallVideoCardCover),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),

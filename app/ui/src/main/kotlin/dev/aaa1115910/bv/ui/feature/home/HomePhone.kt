@@ -374,6 +374,7 @@ private fun PhoneFeaturedCarousel(items: List<UgcItem>, onOpen: (UgcItem) -> Uni
                 Modifier
                     .fillMaxSize()
                     .maskClip(RoundedCornerShape(28.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                     .clickable { onOpen(item) }
             ) {
                 AsyncImage(
