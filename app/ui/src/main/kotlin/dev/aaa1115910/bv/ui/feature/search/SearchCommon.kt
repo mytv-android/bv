@@ -1,5 +1,6 @@
 package dev.aaa1115910.bv.ui.feature.search
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -17,23 +18,33 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowDropDown
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -45,12 +56,12 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import dev.aaa1115910.biliapi.repositories.SearchFilterDuration
-import dev.aaa1115910.biliapi.repositories.SearchFilterOrderType
 import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.ui.designsystem.component.BvButton
 import dev.aaa1115910.bv.ui.designsystem.component.BvButtonStyle
@@ -60,6 +71,7 @@ import dev.aaa1115910.bv.ui.designsystem.component.SectionHeader
 import dev.aaa1115910.bv.ui.designsystem.focus.bvFocus
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.util.PartitionUtil
+import kotlinx.coroutines.launch
 
 /** 「大家都在搜」条数（手机 / 平板）。 */
 private const val IdleHotCount = 10
@@ -258,10 +270,14 @@ internal fun SearchDialogFrame(onDismiss: () -> Unit, content: @Composable Colum
     }
 }
 
+/** 一组筛选：标题 + 自动换行的 chip；[enabled] = false 时整组置灰（chip 本身也要传 enabled = false）。 */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FilterGroup(title: String, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+private fun FilterGroup(title: String, enabled: Boolean = true, content: @Composable () -> Unit) {
+    Column(
+        Modifier.alpha(if (enabled) 1f else DisabledAlpha),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
         Text(title, style = BvType.Label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         FlowRow(
             Modifier
@@ -273,68 +289,272 @@ private fun FilterGroup(title: String, content: @Composable () -> Unit) {
     }
 }
 
+/** 手机筛选抽屉收起时显示的分区个数（不含「全部分区」；已选的分区总会显示）。 */
+private const val CollapsedPartitions = 7
+
+/** 不可用的筛选组的透明度（M3 disabled 内容 38%）。 */
+private const val DisabledAlpha = 0.38f
+
+/**
+ * 筛选的四组单选 chip：排序 / 时长 / 分区 / 子分区（选了分区才出现），选中即生效并重新搜索。
+ * App 接口只有排序（选项也不同），时长和分区置灰并提示去设置里切到 Web 接口。
+ * [collapsePartitions] = true 时（手机抽屉）分区先只显示一部分，末尾一个 chip 展开 / 收起。
+ */
+@Composable
+private fun SearchFilterGroups(
+    state: SearchUiState,
+    firstRequester: FocusRequester? = null,
+    collapsePartitions: Boolean = false,
+) {
+    val result = state.result
+    val full = state.fullFilters
+    var expanded by remember { mutableStateOf(!collapsePartitions) }
+    FilterGroup(stringResource(R.string.search_filter_order)) {
+        state.orderFilters.forEach { order ->
+            val selected = order == result.selectedOrder
+            BvChip(
+                text = stringResource(order.labelRes()),
+                selected = selected,
+                onClick = { state.setOrder(order) },
+                modifier = if (selected && firstRequester != null) Modifier.focusRequester(firstRequester) else Modifier,
+                icon = if (selected) Icons.Rounded.Check else null,
+            )
+        }
+    }
+    if (!full) {
+        Text(
+            stringResource(R.string.search_filter_app_hint),
+            style = BvType.Meta,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    FilterGroup(stringResource(R.string.search_filter_duration), enabled = full) {
+        SearchFilterDuration.entries.forEach { duration ->
+            val selected = duration == result.selectedDuration
+            BvChip(
+                text = stringResource(duration.labelRes()),
+                selected = selected,
+                onClick = { state.setDuration(duration) },
+                icon = if (selected) Icons.Rounded.Check else null,
+                enabled = full,
+            )
+        }
+    }
+    FilterGroup(stringResource(R.string.search_filter_partition), enabled = full) {
+        val all = PartitionUtil.partitions
+        val selectedPartition = result.selectedPartition
+        val shown = if (expanded) {
+            all
+        } else {
+            all.take(CollapsedPartitions).let { if (selectedPartition != null && selectedPartition !in it) it + selectedPartition else it }
+        }
+        BvChip(
+            text = stringResource(R.string.search_partition_all),
+            selected = selectedPartition == null,
+            onClick = { state.setPartition(null) },
+            icon = if (selectedPartition == null) Icons.Rounded.Check else null,
+            enabled = full,
+        )
+        shown.forEach { partition ->
+            val selected = partition == selectedPartition
+            BvChip(
+                text = partition.strRes,
+                selected = selected,
+                onClick = { state.setPartition(partition) },
+                icon = if (selected) Icons.Rounded.Check else null,
+                enabled = full,
+            )
+        }
+        if (collapsePartitions) {
+            BvChip(
+                text = if (expanded) {
+                    stringResource(R.string.search_filter_collapse_partitions)
+                } else {
+                    stringResource(R.string.search_filter_expand_partitions, all.size)
+                },
+                selected = false,
+                onClick = { expanded = !expanded },
+                enabled = full,
+                trailing = {
+                    Icon(
+                        if (expanded) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+            )
+        }
+    }
+    val children = result.selectedPartition?.children.orEmpty()
+    if (children.isNotEmpty()) {
+        FilterGroup(stringResource(R.string.search_filter_child_partition)) {
+            children.forEach { child ->
+                val selected = child == result.selectedChildPartition
+                BvChip(
+                    text = child.strRes,
+                    selected = selected,
+                    onClick = { state.setChildPartition(child) },
+                    icon = if (selected) Icons.Rounded.Check else null,
+                )
+            }
+        }
+    }
+}
+
 /**
  * 视频结果筛选（照抄旧电视版 SearchResultVideoFilter：排序 / 时长 / 分区 / 子分区，选中即生效并重新搜索）。
- * 只在 Web 接口下提供（旧版同样只在 Web 下打开）。
+ * 平板 / 电视用这个对话框，手机用 [SearchFilterSheet]。App 接口下只能排序。
  */
 @Composable
 internal fun SearchFilterDialog(state: SearchUiState, onDismiss: () -> Unit) {
-    val result = state.result
     val firstRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { firstRequester.requestFocus() } }
     SearchDialogFrame(onDismiss) {
         Text(stringResource(R.string.search_filter_title), style = BvType.PanelTitle)
-        FilterGroup(stringResource(R.string.search_filter_order)) {
-            SearchFilterOrderType.webFilters.forEach { order ->
-                val selected = order == result.selectedOrder
-                BvChip(
-                    text = stringResource(order.labelRes()),
-                    selected = selected,
-                    onClick = { state.setOrder(order) },
-                    modifier = if (selected) Modifier.focusRequester(firstRequester) else Modifier,
-                )
-            }
-        }
-        FilterGroup(stringResource(R.string.search_filter_duration)) {
-            SearchFilterDuration.entries.forEach { duration ->
-                BvChip(
-                    text = stringResource(duration.labelRes()),
-                    selected = duration == result.selectedDuration,
-                    onClick = { state.setDuration(duration) },
-                )
-            }
-        }
-        FilterGroup(stringResource(R.string.search_filter_partition)) {
-            BvChip(
-                text = stringResource(R.string.search_partition_all),
-                selected = result.selectedPartition == null,
-                onClick = { state.setPartition(null) },
-            )
-            PartitionUtil.partitions.forEach { partition ->
-                BvChip(
-                    text = partition.strRes,
-                    selected = partition == result.selectedPartition,
-                    onClick = { state.setPartition(partition) },
-                )
-            }
-        }
-        val children = result.selectedPartition?.children.orEmpty()
-        if (children.isNotEmpty()) {
-            FilterGroup(stringResource(R.string.search_filter_child_partition)) {
-                children.forEach { child ->
-                    BvChip(
-                        text = child.strRes,
-                        selected = child == result.selectedChildPartition,
-                        onClick = { state.setChildPartition(child) },
-                    )
-                }
-            }
-        }
+        SearchFilterGroups(state, firstRequester)
         BvButton(
             text = stringResource(R.string.search_filter_done),
             onClick = onDismiss,
             modifier = Modifier.align(Alignment.End),
             style = BvButtonStyle.Tonal,
         )
+    }
+}
+
+/** 筛选条上的下拉 chip：当前值 + ▾，改过（非默认值）时高亮。 */
+@Composable
+private fun FilterDropChip(text: String, changed: Boolean, onClick: () -> Unit) {
+    BvChip(
+        text = text,
+        selected = changed,
+        onClick = onClick,
+        contentPadding = PaddingValues(start = 14.dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+        trailing = { Icon(Icons.Rounded.ArrowDropDown, contentDescription = null, modifier = Modifier.size(18.dp)) },
+    )
+}
+
+/**
+ * 手机结果上方的筛选条（原型 filterBar）：「筛选」+ 已改项数角标，然后是排序 / 时长 / 分区三个下拉 chip。
+ * 点任意一个都打开 [SearchFilterSheet]。
+ */
+@Composable
+internal fun SearchFilterBar(state: SearchUiState, onOpen: () -> Unit, modifier: Modifier = Modifier) {
+    val result = state.result
+    val count = state.filterCount
+    val duration = result.selectedDuration
+    val partition = result.selectedPartition
+    val child = result.selectedChildPartition
+    Row(
+        modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        BvChip(
+            text = stringResource(R.string.search_filter_title),
+            selected = false,
+            onClick = onOpen,
+            icon = Icons.Rounded.Tune,
+            contentPadding = PaddingValues(start = 10.dp, end = if (count > 0) 8.dp else 14.dp, top = 6.dp, bottom = 6.dp),
+            trailing = if (count > 0) {
+                {
+                    Text(
+                        count.toString(),
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.primary, CircleShape)
+                            .widthIn(min = 18.dp)
+                            .padding(horizontal = 5.dp, vertical = 2.dp),
+                        style = BvType.Badge,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            } else {
+                null
+            },
+        )
+        FilterDropChip(
+            text = stringResource(result.selectedOrder.labelRes()),
+            changed = result.selectedOrder != DefaultSearchOrder,
+            onClick = onOpen,
+        )
+        // App 接口只能排序，时长和分区的 chip 不放在筛选条上（抽屉里置灰）
+        if (state.fullFilters) {
+            FilterDropChip(
+                text = stringResource(if (duration == SearchFilterDuration.All) R.string.search_filter_duration else duration.labelRes()),
+                changed = duration != SearchFilterDuration.All,
+                onClick = onOpen,
+            )
+            FilterDropChip(
+                text = when {
+                    partition == null -> stringResource(R.string.search_filter_partition)
+                    child == null -> partition.strRes
+                    else -> stringResource(R.string.search_filter_partition_child, partition.strRes, child.strRes)
+                },
+                changed = partition != null,
+                onClick = onOpen,
+            )
+        }
+    }
+}
+
+/**
+ * 手机筛选抽屉（原型 searchFilterPhone）：ModalBottomSheet，标题「筛选视频」+「重置」，说明一行，
+ * 四组单选 chip（分区默认收起一部分），底部「完成」。选中即生效，抽屉后面的结果同步刷新。
+ */
+@Composable
+internal fun SearchFilterSheet(state: SearchUiState, onDismiss: () -> Unit) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        stringResource(R.string.search_filter_sheet_title),
+                        modifier = Modifier.weight(1f),
+                        style = BvType.PanelTitle,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    if (state.filterCount > 0) {
+                        Text(
+                            stringResource(R.string.search_filter_reset),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable(onClick = state::resetFilters)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            style = BvType.BodyBold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+                Text(
+                    stringResource(R.string.search_filter_hint),
+                    style = BvType.Meta,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            SearchFilterGroups(state, collapsePartitions = true)
+            BvButton(
+                text = stringResource(R.string.search_filter_done),
+                onClick = {
+                    scope.launch {
+                        runCatching { sheetState.hide() }
+                        onDismiss()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                large = true,
+            )
+        }
     }
 }

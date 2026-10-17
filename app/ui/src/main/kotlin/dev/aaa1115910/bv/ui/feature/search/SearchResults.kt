@@ -334,14 +334,14 @@ internal fun SearchResultsPane(
     }
 }
 
-/** 「视频」区块标题：右侧「按播放量 ›」（Web 接口下点击打开筛选）。 */
+/** 「视频」区块标题：右侧「按播放量 ›」，点击打开筛选。 */
 @Composable
 private fun VideoSectionHeader(state: SearchUiState, onFilter: () -> Unit, modifier: Modifier = Modifier) {
     SectionHeader(
         title = stringResource(R.string.search_section_video),
         modifier = modifier,
         action = stringResource(R.string.search_sort_action, stringResource(state.result.selectedOrder.labelRes())),
-        onAction = if (state.filterEnabled) onFilter else null,
+        onAction = onFilter,
     )
 }
 
@@ -449,9 +449,7 @@ private fun VideoResultsGrid(
     val videos = state.videoCards()
     if (videos.isEmpty()) {
         Column(modifier) {
-            if (state.filterEnabled) {
-                VideoSectionHeader(state, onFilter, Modifier.padding(contentPadding))
-            }
+            VideoSectionHeader(state, onFilter, Modifier.padding(contentPadding))
             EmptyResult(loading, onRetry = { state.refresh() }, Modifier.weight(1f))
         }
         return
@@ -603,7 +601,8 @@ internal fun SearchResultsList(
     }
     val empty = pgcs.isEmpty() && shownUsers.isEmpty() && (!showVideos || videos.isEmpty())
     if (empty) {
-        EmptyResult(loading, onRetry = { state.refresh() }, modifier)
+        // 手机顶栏盖在列表上，空状态也要避开 contentPadding 的顶部
+        EmptyResult(loading, onRetry = { state.refresh() }, modifier.padding(contentPadding))
         return
     }
     val userItemPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp)

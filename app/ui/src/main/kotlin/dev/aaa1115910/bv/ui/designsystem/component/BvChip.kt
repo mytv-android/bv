@@ -33,7 +33,7 @@ import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 
 /**
  * 原型 `.m-chip`：未选中 圆角 10 + 1dp outlineVariant 内描边；选中 全圆角 + secondaryContainer。
- * selectOnFocus = true 时聚焦即选中（电视顶栏标签）。
+ * selectOnFocus = true 时聚焦即选中（电视顶栏标签）。[trailing] 放在文字后面（下拉箭头、数量角标）。
  */
 @Composable
 fun BvChip(
@@ -46,6 +46,7 @@ fun BvChip(
     contentPadding: PaddingValues = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
     textStyle: TextStyle = BvType.Small.copy(fontWeight = FontWeight.Medium),
     enabled: Boolean = true,
+    trailing: (@Composable () -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
@@ -80,6 +81,7 @@ fun BvChip(
         ) {
             if (icon != null) Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
             Text(text, style = textStyle, maxLines = 1)
+            trailing?.invoke()
         }
     }
 }

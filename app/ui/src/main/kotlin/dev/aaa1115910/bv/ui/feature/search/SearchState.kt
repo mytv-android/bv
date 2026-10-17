@@ -56,6 +56,9 @@ internal enum class SearchCategory(@StringRes val label: Int) {
 /** 请求发出后最多等这么久就不再显示「加载中」（ViewModel 失败时只打日志，没有错误状态）。 */
 private const val PendingTimeoutMs = 10_000L
 
+/** 默认排序，与 SearchResultViewModel.selectedOrder 的初值一致。 */
+internal val DefaultSearchOrder = SearchFilterOrderType.MostClicks
+
 /**
  * 搜索页三端共享的状态：
  * - 输入、联想、历史、热搜来自 [SearchInputViewModel]；
@@ -78,8 +81,12 @@ internal class SearchUiState(
 
     val apiType: ApiType = runCatching { Prefs.apiType }.getOrDefault(ApiType.Web)
 
-    /** 筛选（排序 / 时长 / 分区）只在 Web 接口下可用，与旧电视版相同。 */
-    val filterEnabled: Boolean = apiType == ApiType.Web
+    /** 可选的排序：Web 和 App 接口支持的排序不同。 */
+    val orderFilters: List<SearchFilterOrderType> =
+        if (apiType == ApiType.Web) SearchFilterOrderType.webFilters else SearchFilterOrderType.allFilters
+
+    /** 时长和分区只有 Web 接口支持；App 接口（gRPC SearchByType）只能排序，这两组置灰。 */
+    val fullFilters: Boolean = apiType == ApiType.Web
 
     /** 当前结果对应的关键词（"" = 还没有搜索过）。 */
     val submitted: String get() = result.keyword
@@ -175,6 +182,23 @@ internal class SearchUiState(
 
     fun setChildPartition(partition: Partition) {
         result.selectedChildPartition = if (partition != result.selectedChildPartition) partition else null
+        refresh()
+    }
+
+    /** 相对默认值改过的筛选项数（排序 / 时长 / 分区），显示在手机筛选条的「筛选」上。 */
+    val filterCount: Int
+        get() = listOf(
+            result.selectedOrder != DefaultSearchOrder,
+            result.selectedDuration != SearchFilterDuration.All,
+            result.selectedPartition != null,
+        ).count { it }
+
+    fun resetFilters() {
+        if (filterCount == 0) return
+        result.selectedOrder = DefaultSearchOrder
+        result.selectedDuration = SearchFilterDuration.All
+        result.selectedPartition = null
+        result.selectedChildPartition = null
         refresh()
     }
 }

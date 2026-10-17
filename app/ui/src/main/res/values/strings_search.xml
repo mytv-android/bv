@@ -37,6 +37,13 @@
     <string name="search_filter_partition">分区</string>
     <string name="search_filter_child_partition">子分区</string>
     <string name="search_filter_done">完成</string>
+    <string name="search_filter_sheet_title">筛选视频</string>
+    <string name="search_filter_hint">选中即生效，结果同步刷新 · 只作用于视频结果</string>
+    <string name="search_filter_reset">重置</string>
+    <string name="search_filter_expand_partitions">展开全部 %1$d 个分区</string>
+    <string name="search_filter_collapse_partitions">收起分区</string>
+    <string name="search_filter_partition_child">%1$s · %2$s</string>
+    <string name="search_filter_app_hint">App 接口只能排序；按时长和分区筛选需在「设置 → 网络与代理 → 接口偏好」切到 Web</string>
     <string name="search_watch_now">立即观看</string>
     <string name="search_pgc_meta_rating">%1$s · %2$s 分</string>
     <string name="search_follow">关注</string>
