@@ -49,6 +49,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -85,6 +86,7 @@ import dev.aaa1115910.bv.player.entity.LocalVideoPlayerSeekData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerStateData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoInfoData
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoShotData
+import dev.aaa1115910.bv.player.entity.PlayerLongPressAction
 import dev.aaa1115910.bv.player.shared.BuildConfig
 import dev.aaa1115910.bv.player.ui.BottomSubtitle
 import dev.aaa1115910.bv.player.ui.BufferingTip
@@ -136,7 +138,8 @@ private val ControlsEnd = 48.dp
  * | 快进中 | 确认（抬起） | 跳到目标时间，暂停中则继续播放 |
  * | 快进中 | 返回、菜单、上、下（抬起） | 取消快进 |
  * | — | 确认短按（抬起） | 有「回到上次进度」提示时跳转，否则播放 / 暂停 |
- * | — | 确认长按、菜单（抬起） | 打开菜单 |
+ * | — | 确认长按（按住） | 按设置打开菜单，或临时加速播放（松开恢复） |
+ * | — | 菜单（抬起） | 打开菜单 |
  * | — | 上（抬起） | 打开选集 |
  * | — | 下（抬起） | 显示控制栏并聚焦按钮行（旧版为显示视频信息） |
  * | — | 左右、快退快进（按下，可连按加速） | 快进 / 快退 |
@@ -190,6 +193,9 @@ internal fun TvController(
     var lastSeekChangeTime by remember { mutableLongStateOf(0L) }
 
     var centerLongFired by remember { mutableStateOf(false) }
+    // 长按确认键加速：centerLongHeld 防止按住期间系统重复上报长按事件时反复触发
+    var centerLongHeld by remember { mutableStateOf(false) }
+    var longPressSpeedUp by remember { mutableStateOf(false) }
     var lastPressBack by remember { mutableLongStateOf(0L) }
     var showLogs by remember { mutableStateOf(false) }
 
@@ -291,6 +297,25 @@ internal fun TvController(
         if (videoPlayer.isPlaying) controller.pause() else controller.play()
     }
 
+    // ------------------------------------------------------------- 长按加速
+
+    val startLongPressSpeedUp: () -> Unit = {
+        if (!longPressSpeedUp) {
+            longPressSpeedUp = true
+            controller.setTemporarySpeed(configData.longPressSpeed)
+            logger.fInfo { "Long press speed up: ${configData.longPressSpeed}x" }
+        }
+    }
+
+    /** 恢复为设置里的倍速；幂等，松开 / 暂停 / 换集 / 退出时都调用。 */
+    val restoreLongPressSpeed: () -> Unit = {
+        if (longPressSpeedUp) {
+            longPressSpeedUp = false
+            controller.setTemporarySpeed(null)
+            logger.fInfo { "Long press speed restored: ${configData.currentVideoSpeed}x" }
+        }
+    }
+
     // ------------------------------------------------------------- 按键（按下）
 
     val onKeyDown: (BvKey) -> Boolean = handler@{ key ->
@@ -338,7 +363,15 @@ internal fun TvController(
             BvKey.CenterLong -> {
                 logger.fInfo { "[$key] long press" }
                 centerLongFired = true
-                openMenu(TvMenuCategory.Picture)
+                // 按住期间系统可能重复上报长按，只在第一次按下时处理
+                if (!centerLongHeld) {
+                    centerLongHeld = true
+                    if (configData.longPressAction == PlayerLongPressAction.SpeedUp) {
+                        startLongPressSpeedUp()
+                    } else {
+                        openMenu(TvMenuCategory.Picture)
+                    }
+                }
                 true
             }
 
@@ -369,10 +402,19 @@ internal fun TvController(
 
     val onKeyUp: (BvKey) -> Boolean = handler@{ key ->
         if (showRemoteControlHint) return@handler false
+        // 部分盒子的长按确认键（763）抬起时仍是 CenterLong
+        if (key == BvKey.CenterLong) {
+            centerLongFired = false
+            centerLongHeld = false
+            restoreLongPressSpeed()
+            return@handler true
+        }
         var wasLongPress = false
         if (key == BvKey.Center) {
             wasLongPress = centerLongFired
             centerLongFired = false
+            centerLongHeld = false
+            restoreLongPressSpeed()
         }
         if (panelOpen) {
             if (key == BvKey.Back || key == BvKey.Menu) {
@@ -490,6 +532,22 @@ internal fun TvController(
         showLogs = false
     }
 
+    // 暂停 / 换集时恢复原倍速（长按期间若视频暂停或切集，不留下加速状态）
+    LaunchedEffect(stateData.isPlaying) {
+        if (!stateData.isPlaying) restoreLongPressSpeed()
+    }
+    LaunchedEffect(configData.currentVideoCid) {
+        restoreLongPressSpeed()
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            if (longPressSpeedUp) {
+                longPressSpeedUp = false
+                runCatching { controller.setTemporarySpeed(null) }
+            }
+        }
+    }
+
     // ------------------------------------------------------------- 文案
 
     val nextItem = remember(configData.availableVideoList, configData.currentVideoCid) {
@@ -542,6 +600,16 @@ internal fun TvController(
             }
 
             BottomSubtitle()
+
+            // 长按确认键加速中的提示
+            if (longPressSpeedUp) {
+                TvLongPressSpeedTip(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 8.dp),
+                    speed = configData.longPressSpeed,
+                )
+            }
 
             // 播放状态提示（旧 PlayStateTips）
             if (!stateData.isPlaying && !stateData.isBuffering && !stateData.isError && !controlsVisible) {

@@ -64,6 +64,7 @@
 
     <!-- 提示 -->
     <string name="player_ui_double_speed_tip">x2 倍速播放中</string>
+    <string name="player_ui_long_press_speed_tip">%1$s 加速播放中</string>
     <string name="player_ui_error_title">播放器正在抽风</string>
     <string name="player_ui_error_face">_(:з」∠)_</string>
     <string name="player_ui_error_message">错误信息：%1$s</string>

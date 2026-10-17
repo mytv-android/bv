@@ -34,6 +34,7 @@ internal fun createVideoPlayer(context: Context): AbstractVideoPlayer {
             ApiType.App -> null
         },
         enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
+        enableSkipSilence = Prefs.playerSkipSilence,
         audioBalanceLevel = Prefs.playerAudioBalanceLevel
     )
     return when (Prefs.playerType) {

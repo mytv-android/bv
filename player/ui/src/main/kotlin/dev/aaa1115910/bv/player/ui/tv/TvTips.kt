@@ -30,11 +30,13 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.aaa1115910.bv.player.ui.R
 import dev.aaa1115910.bv.player.ui.design.PlayerType
+import dev.aaa1115910.bv.player.ui.formatSpeed
 
 /** 暂停中且控制层隐藏时，右下角的暂停图标（照搬旧电视版 PauseIcon）。 */
 @Composable
@@ -51,6 +53,27 @@ internal fun PauseIcon(modifier: Modifier = Modifier) {
             imageVector = Icons.Rounded.Pause,
             contentDescription = null,
             tint = Color.White
+        )
+    }
+}
+
+/** 长按确认键加速播放中的提示（底部居中）。 */
+@Composable
+internal fun TvLongPressSpeedTip(
+    speed: Float,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(Color.Black.copy(alpha = 0.3f))
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = stringResource(R.string.player_ui_long_press_speed_tip, formatSpeed(context, speed)),
+            style = PlayerType.Body,
+            color = Color.White.copy(alpha = 0.8f),
         )
     }
 }

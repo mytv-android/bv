@@ -70,6 +70,10 @@
     <string name="settings_play_player_type">播放器内核</string>
     <string name="settings_play_ffmpeg">启用音频软解</string>
     <string name="settings_play_ffmpeg_desc">尝试使用 FFmpeg 播放硬解不兼容的音频</string>
+    <string name="settings_play_skip_silence">跳过静音</string>
+    <string name="settings_play_skip_silence_desc">自动跳过音频中的静音片段（仅 2.5 倍速及以上生效）</string>
+    <string name="settings_play_long_press_action">长按确认键行为（电视）</string>
+    <string name="settings_play_long_press_speed">长按加速倍速</string>
 
     <!-- 弹幕 -->
     <string name="settings_danmaku_enabled">默认开启弹幕</string>

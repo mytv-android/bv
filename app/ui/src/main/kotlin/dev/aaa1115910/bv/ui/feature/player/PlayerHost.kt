@@ -153,6 +153,8 @@ internal fun BvPlayerHost(
                     currentSubtitleBottomPadding = playerVm.currentSubtitleBottomPadding,
                     currentPlayMode = playerVm.currentPlayMode,
                     incognitoMode = Prefs.incognitoMode,
+                    longPressAction = Prefs.playerLongPressAction,
+                    longPressSpeed = Prefs.playerLongPressSpeed,
                 ),
                 LocalVideoPlayerDanmakuMasksData provides VideoPlayerDanmakuMasksData(
                     danmakuMasks = playerVm.danmakuMasks,

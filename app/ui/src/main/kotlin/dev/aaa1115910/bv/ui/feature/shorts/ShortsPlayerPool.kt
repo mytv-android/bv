@@ -210,6 +210,7 @@ internal class ShortsPlayerPool(
                 ApiType.App -> null
             },
             enableFfmpegAudioRenderer = Prefs.enableFfmpegAudioRenderer,
+            enableSkipSilence = Prefs.playerSkipSilence,
             audioBalanceLevel = Prefs.playerAudioBalanceLevel
         )
     }

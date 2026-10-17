@@ -28,6 +28,7 @@ import dev.aaa1115910.bv.player.entity.Audio
 import dev.aaa1115910.bv.player.entity.AudioBalanceLevel
 import dev.aaa1115910.bv.player.entity.DanmakuType
 import dev.aaa1115910.bv.player.entity.PlayMode
+import dev.aaa1115910.bv.player.entity.PlayerLongPressAction
 import dev.aaa1115910.bv.player.entity.Resolution
 import dev.aaa1115910.bv.player.entity.VideoCodec
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -358,6 +359,35 @@ object Prefs {
             dsm.editPreference(PrefKeys.prefPlayerAudioBalanceLevelKey, value.ordinal)
         }
 
+    /** 跳过静音段，默认关闭；只在新播放器创建时读取（2.5 倍速及以上才真正生效） */
+    var playerSkipSilence: Boolean
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefPlayerSkipSilenceRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefPlayerSkipSilenceKey, value)
+        }
+
+    /** 电视端长按确认键行为，默认加速播放（照搬 fantasy） */
+    var playerLongPressAction: PlayerLongPressAction
+        get() = runBlocking {
+            PlayerLongPressAction.entries.getOrElse(
+                dsm.getPreferenceFlow(PrefKeys.prefPlayerLongPressActionRequest).first()
+            ) { PlayerLongPressAction.SpeedUp }
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefPlayerLongPressActionKey, value.ordinal)
+        }
+
+    /** 长按确认键加速播放时的倍速，默认 2× */
+    var playerLongPressSpeed: Float
+        get() = runBlocking {
+            dsm.getPreferenceFlow(PrefKeys.prefPlayerLongPressSpeedRequest).first()
+        }
+        set(value) = runBlocking {
+            dsm.editPreference(PrefKeys.prefPlayerLongPressSpeedKey, value)
+        }
+
     var blacklistUser: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefBlacklistUserRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefBlacklistUserKey, value) }
@@ -471,6 +501,9 @@ object PrefKeys {
     val prefDefaultDanmakuMask = booleanPreferencesKey("prefer_enable_webmark")
     val prefEnableFfmpegAudioRenderer = booleanPreferencesKey("enable_ffmpeg_audio_renderer")
     val prefPlayerAudioBalanceLevelKey = intPreferencesKey("player_audio_balance_level")
+    val prefPlayerSkipSilenceKey = booleanPreferencesKey("player_skip_silence")
+    val prefPlayerLongPressActionKey = intPreferencesKey("player_long_press_action")
+    val prefPlayerLongPressSpeedKey = floatPreferencesKey("player_long_press_speed")
     val prefBlacklistUserKey = booleanPreferencesKey("blacklist_user")
     val prefThemeTypeKey = intPreferencesKey("theme_type")
     val prefPlayModeKey = intPreferencesKey("play_mode")
@@ -536,6 +569,10 @@ object PrefKeys {
     val prefEnableFfmpegEndererRequest = PreferenceRequest(prefEnableFfmpegAudioRenderer, false)
     val prefPlayerAudioBalanceLevelRequest =
         PreferenceRequest(prefPlayerAudioBalanceLevelKey, AudioBalanceLevel.Off.ordinal)
+    val prefPlayerSkipSilenceRequest = PreferenceRequest(prefPlayerSkipSilenceKey, false)
+    val prefPlayerLongPressActionRequest =
+        PreferenceRequest(prefPlayerLongPressActionKey, PlayerLongPressAction.SpeedUp.ordinal)
+    val prefPlayerLongPressSpeedRequest = PreferenceRequest(prefPlayerLongPressSpeedKey, 2f)
     val prefBlacklistUserRequest = PreferenceRequest(prefBlacklistUserKey, false)
     val prefThemeTypeRequest = PreferenceRequest(prefThemeTypeKey, ThemeType.Auto.ordinal)
     val prefPlayModeRequest = PreferenceRequest(prefPlayModeKey, PlayMode.Sequential.ordinal)

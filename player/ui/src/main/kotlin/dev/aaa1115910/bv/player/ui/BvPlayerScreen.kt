@@ -689,6 +689,6 @@ internal class PlayerController(
     val playNewVideo: (VideoListItem) -> Unit,
     /** 上报心跳后退出播放器。 */
     val exit: () -> Unit,
-    /** 临时倍速（长按 2 倍速）；null 恢复为当前设置的倍速。不写入设置。 */
+    /** 临时倍速（触摸端长按 2×、电视端长按确认键用设置值）；null 恢复为当前设置的倍速。不写入设置。 */
     val setTemporarySpeed: (Float?) -> Unit,
 )

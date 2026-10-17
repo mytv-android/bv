@@ -10,6 +10,9 @@
     <string name="audio_balance_standard">标准模式</string>
     <string name="audio_balance_cinema">影音模式</string>
 
+    <string name="player_long_press_action_open_menu">打开菜单</string>
+    <string name="player_long_press_action_speed_up">加速播放</string>
+
     <string name="play_mode_sequential">顺序播放</string>
     <string name="play_mode_sequential_loop">列表循环</string>
     <string name="play_mode_single">单集播放</string>
