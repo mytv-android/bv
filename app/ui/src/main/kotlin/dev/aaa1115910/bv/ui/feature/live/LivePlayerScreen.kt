@@ -614,6 +614,7 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
         // 中央提示：加载失败 / 未开播 / 播放错误 / 缓冲
         LiveCenterTips(
             vm = vm,
+            isBuffering = isBuffering,
             isPlaybackError = isPlaybackError,
             onRetryLoad = { vm.load(route.roomId) },
             onRetryStream = { vm.refreshStream() },
@@ -961,6 +962,7 @@ private fun LiveMenuPanel(
 @Composable
 private fun LiveCenterTips(
     vm: LivePlayerViewModel,
+    isBuffering: Boolean,
     isPlaybackError: Boolean,
     onRetryLoad: () -> Unit,
     onRetryStream: () -> Unit,
