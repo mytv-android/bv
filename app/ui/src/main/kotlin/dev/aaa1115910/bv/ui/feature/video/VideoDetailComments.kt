@@ -23,8 +23,10 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,9 +40,13 @@ import dev.aaa1115910.biliapi.entity.Picture
 import dev.aaa1115910.biliapi.entity.reply.Comment
 import dev.aaa1115910.biliapi.entity.reply.CommentSort
 import dev.aaa1115910.bv.appui.R
+import dev.aaa1115910.bv.ui.designsystem.adaptive.BvInputMode
+import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.designsystem.component.BvChip
 import dev.aaa1115910.bv.ui.designsystem.component.CommentItem
+import dev.aaa1115910.bv.ui.designsystem.component.CommentQrCodeDialog
 import dev.aaa1115910.bv.ui.designsystem.component.LoadMoreIndicator
+import dev.aaa1115910.bv.ui.designsystem.component.commentQrLink
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.ui.imageviewer.previewer.ImagePreviewer
 import dev.aaa1115910.bv.ui.imageviewer.previewer.ImagePreviewerState
@@ -91,6 +97,8 @@ internal fun DetailCommentList(
 ) {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val touchInput = LocalDeviceProfile.current.input == BvInputMode.Touch
+    var qrLink by remember { mutableStateOf<String?>(null) }
     val shouldLoadMore by remember {
         derivedStateOf {
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -123,6 +131,9 @@ internal fun DetailCommentList(
                     onReplyClick = if (comment.repliesCount > 0) {
                         { onOpenReplies(comment) }
                     } else null,
+                    onLongClick = if (touchInput) {
+                        { commentQrLink(comment.content)?.let { qrLink = it } }
+                    } else null,
                 )
             }
             if (commentVm.updatingComments) {
@@ -146,6 +157,9 @@ internal fun DetailCommentList(
             item(key = "nav") { Box(Modifier.navigationBarsPadding()) }
         }
     }
+    qrLink?.let { link ->
+        CommentQrCodeDialog(link = link, onDismiss = { qrLink = null })
+    }
 }
 
 /**
@@ -161,6 +175,8 @@ internal fun RepliesSheet(
     val scope = rememberCoroutineScope()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val listState = rememberLazyListState()
+    val touchInput = LocalDeviceProfile.current.input == BvInputMode.Touch
+    var qrLink by remember { mutableStateOf<String?>(null) }
     val shouldLoadMore by remember {
         derivedStateOf {
             val last = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
@@ -185,7 +201,14 @@ internal fun RepliesSheet(
         ) {
             commentVm.replyRootComment?.let { root ->
                 item(key = "root") {
-                    CommentItem(comment = root, maxLines = Int.MAX_VALUE, onPictureClick = onShowPictures)
+                    CommentItem(
+                        comment = root,
+                        maxLines = Int.MAX_VALUE,
+                        onPictureClick = onShowPictures,
+                        onLongClick = if (touchInput) {
+                            { commentQrLink(root.content)?.let { qrLink = it } }
+                        } else null,
+                    )
                 }
             }
             item(key = "header") {
@@ -222,13 +245,22 @@ internal fun RepliesSheet(
                 }
             }
             items(commentVm.replies) { reply ->
-                CommentItem(comment = reply, onPictureClick = onShowPictures)
+                CommentItem(
+                    comment = reply,
+                    onPictureClick = onShowPictures,
+                    onLongClick = if (touchInput) {
+                        { commentQrLink(reply.content)?.let { qrLink = it } }
+                    } else null,
+                )
             }
             if (commentVm.updatingReplies || commentVm.refreshingReplies) {
                 item(key = "loading") { LoadMoreIndicator() }
             }
             item(key = "nav") { Box(Modifier.navigationBarsPadding()) }
         }
+    }
+    qrLink?.let { link ->
+        CommentQrCodeDialog(link = link, onDismiss = { qrLink = null })
     }
 }
 

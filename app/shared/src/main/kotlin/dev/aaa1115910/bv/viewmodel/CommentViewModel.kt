@@ -74,7 +74,22 @@ class CommentViewModel(
             )
             nextCommentPage = commentsData.nextPage
             hasMoreComments = commentsData.hasNext
-            comments.addAll(commentsData.comments)
+            val firstPage = comments.isEmpty()
+            // 接口把置顶评论单独返回：只在第一页插到列表最前
+            if (firstPage) {
+                comments.addAll(commentsData.topReplies)
+            }
+            // 按 rpid 去重，避免置顶评论同时出现在普通列表 / 分页重复
+            val knownIds = comments.mapTo(HashSet()) { it.rpid }
+            commentsData.comments.forEach { comment ->
+                if (knownIds.add(comment.rpid)) comments.add(comment)
+            }
+            // 若置顶评论混在普通列表中（接口字段标记），稳定排序把置顶挪到最前，其余顺序不变
+            if (firstPage) {
+                val ordered = comments.sortedByDescending { it.isPinned }
+                comments.clear()
+                comments.addAll(ordered)
+            }
         }.onFailure {
             logger.fException(it) { "Load more comments failed" }
             withContext(Dispatchers.Main) {

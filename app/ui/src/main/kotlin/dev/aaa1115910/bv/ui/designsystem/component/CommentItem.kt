@@ -2,11 +2,14 @@ package dev.aaa1115910.bv.ui.designsystem.component
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -57,8 +60,25 @@ fun CommentItem(
     /** 正文展开状态；为 null 时由组件内部托管（触屏点击「展开/收起」），电视端由评论面板托管以便遥控器触发。 */
     textExpanded: Boolean? = null,
     onToggleTextExpand: (() -> Unit)? = null,
+    /** 触屏长按整条评论（带链接评论的二维码入口）；为 null 时不处理触摸长按。 */
+    onLongClick: (() -> Unit)? = null,
 ) {
-    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    val interactionSource = remember { MutableInteractionSource() }
+    Row(
+        modifier
+            .fillMaxWidth()
+            .then(
+                if (onLongClick != null) {
+                    Modifier.combinedClickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = {},
+                        onLongClick = onLongClick,
+                    )
+                } else Modifier
+            ),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
         BvAvatar(
             url = comment.member.avatar,
             size = 30.dp,
@@ -67,13 +87,29 @@ fun CommentItem(
             modifier = if (onAvatarClick != null) Modifier.clickable(onClick = onAvatarClick) else Modifier,
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                comment.member.name,
-                style = BvType.Label.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (comment.isPinned) {
+                    Text(
+                        stringResource(R.string.ds_pinned),
+                        modifier = Modifier
+                            .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp),
+                        style = BvType.Meta.copy(lineHeight = 13.sp, fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+                Text(
+                    comment.member.name,
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = BvType.Label.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             CommentText(comment.content, comment.emotes, maxLines, textExpanded, onToggleTextExpand)
             if (comment.pictures.isNotEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {

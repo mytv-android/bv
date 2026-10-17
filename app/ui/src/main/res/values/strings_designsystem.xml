@@ -13,6 +13,9 @@
     <string name="ds_reply_count">回复 %d</string>
     <string name="ds_expand">展开</string>
     <string name="ds_collapse">收起</string>
+    <string name="ds_pinned">置顶</string>
+    <string name="ds_comment_qr_title">扫描二维码打开链接</string>
+    <string name="ds_comment_qr_hint">按返回键关闭</string>
     <string name="ds_all">全部</string>
     <string name="ds_all_more">全部 ›</string>
     <string name="ds_back">返回</string>

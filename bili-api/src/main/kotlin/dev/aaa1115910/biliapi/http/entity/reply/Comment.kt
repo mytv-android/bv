@@ -21,7 +21,7 @@ data class CommentData(
     val replies: List<Reply> = emptyList(),
     val top: Top,
     @SerialName("top_replies")
-    val topReplies: JsonElement? = null,
+    val topReplies: List<Reply> = emptyList(),
     @SerialName("up_selection")
     val upSelection: UpSelection? = null,
     val upper: Upper,

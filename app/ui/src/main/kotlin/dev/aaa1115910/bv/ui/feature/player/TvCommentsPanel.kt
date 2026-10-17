@@ -1,5 +1,6 @@
 package dev.aaa1115910.bv.ui.feature.player
 
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,20 +26,28 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.aaa1115910.biliapi.entity.reply.CommentSort
 import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.ui.designsystem.component.BvChip
 import dev.aaa1115910.bv.ui.designsystem.component.CommentItem
+import dev.aaa1115910.bv.ui.designsystem.component.CommentQrCodeDialog
 import dev.aaa1115910.bv.ui.designsystem.component.LoadMoreIndicator
+import dev.aaa1115910.bv.ui.designsystem.component.commentQrLink
 import dev.aaa1115910.bv.ui.designsystem.focus.TvColumnPivot
 import dev.aaa1115910.bv.ui.designsystem.focus.bvFocus
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
@@ -60,6 +69,8 @@ internal fun TvCommentsPanel(
     val firstRequester = remember { FocusRequester() }
     // 长评论展开状态：按 rpid 记录，切换排序 / 加载更多后保持
     val expandedComments = remember { mutableStateMapOf<Long, Boolean>() }
+    val longPressGuard = remember { CommentLongPressGuard() }
+    var qrLink by remember { mutableStateOf<String?>(null) }
 
     BackHandler(onBack = onDismiss)
 
@@ -134,12 +145,19 @@ internal fun TvCommentsPanel(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     items(commentVm.comments) { comment ->
+                        val qrLinkOfComment = remember(comment.rpid, comment.content) {
+                            commentQrLink(comment.content)
+                        }
                         CommentItem(
                             comment = comment,
                             // clickable 让遥控器确认键展开 / 收起长评论（短评论不溢出，切换无变化）
+                            // onPreviewKeyEvent 捕获长按确认键：带链接的评论弹出二维码，无链接时保持原行为
                             modifier = Modifier
                                 .bvFocus(scale = 1f, corner = 16.dp)
                                 .clip(RoundedCornerShape(16.dp))
+                                .onPreviewKeyEvent { event ->
+                                    longPressGuard.handle(event, qrLinkOfComment) { qrLink = it }
+                                }
                                 .clickable {
                                     expandedComments[comment.rpid] = expandedComments[comment.rpid] != true
                                 }
@@ -166,5 +184,58 @@ internal fun TvCommentsPanel(
                 }
             }
         }
+    }
+    qrLink?.let { link ->
+        CommentQrCodeDialog(
+            link = link,
+            onDismiss = {
+                qrLink = null
+                longPressGuard.reset()
+            },
+        )
+    }
+}
+
+/**
+ * 电视评论卡片长按确认键：带链接的评论弹出二维码；不带链接时不拦截，
+ * 确认键仍按 clickable 原有逻辑展开 / 收起长评论。触发后吞掉 KeyUp，
+ * 避免这次长按被 clickable 再当成一次点击。
+ */
+private class CommentLongPressGuard {
+    private var swallowCenterUp = false
+
+    /** 关闭二维码时重置，避免 KeyUp 被对话框窗口接走后留下「一直吞确认键」的状态。 */
+    fun reset() {
+        swallowCenterUp = false
+    }
+
+    fun handle(event: KeyEvent, qrLink: String?, onShowQrCode: (String) -> Unit): Boolean {
+        val native = event.nativeKeyEvent
+        val code = native.keyCode
+        val centerKey = code == AndroidKeyEvent.KEYCODE_DPAD_CENTER ||
+            code == AndroidKeyEvent.KEYCODE_ENTER ||
+            code == AndroidKeyEvent.KEYCODE_NUMPAD_ENTER
+        val longPressKey = code == LONG_PRESS_KEY_CODE
+
+        if (event.type == KeyEventType.KeyUp) {
+            if ((centerKey || longPressKey) && swallowCenterUp) {
+                swallowCenterUp = false
+                return true
+            }
+            return false
+        }
+        if (event.type != KeyEventType.KeyDown) return false
+
+        val isLongPress = longPressKey || (centerKey && native.isLongPress)
+        if (!isLongPress || qrLink == null) return false
+
+        swallowCenterUp = true
+        onShowQrCode(qrLink)
+        return true
+    }
+
+    private companion object {
+        /** 部分盒子的「长按确认」键码（与 DeleteMode 保持一致） */
+        const val LONG_PRESS_KEY_CODE = 763
     }
 }
