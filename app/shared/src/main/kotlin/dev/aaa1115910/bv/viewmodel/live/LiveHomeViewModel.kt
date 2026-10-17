@@ -24,7 +24,7 @@ import org.koin.android.annotation.KoinViewModel
 
 /**
  * 直播首页数据：推荐（一次加载，接口无分页参数）、关注（登录才加载，失败静默置空）、
- * 分区（两级分区列表 + 分区房间分页）。切 tab / 切分区由 UI 调对应 ensure*/selectArea。
+ * 分区（两级分区列表 + 分区房间分页）。切 tab / 切分区由 UI 调对应 ensure 方法。
  */
 @KoinViewModel
 class LiveHomeViewModel(

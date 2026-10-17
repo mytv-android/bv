@@ -7,7 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.aaa1115910.biliapi.http.entity.live.LiveEvent
-import dev.aaa1115910.biliapi.http.entity.live.LivePlayInfo
+import dev.aaa1115910.biliapi.repositories.LivePlayInfo
 import dev.aaa1115910.biliapi.http.entity.live.RoomInfoData
 import dev.aaa1115910.biliapi.repositories.LiveRepository
 import dev.aaa1115910.biliapi.websocket.LiveDataWebSocket

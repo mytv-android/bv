@@ -353,11 +353,12 @@ class VideoPlayerV3ViewModel(
             if (previewPlayback) startShowPreviewTipCountdown()
 
         }.onFailure {
-            if (it is RiskControlException && it.vVoucher != null) {
+            val voucher = (it as? RiskControlException)?.vVoucher
+            if (voucher != null) {
                 logger.fWarn { "Risk control v_voucher detected" }
                 addLogs("触发风控，正在申请验证…")
                 handleVVoucher(
-                    vVoucher = it.vVoucher,
+                    vVoucher = voucher,
                     retryRequest = GeetestRetryRequest(
                         avid = avid,
                         cid = cid,
@@ -596,7 +597,7 @@ class VideoPlayerV3ViewModel(
 
     fun onGeetestCancelled() {
         clearGeetestState()
-        addLogs("用户取消了风控验证")
+        viewModelScope.launch(Dispatchers.IO) { addLogs("用户取消了风控验证") }
         errorMessage = "验证已取消"
         loadState = RequestState.Failed
     }
