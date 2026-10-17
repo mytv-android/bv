@@ -39,6 +39,8 @@ import dev.aaa1115910.bv.ui.designsystem.theme.BvTheme
 import dev.aaa1115910.bv.ui.designsystem.theme.CoverSeedCache
 import dev.aaa1115910.bv.ui.designsystem.theme.CoverTheme
 import dev.aaa1115910.bv.ui.designsystem.theme.LocalThemePrefs
+import dev.aaa1115910.bv.ui.feature.verify.GeetestTvVerifyDialog
+import dev.aaa1115910.bv.ui.feature.verify.GeetestVerifyDialogHost
 import dev.aaa1115910.bv.util.Prefs
 import dev.aaa1115910.bv.viewmodel.VideoPlayerV3ViewModel
 import kotlinx.coroutines.Dispatchers
@@ -167,6 +169,31 @@ internal fun BvPlayerHost(
                     videoShot = playerVm.videoShot,
                 ),
             ) {
+                // 风控验证弹窗：电视端用遥控器滑块对话框，触屏端用极验 SDK 对话框
+                if (isTv) {
+                    if (playerVm.showGeetestDialog) {
+                        GeetestTvVerifyDialog(
+                            gt = playerVm.geetestGt,
+                            challenge = playerVm.geetestChallenge,
+                            onResult = { result ->
+                                playerVm.onGeetestResult(
+                                    result.challenge,
+                                    result.validate,
+                                    result.seccode
+                                )
+                            },
+                            onDismiss = playerVm::onGeetestCancelled,
+                        )
+                    }
+                } else {
+                    GeetestVerifyDialogHost(
+                        show = playerVm.showGeetestDialog,
+                        gt = playerVm.geetestGt,
+                        challenge = playerVm.geetestChallenge,
+                        onResult = playerVm::onGeetestResult,
+                        onCancelled = playerVm::onGeetestCancelled,
+                    )
+                }
                 BvPlayerScreen(
                     videoPlayer = videoPlayer,
                     danmakuPlayer = danmakuPlayer,

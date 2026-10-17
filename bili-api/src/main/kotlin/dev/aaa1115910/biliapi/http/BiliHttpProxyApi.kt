@@ -15,8 +15,10 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.parameter
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.URLProtocol
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 
 object BiliHttpProxyApi {
@@ -78,26 +80,38 @@ object BiliHttpProxyApi {
         drmTechType: Int? = null,
         fromClient: String? = null,
         sessData: String? = null,
-        dedeUserID: Long? = null
-    ): BiliResponse<PlayUrlData> = client?.get("/pgc/player/web/playurl") {
-        require(av != null || bv != null) { "av and bv cannot be null at the same time" }
-        require(epid != null || cid != null) { "epid and cid cannot be null at the same time" }
-        av?.let { parameter("avid", it) }
-        bv?.let { parameter("bvid", it) }
-        epid?.let { parameter("ep_id", it) }
-        cid?.let { parameter("cid", it) }
-        qn?.let { parameter("qn", it) }
-        fnval?.let { parameter("fnval", it) }
-        fnver?.let { parameter("fnver", it) }
-        fourk?.let { parameter("fourk", it) }
-        session?.let { parameter("session", it) }
-        supportMultiAudio?.let { parameter("support_multi_audio", it) }
-        drmTechType?.let { parameter("drm_tech_type", it) }
-        fromClient?.let { parameter("from_client", it) }
-        sessData?.let { header("Cookie", "SESSDATA=$sessData;DedeUserID=$dedeUserID") }
-        //必须得加上 referer 才能通过账号身份验证
-        header("referer", "https://www.bilibili.com")
-    }?.body() ?: throw IllegalStateException("no proxy server")
+        dedeUserID: Long? = null,
+        gaiaVtoken: String? = null
+    ): BiliResponse<PlayUrlData> {
+        val bodyText = client?.get("/pgc/player/web/playurl") {
+            require(av != null || bv != null) { "av and bv cannot be null at the same time" }
+            require(epid != null || cid != null) { "epid and cid cannot be null at the same time" }
+            av?.let { parameter("avid", it) }
+            bv?.let { parameter("bvid", it) }
+            epid?.let { parameter("ep_id", it) }
+            cid?.let { parameter("cid", it) }
+            qn?.let { parameter("qn", it) }
+            fnval?.let { parameter("fnval", it) }
+            fnver?.let { parameter("fnver", it) }
+            fourk?.let { parameter("fourk", it) }
+            session?.let { parameter("session", it) }
+            supportMultiAudio?.let { parameter("support_multi_audio", it) }
+            drmTechType?.let { parameter("drm_tech_type", it) }
+            fromClient?.let { parameter("from_client", it) }
+            val cookieParts = mutableListOf<String>()
+            sessData?.let { cookieParts.add("SESSDATA=$it") }
+            dedeUserID?.let { cookieParts.add("DedeUserID=$it") }
+            gaiaVtoken?.takeIf { it.isNotBlank() }?.let {
+                parameter("gaia_vtoken", it)
+                cookieParts.add("x-bili-gaia-vtoken=$it")
+            }
+            if (cookieParts.isNotEmpty()) header("Cookie", cookieParts.joinToString(";") + ";")
+            //必须得加上 referer 才能通过账号身份验证
+            header("referer", "https://www.bilibili.com")
+        }?.bodyAsText() ?: throw IllegalStateException("no proxy server")
+        checkForVVoucher(bodyText)
+        return json.decodeFromString(bodyText)
+    }
 
     /**
      * 分类搜索与[keyword]相关的[type]类型的相关结果

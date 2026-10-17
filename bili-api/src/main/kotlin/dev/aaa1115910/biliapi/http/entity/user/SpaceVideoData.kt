@@ -1,5 +1,6 @@
 package dev.aaa1115910.biliapi.http.entity.user
 
+import dev.aaa1115910.biliapi.http.entity.VVoucherHolder
 import dev.aaa1115910.biliapi.http.entity.video.VideoStat
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -30,8 +31,8 @@ data class WebSpaceVideoData(
     @SerialName("gaia_data")
     val gaiaData: JsonElement? = null,
     @SerialName("v_voucher")
-    val vVoucher: String? = null,
-) {
+    override val vVoucher: String? = null,
+) : VVoucherHolder {
     /**
      * @param tlist 投稿视频分区索引
      * @param vlist 投稿视频列表

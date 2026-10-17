@@ -701,4 +701,24 @@
     <string name="video_player_referer">https://www.bilibili.com</string>
     <string name="video_player_user_agent_client">Bilibili Freedoooooom/MarkII</string>
     <string name="video_player_user_agent_http">Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36</string>
+
+    <string name="geetest_tv_status_loading">正在加载验证码…</string>
+    <string name="geetest_tv_status_ready_auto">请使用方向键移动光标，确认键点击</string>
+    <string name="geetest_tv_status_ready_click">点击模式：方向键移动光标，确认键点击</string>
+    <string name="geetest_tv_status_ready_slider">滑块模式：左右键拖动滑块，确定键提交</string>
+    <string name="geetest_tv_status_dragging">拖动中：左右键对齐缺口，确定键提交</string>
+    <string name="geetest_tv_status_drag_submitted">已提交滑块位置，正在等待验证结果…</string>
+    <string name="geetest_tv_status_drag_cancelled">拖动已取消</string>
+    <string name="geetest_tv_status_no_handle">未找到滑块把手，请长按确定键切回点击操作</string>
+    <string name="geetest_tv_status_drag_first">请先用左右键拖动滑块，再按确定键提交</string>
+    <string name="geetest_tv_status_no_slider_click_submitted">未检测到滑块，已按点击提交</string>
+    <string name="geetest_tv_status_switched_to_slider">已切换为滑块操作：左右键拖动，确定键提交</string>
+    <string name="geetest_tv_status_switched_to_click">已切换为点击操作：方向键移动光标，确定键点击</string>
+    <string name="geetest_tv_status_slider_detected">滑块验证：左右键拖动滑块，确定键提交</string>
+    <string name="geetest_tv_status_click_detected">点击验证：方向键移动光标，确认键点击</string>
+    <string name="geetest_tv_status_type_mismatch">注意：本题实际为%1$s题，当前强制模式可能无法通过</string>
+    <string name="geetest_tv_hint_slider_auto">左右键拖动滑块 ｜ 确认键提交 ｜ 长按确认键切换 ｜ 返回键取消</string>
+    <string name="geetest_tv_hint_slider">左右键拖动滑块 ｜ 确认键提交 ｜ 返回键取消</string>
+    <string name="geetest_tv_hint_click_auto">方向键移动光标 ｜ 确认键点击 ｜ 长按确认键切换 ｜ 返回键取消</string>
+    <string name="geetest_tv_hint_click">方向键移动光标 ｜ 确认键点击 ｜ 返回键取消</string>
 </resources>

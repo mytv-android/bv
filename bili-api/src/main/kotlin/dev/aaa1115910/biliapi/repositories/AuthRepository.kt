@@ -14,6 +14,9 @@ class AuthRepository {
     var buvid3: String? = null
     var buvid: String? = null
 
+    /** 风控验证通过后的 gaia_vtoken（来自 grisk_id） */
+    var gaiaVtoken: String? = null
+
     /**
      * 把当前会话字段接到 [WebCookieManager]。refresh_token 与 cookie 的持久化
      * 属于应用层，仍由应用层另行设置。

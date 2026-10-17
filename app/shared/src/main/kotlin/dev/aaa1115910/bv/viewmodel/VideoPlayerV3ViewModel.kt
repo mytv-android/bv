@@ -24,7 +24,9 @@ import dev.aaa1115910.biliapi.entity.video.SubtitleAiType
 import dev.aaa1115910.biliapi.entity.video.SubtitleType
 import dev.aaa1115910.biliapi.entity.video.VideoShot
 import dev.aaa1115910.biliapi.http.BiliHttpApi
+import dev.aaa1115910.biliapi.http.entity.RiskControlException
 import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
+import dev.aaa1115910.biliapi.repositories.AuthRepository
 import dev.aaa1115910.biliapi.repositories.VideoPlayRepository
 import dev.aaa1115910.bilisubtitle.SubtitleParser
 import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
@@ -42,7 +44,10 @@ import dev.aaa1115910.bv.player.entity.VideoListItemData
 import dev.aaa1115910.bv.player.entity.toAudioLoudness
 import dev.aaa1115910.bv.repository.PlayUrlResolver
 import dev.aaa1115910.bv.repository.VideoInfoRepository
+import dev.aaa1115910.bv.util.GeetestSession
+import dev.aaa1115910.bv.util.GeetestSubmitResult
 import dev.aaa1115910.bv.util.Prefs
+import dev.aaa1115910.bv.util.VVoucherAlreadyAttemptedException
 import dev.aaa1115910.bv.util.fException
 import dev.aaa1115910.bv.util.fInfo
 import dev.aaa1115910.bv.util.fWarn
@@ -53,6 +58,7 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.okhttp.OkHttp
 import io.ktor.client.request.get
 import io.ktor.client.statement.bodyAsText
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -61,10 +67,24 @@ import kotlinx.coroutines.withContext
 import org.koin.android.annotation.KoinViewModel
 import java.net.URI
 
+/**
+ * [runCatching] 会把协程取消也当成失败，进了 `onFailure` 就会留下"xxx 失败"的假日志/假错误状态。
+ * 这里让 [CancellationException] 照常向上抛，只把真正的失败包成 [Result]。
+ */
+private inline fun <T> runCatchingCancellable(block: () -> T): Result<T> =
+    try {
+        Result.success(block())
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Throwable) {
+        Result.failure(e)
+    }
+
 @KoinViewModel
 class VideoPlayerV3ViewModel(
     private val videoInfoRepository: VideoInfoRepository,
     private val videoPlayRepository: VideoPlayRepository,
+    private val authRepository: AuthRepository,
 ) : ViewModel() {
     private val logger = KotlinLogging.logger { }
     private val playUrlResolver = PlayUrlResolver(videoPlayRepository)
@@ -128,6 +148,22 @@ class VideoPlayerV3ViewModel(
 
     /** 当前播放的是试看片段（needPay 且仍有可播放流） */
     var isPreviewPlayback by mutableStateOf(false)
+
+    /** 触发 Geetest 验证时的播放请求快照，验证通过后按快照重试原请求 */
+    private data class GeetestRetryRequest(
+        val avid: Long,
+        val cid: Long,
+        val epid: Int,
+        val proxyArea: ProxyArea,
+    )
+
+    // 风控 Geetest 验证状态
+    var showGeetestDialog by mutableStateOf(false)
+    var geetestGt by mutableStateOf("")
+    var geetestChallenge by mutableStateOf("")
+    private var pendingRetryRequest: GeetestRetryRequest? = null
+    // v_voucher 是一次性凭证，会话内部保证同一个 voucher 只注册一次，避免重复弹窗死循环
+    private val geetestSession = GeetestSession(authRepository)
 
     /** 试看提示在起播后短暂显示 */
     var showPreviewTip by mutableStateOf(false)
@@ -271,6 +307,20 @@ class VideoPlayerV3ViewModel(
             if (previewPlayback) startShowPreviewTipCountdown()
 
         }.onFailure {
+            if (it is RiskControlException && it.vVoucher != null) {
+                logger.fWarn { "Risk control v_voucher detected" }
+                addLogs("触发风控，正在申请验证…")
+                handleVVoucher(
+                    vVoucher = it.vVoucher,
+                    retryRequest = GeetestRetryRequest(
+                        avid = avid,
+                        cid = cid,
+                        epid = epid,
+                        proxyArea = proxyArea,
+                    )
+                )
+                return@onFailure
+            }
             addLogs("加载视频地址失败：${it.localizedMessage}")
             errorMessage = it.localizedMessage ?: "Unknown error"
             loadState = RequestState.Failed
@@ -290,6 +340,92 @@ class VideoPlayerV3ViewModel(
             showPreviewTip = false
         }
     }
+
+    private suspend fun handleVVoucher(
+        vVoucher: String,
+        retryRequest: GeetestRetryRequest,
+    ) {
+        runCatchingCancellable {
+            val challenge = geetestSession.start(vVoucher)
+            pendingRetryRequest = retryRequest
+            geetestGt = challenge.gt
+            geetestChallenge = challenge.challenge
+            showGeetestDialog = true
+            addLogs("请完成人机验证")
+        }.onFailure {
+            if (it is VVoucherAlreadyAttemptedException) {
+                logger.fWarn { "Skip duplicated Geetest verification: ${it.message}" }
+                addLogs("风控验证已申请过，跳过重复弹窗")
+                errorMessage = "风控验证已申请，请稍后重试"
+                loadState = RequestState.Failed
+                return@onFailure
+            }
+            addLogs("风控验证申请失败：${it.localizedMessage}")
+            errorMessage = "风控验证申请失败：${it.localizedMessage}"
+            loadState = RequestState.Failed
+            logger.fException(it) { "gaiaVgateRegister failed" }
+        }
+    }
+
+    fun onGeetestResult(challenge: String, validate: String, seccode: String) {
+        val retryRequest = pendingRetryRequest ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            when (val result = geetestSession.submit(challenge, validate, seccode)) {
+                is GeetestSubmitResult.StaleChallenge -> {
+                    // 失败重试后极验会回传另一个 challenge，其 token 已被服务端丢弃，提交必然失败
+                    logger.fWarn {
+                        "Ignore stale Geetest result: expected=${result.expected.take(8)} actual=${result.actual.take(8)}"
+                    }
+                    addLogs("人机验证信息已失效，请重新验证")
+                    errorMessage = "人机验证信息已失效，请重新验证"
+                    loadState = RequestState.Failed
+                    clearGeetestState()
+                }
+
+                is GeetestSubmitResult.Failure -> {
+                    addLogs("风控验证失败：${result.message}")
+                    logger.fException(result.cause) { "gaiaVgateValidate failed" }
+                    errorMessage = "风控验证失败：${result.message}"
+                    loadState = RequestState.Failed
+                    clearGeetestState()
+                }
+
+                GeetestSubmitResult.Success -> {
+                    clearGeetestState()
+                    addLogs("风控验证通过")
+                    logger.fInfo { "Gaia vgate validate success, retrying play url" }
+                    if (!isCurrentGeetestPlaybackSession(retryRequest)) {
+                        logger.fWarn { "Skip Geetest retry: playback session changed" }
+                        return@launch
+                    }
+                    // 验证通过后按快照重试原请求：成功后沿用原有 playQuality 流程自动起播
+                    loadPlayUrl(
+                        avid = retryRequest.avid,
+                        cid = retryRequest.cid,
+                        epid = retryRequest.epid,
+                        proxyArea = retryRequest.proxyArea,
+                    )
+                }
+            }
+        }
+    }
+
+    fun onGeetestCancelled() {
+        clearGeetestState()
+        addLogs("用户取消了风控验证")
+        errorMessage = "验证已取消"
+        loadState = RequestState.Failed
+    }
+
+    private fun clearGeetestState() {
+        showGeetestDialog = false
+        pendingRetryRequest = null
+        geetestSession.clear()
+    }
+
+    /** 校验触发风控的播放会话是否仍是当前会话，避免验证结果作用于已切换的视频 */
+    private fun isCurrentGeetestPlaybackSession(retryRequest: GeetestRetryRequest): Boolean =
+        currentAid == retryRequest.avid && currentCid == retryRequest.cid
 
     private suspend fun updateAvailableCodec() {
         val codecSelection = playUrlResolver.selectCodec(
