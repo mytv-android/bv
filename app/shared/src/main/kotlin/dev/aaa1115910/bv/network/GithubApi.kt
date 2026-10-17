@@ -103,6 +103,8 @@ object GithubApi {
             client.get(url) {
                 parameter("per_page", pageSize)
                 parameter("page", page)
+                // gh-proxy 类镜像有 CDN 缓存，加分钟级时间戳防止返回过期的列表
+                parameter("t", System.currentTimeMillis() / 60_000)
             }
         )
     }
@@ -119,13 +121,21 @@ object GithubApi {
     }
 
     suspend fun getLatestPreReleaseBuild(): Release {
-        // 发布的 Alpha 构建都在前几页，没必要把历史上百个 release 全翻一遍
+        // 发布的 Alpha 构建都在前几页，没必要把历史上百个 release 全翻一遍。
+        // 加速镜像可能缓存旧列表，不能依赖接口顺序取 first()，
+        // 改为翻页收集后按 versionCode 取数值最大的 prerelease。
+        var best: Release? = null
         for (page in 1..MAX_RELEASE_PAGES) {
             val releases = getReleases(page = page)
             if (releases.isEmpty()) break
-            releases.firstOrNull { it.isPreRelease }?.let { return it }
+            for (release in releases) {
+                if (!release.isPreRelease) continue
+                if ((release.revision ?: Int.MIN_VALUE) >= (best?.revision ?: Int.MIN_VALUE)) {
+                    best = release
+                }
+            }
         }
-        throw GithubApiException("没有找到 Alpha 构建")
+        return best ?: throw GithubApiException("没有找到 Alpha 构建")
     }
 
     suspend fun getLatestReleaseBuild(): Release = getLatestRelease()
