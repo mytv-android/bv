@@ -61,6 +61,36 @@ class DanmakuMaskTest {
         }
     }
 
+    @Test
+    fun `web mask frames cover the end of every non-last segment`() {
+        val maskFile = Any::class::class.java.getResource("/3540266_25_2.exp.webmask")!!
+        val binary = File(maskFile.toURI()).readBytes()
+        val mask = DanmakuMask.fromBinary(binary, DanmakuMaskType.WebMask)
+
+        // 服务端每段通常少生成最后一帧，末帧结束时间比下一段起点早约一帧（~40ms）。
+        // 若不把末帧延伸到本段末尾，消费端在段边界取不到蒙版帧，表现为每 ~10s 闪烁一次。
+        mask.segments.dropLast(1).forEach { segment ->
+            val lastFrame = segment.frames.last()
+            assert(lastFrame.range.last >= segment.range.last) {
+                "segment ${segment.range} has tail gap: " +
+                    "last frame ${lastFrame.range} does not reach the segment end"
+            }
+        }
+    }
+
+    @Test
+    fun `web mask last segment is not extended`() {
+        val maskFile = Any::class::class.java.getResource("/3540266_25_2.exp.webmask")!!
+        val binary = File(maskFile.toURI()).readBytes()
+        val mask = DanmakuMask.fromBinary(binary, DanmakuMaskType.WebMask)
+
+        // 末段没有下一段可衔接，延伸到段末尾（Long.MAX_VALUE - 1）会让蒙版在数据结束后一直残留
+        val lastSegment = mask.segments.last()
+        assert(lastSegment.frames.last().range.last < Long.MAX_VALUE - 1) {
+            "last segment must not be extended to the segment end"
+        }
+    }
+
     @OptIn(ExperimentalStdlibApi::class)
     @Test
     fun `parse mob mask file and output`() {
