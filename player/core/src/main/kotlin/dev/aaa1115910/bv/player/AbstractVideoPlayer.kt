@@ -13,8 +13,21 @@ abstract class AbstractVideoPlayer {
     /** 设置请求头 */
     abstract fun setHeader(headers: Map<String, String>)
 
-    /** 设置播放地址 */
+    /** 设置播放地址（单地址，行为与之前完全一致） */
     abstract fun playUrl(videoUrl: String? = null, audioUrl: String? = null)
+
+    /**
+     * 设置候选播放地址列表：用第一个地址起播，播放失败或频繁缓冲时自动切到下一个候选。
+     *
+     * 默认实现只播放第一个地址（等价于旧签名），需要自动切换的播放器实现应覆盖此方法。
+     * [videoUrls] 为空时不会起播。
+     */
+    open fun playUrl(videoUrls: List<String>, audioUrls: List<String> = emptyList()) {
+        playUrl(videoUrls.firstOrNull(), audioUrls.firstOrNull())
+    }
+
+    /** 运行时开关「播放失败/频繁缓冲自动切候选」；默认实现忽略（仅单地址能力） */
+    open fun setCdnFailoverEnabled(enabled: Boolean) {}
 
     /** 准备开始播放 */
     abstract fun prepare()

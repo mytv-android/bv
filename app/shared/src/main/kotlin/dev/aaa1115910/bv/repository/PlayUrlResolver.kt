@@ -217,12 +217,17 @@ class PlayUrlResolver(
      * @param audioUrl 音频地址；为 null 表示只有视频流（或视频地址本身已含音频）
      * @param video 与所选清晰度、编码完全匹配的视频流；为 null 表示没有匹配项，[videoUrl] 取自第一条视频流
      * @param audio 所选音频流
+     * @param videoUrls 视频候选地址：首个就是 [videoUrl]，其后是备用 CDN（已去重）。
+     *   启用代理时只有替换后的单个地址，避免切到未经代理的备用地址
+     * @param audioUrls 音频候选地址：首个就是 [audioUrl]，其后是备用 CDN；无音频流时为空
      */
     data class SelectedStreams(
         val videoUrl: String,
         val audioUrl: String?,
         val video: DashVideo?,
-        val audio: DashAudio?
+        val audio: DashAudio?,
+        val videoUrls: List<String> = listOf(videoUrl),
+        val audioUrls: List<String> = listOfNotNull(audioUrl)
     )
 
     /**
@@ -274,13 +279,20 @@ class PlayUrlResolver(
         logger.fInfo { "all audio hosts: ${audioUrls.map { it.urlHost() }}" }
 
         //replace cdn
+        val selectedVideoUrls: List<String>
+        val selectedAudioUrls: List<String>
         if (enableProxy && proxyArea != ProxyArea.MainLand) {
             videoUrl = videoUrl.replaceUrlDomainWithAliCdn()
             audioUrl = audioUrl?.replaceUrlDomainWithAliCdn()
+            // 代理场景不暴露原始备用地址，避免自动切换绕过代理
+            selectedVideoUrls = listOf(videoUrl)
+            selectedAudioUrls = listOfNotNull(audioUrl)
         } else {
             // 如果未通过网络代理获得播放地址，才判断是否应该替换为官方 cdn
             videoUrl = selectOfficialCdnUrl(videoUrls, preferOfficialCdn)
             audioUrl = if (audioUrls.isNotEmpty()) selectOfficialCdnUrl(audioUrls, preferOfficialCdn) else null
+            selectedVideoUrls = candidateUrls(videoUrl, videoUrls)
+            selectedAudioUrls = audioUrl?.let { candidateUrls(it, audioUrls) } ?: emptyList()
         }
         logger.fInfo { "Select audio: $audioItem" }
 
@@ -288,9 +300,18 @@ class PlayUrlResolver(
             videoUrl = videoUrl,
             audioUrl = audioUrl,
             video = videoItem,
-            audio = audioItem
+            audio = audioItem,
+            videoUrls = selectedVideoUrls,
+            audioUrls = selectedAudioUrls
         )
     }
+
+    /**
+     * 候选地址列表：当前选中的地址放首位，其余保持接口返回顺序（已去重）。
+     * 供起播测速排序与播放失败自动切换使用；列表首项始终等于选中地址。
+     */
+    private fun candidateUrls(selectedUrl: String, urls: List<String>): List<String> =
+        (listOf(selectedUrl) + urls.filter { it.isNotBlank() }).distinct()
 
     /**
      * 一次解析的完整结果
@@ -302,6 +323,8 @@ class PlayUrlResolver(
      * @param height 视频流高度（未知时为 0）
      * @param availableQualities 全部可选清晰度（不受上限影响，可用于手动切换）
      * @param availableCodecs 所选清晰度下可用的编码；接口未给出时为空列表
+     * @param videoUrls 视频候选地址：首个就是 [videoUrl]，其后为备用 CDN
+     * @param audioUrls 音频候选地址：首个就是 [audioUrl]，其后为备用 CDN；无音频流时为空
      */
     data class ResolvedPlayUrl(
         val aid: Long,
@@ -316,7 +339,9 @@ class PlayUrlResolver(
         val availableQualities: List<Resolution>,
         val availableCodecs: List<VideoCodec>,
         val availableAudios: List<Audio>,
-        val playData: PlayData
+        val playData: PlayData,
+        val videoUrls: List<String> = listOf(videoUrl),
+        val audioUrls: List<String> = listOfNotNull(audioUrl)
     )
 
     /**
@@ -382,7 +407,9 @@ class PlayUrlResolver(
             availableQualities = qualities,
             availableCodecs = codecSelection.available.orEmpty(),
             availableAudios = audios,
-            playData = playData
+            playData = playData,
+            videoUrls = streams.videoUrls,
+            audioUrls = streams.audioUrls
         )
     }
 
