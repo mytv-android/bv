@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStore
 import androidx.webkit.WebViewCompat
 import de.schnettler.datastore.manager.DataStoreManager
+import dev.aaa1115910.biliapi.http.BiliHttpApi
 import dev.aaa1115910.biliapi.http.BiliHttpProxyApi
 import dev.aaa1115910.biliapi.http.util.BiliAppConf
 import dev.aaa1115910.biliapi.http.util.BiliWebConf
@@ -20,6 +21,7 @@ import dev.aaa1115910.bv.dao.AppDatabase
 import dev.aaa1115910.bv.entity.AuthData
 import dev.aaa1115910.bv.entity.db.UserDB
 import dev.aaa1115910.bv.network.HttpServer
+import dev.aaa1115910.bv.player.PlayerHttpClient
 import dev.aaa1115910.bv.util.BlacklistUtil
 import dev.aaa1115910.bv.util.FirebaseUtil
 import dev.aaa1115910.bv.util.LogCatcherUtil
@@ -69,6 +71,7 @@ class BVApp : Application() {
         initApiConfig()
         initRepository()
         initProxy()
+        warmUpApi()
         instance = this
         updateMigration()
         HttpServer.startServer()
@@ -117,6 +120,13 @@ class BVApp : Application() {
                     Prefs.proxyGRPCServer
                 )
             }
+        }
+    }
+
+    private fun warmUpApi() {
+        CoroutineScope(Dispatchers.IO).launch {
+            BiliHttpApi.warmUpClient()
+            PlayerHttpClient.preheat(this@BVApp)
         }
     }
 
