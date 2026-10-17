@@ -36,6 +36,7 @@ import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
 import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.Executors
@@ -153,7 +154,7 @@ object LiveDataWebSocket {
             val listener = object : WebSocketListener() {
                 override fun onOpen(webSocket: WebSocket, response: Response) {
                     logger.info { "WebSocket opened to ${host.host}:${host.wssPort}" }
-                    webSocket.send(ByteString.of(authPacket, 0, authPacket.size))
+                    webSocket.send(authPacket.toByteString(0, authPacket.size))
 
                     // 6s 内未收到认证回复视为超时
                     authTimeoutTask?.cancel(false)
@@ -179,8 +180,8 @@ object LiveDataWebSocket {
                                     // 鉴权后 5s 发第一次心跳，之后每 30s 一次
                                     heartbeatTask = scheduler.scheduleWithFixedDelay({
                                         webSocket.send(
-                                            ByteString.of(
-                                                heartbeatPacket, 0, heartbeatPacket.size
+                                            heartbeatPacket.toByteString(
+                                                0, heartbeatPacket.size
                                             )
                                         )
                                     }, 5, 30, TimeUnit.SECONDS)
