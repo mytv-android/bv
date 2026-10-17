@@ -60,6 +60,7 @@ import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoShotData
 import dev.aaa1115910.bv.player.entity.VideoListItemData
 import dev.aaa1115910.bv.player.ui.BottomSubtitle
 import dev.aaa1115910.bv.player.ui.BufferingTip
+import dev.aaa1115910.bv.player.ui.PaidRequireTip
 import dev.aaa1115910.bv.player.ui.PlayErrorTip
 import dev.aaa1115910.bv.player.ui.PlayerController
 import dev.aaa1115910.bv.player.ui.PreviewTip
