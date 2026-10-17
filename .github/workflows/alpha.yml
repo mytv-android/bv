@@ -79,9 +79,13 @@ jobs:
       - name: Get changelog
         id: changelog
         run: |
+          # 失败的构建不产出 release，其提交会被跳过；改为列出上一个 alpha tag 之后的全部提交
+          git fetch --tags --force --quiet
+          PREV_TAG=$(git describe --tags --match "alpha-r*" --abbrev=0 2>/dev/null || true)
+          RANGE="${PREV_TAG:+$PREV_TAG..}HEAD"
           {
             echo "changelog<<EOF"
-            echo "$(git log --pretty=format:"- %s (%h)" ${{ github.event.before }}..${{ github.sha }})"
+            git log --pretty=format:"- %s (%h)" $RANGE
             echo "EOF"
           } >> "$GITHUB_ENV"
 
