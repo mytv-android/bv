@@ -375,8 +375,12 @@ internal fun ShortsTv(
                                     val tap = leftPending && !leftSeeking
                                     leftPending = false
                                     leftSeeking = false
-                                    // 短按 ← 与其它页面一致：焦点移到左侧导航轨；没有可移动目标时兜底快退
-                                    if (tap && !focusManager.moveFocus(FocusDirection.Left)) seek(false)
+                                    // 短按 ← 呼出导航轨。横屏画面铺满整屏，2D 焦点搜索找不到「更左边」的导轨项，
+                                    // moveFocus(Left) 会失败，所以直接请求导轨焦点（与外壳返回键同一通路）。
+                                    if (tap) {
+                                        revealInfo()
+                                        revealRail?.invoke()
+                                    }
                                 }
                                 true
                             }
