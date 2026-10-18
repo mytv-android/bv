@@ -184,13 +184,18 @@ internal fun ShortsTv(
         pool.update(safeIndex, items)
     }
     LoadCommentsEffect(current?.aid, comments)
-    // 初始焦点在视频框；评论面板打开时焦点进面板，关闭后回到视频框
+    // 初始焦点在视频框；评论面板打开时焦点进面板，关闭后回到视频框。
+    // 页面进入时的请求可能撞上转场被丢掉，重试几次，否则焦点留在导航轨上、自动隐藏不生效。
     LaunchedEffect(panelOpen) {
         if (panelOpen) {
             delay(50)
             runCatching { panelRequester.requestFocus() }
         } else {
-            runCatching { frameRequester.requestFocus() }
+            repeat(6) {
+                withFrameNanos { }
+                if (runCatching { frameRequester.requestFocus() }.getOrDefault(false)) return@LaunchedEffect
+                delay(120)
+            }
         }
     }
     // 横屏播放中 3 秒无操作后隐藏整个信息层；暂停、焦点在信息层上时保持可见

@@ -90,9 +90,12 @@ fun TvRail(
     var wasFocused by remember { mutableStateOf(false) }
     var hidden by remember { mutableStateOf(false) }
     var collapsed by remember { mutableStateOf(false) }
-    // 进入导航轨、或导轨聚焦期间页面被切走（例如返回键）时，把焦点同步到当前页面对应的项。
-    // 补一次是因为 onFocusChanged 时目标可能还没挂上 focusRequester。
-    LaunchedEffect(current, wasFocused) {
+    // 导轨聚焦期间页面被切走（例如确认键切换）时，把焦点同步到新页面对应的项。
+    // 延迟是为了给新页面的初始焦点请求让路，避免导轨把焦点抢回去导致自动隐藏不生效；
+    // 复查 wasFocused：新页面拿到焦点后就不再抢。
+    LaunchedEffect(current) {
+        if (!wasFocused) return@LaunchedEffect
+        delay(250L)
         if (wasFocused) runCatching { selectedRequester.requestFocus() }
     }
     // 全屏页面播放中自动隐藏导航轨；焦点进入或离开自动隐藏页面时立即恢复显示。
