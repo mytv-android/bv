@@ -15,8 +15,10 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -47,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -56,11 +59,14 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -91,30 +97,32 @@ import dev.aaa1115910.bv.ui.designsystem.icon.BvIcons
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.ui.designsystem.theme.CoverTheme
 import dev.aaa1115910.bv.ui.designsystem.theme.LocalThemePrefs
+import dev.aaa1115910.bv.ui.navigation.LocalTvRailReveal
 import dev.aaa1115910.bv.viewmodel.ShortsViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-private val FrameWidth = 273.dp
-private val FrameHeight = 486.dp
+/** 竖屏视频顶天立地：宽度按屏幕高度 9:16 计算（960×540 画布下为 304×540）。 */
+private val PortraitWidth = 304.dp
+private val PortraitX = 300.dp
 
-/** 横屏视频：16:9 大画面，信息改成画面下方的横向信息条（设计稿：电视/平板横屏直接用横向布局）。 */
-private val LandscapeFrameWidth = 704.dp
-private val LandscapeFrameHeight = LandscapeFrameWidth * 9f / 16f
-private val LandscapeFrameX = 180.dp
-private val LandscapeFrameY = 27.dp
+/** 横屏信息层 3 秒无操作后自动隐藏；隐藏后按任意方向键唤回。 */
+private const val InfoAutoHideMs = 3_000L
 
 /** 按住 ← 多久后开始快退；短按则把焦点移回左侧导航轨。 */
 private const val LeftHoldSeekMs = 350L
 
 /**
- * 电视刷刷（原型 shortsTv）：整屏氛围光 + 左侧播放队列 + 中间视频框（初始焦点）+ 右侧信息区。
- * 竖屏视频用 273×486 的竖框 + 右侧信息列；横屏视频改成 16:9 大画面 + 画面下方的横向信息条。
- * 导航轨由外壳叠加。整页包在当前视频的 CoverTheme 里，换条时颜色动画过渡。
+ * 电视刷刷（原型 shortsTv）：整屏氛围光 + 视频舞台（初始焦点）。
+ * 竖屏视频顶天立地（304×540），左侧播放队列、右侧信息列；
+ * 横屏视频直接铺满整屏，标题 / UP / 操作按钮 / 进度条叠在底部渐变上；
+ * 横屏播放 3 秒无操作后信息层整体隐藏，只剩画面，任意方向键唤回。
+ * 导航轨由外壳叠加，播放中自动隐藏，← 或左缘右滑手势呼出。
+ * 整页包在当前视频的 CoverTheme 里，换条时颜色动画过渡。
  *
- * 遥控器（焦点在视频框上）：↑ / 频道+ 上一条，↓ / 频道− 下一条；← 单按移到左侧导航轨（与其他页面一致），
- * 按住才快退 5 秒并连按加速（媒体快退键始终快退）；→ 单按移到操作按钮（横屏为下方信息条），
+ * 遥控器（焦点在视频框上）：↑ / 频道+ 上一条，↓ / 频道− 下一条；← 单按呼出导航轨，
+ * 按住才快退 5 秒并连按加速（媒体快退键始终快退）；→ 单按移到操作按钮（横屏为底部信息层），
  * 按住或快退快进过程中继续按为快进；
  * 确认暂停 / 继续；长按确认点赞；菜单键打开评论面板。
  */
@@ -145,7 +153,15 @@ internal fun ShortsTv(
     val videoHeight = currentSlot?.videoHeight?.takeIf { it > 0 } ?: (current?.height ?: 0)
     val landscape = videoHeight > 0 && videoWidth > videoHeight
     val portrait = !landscape
-    val frameSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Dp>()
+    var infoVisible by remember { mutableStateOf(true) }
+    var infoFocused by remember { mutableStateOf(false) }
+    var interactionTick by remember { mutableIntStateOf(0) }
+    val playing = currentSlot?.isPlaying == true && !pool.userPaused
+    val revealInfo: () -> Unit = {
+        infoVisible = true
+        interactionTick++
+    }
+    val revealRail = LocalTvRailReveal.current
 
     // 快进快退（沿用旧电视播放器：200ms 内连按计数，每 5 次步长加 5 秒）
     var seekTarget by remember { mutableLongStateOf(-1L) }
@@ -175,6 +191,16 @@ internal fun ShortsTv(
         } else {
             runCatching { frameRequester.requestFocus() }
         }
+    }
+    // 横屏播放中 3 秒无操作后隐藏整个信息层；暂停、焦点在信息层上时保持可见
+    LaunchedEffect(landscape, safeIndex, current?.aid, interactionTick, infoFocused, playing) {
+        if (!landscape || infoFocused || !playing) {
+            infoVisible = true
+            return@LaunchedEffect
+        }
+        infoVisible = true
+        delay(InfoAutoHideMs)
+        infoVisible = false
     }
 
     val go: (Int) -> Unit = { delta ->
@@ -220,9 +246,36 @@ internal fun ShortsTv(
     }
 
     CoverTheme(current?.cover, forceDark = true) {
-        Box(
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
+                // 电视遥控器的「手势」：从屏幕左缘向右滑，呼出导航轨
+                .pointerInput(revealRail) {
+                    val edgeWidth = size.width * 0.12f
+                    val threshold = 64.dp.toPx()
+                    var fromEdge = false
+                    var distance = 0f
+                    detectHorizontalDragGestures(
+                        onDragStart = { offset ->
+                            fromEdge = offset.x <= edgeWidth
+                            distance = 0f
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            if (fromEdge) {
+                                distance += dragAmount
+                                change.consume()
+                            }
+                        },
+                        onDragEnd = {
+                            if (fromEdge && distance > threshold) {
+                                revealInfo()
+                                revealRail?.invoke()
+                            }
+                            fromEdge = false
+                        },
+                        onDragCancel = { fromEdge = false },
+                    )
+                }
                 .onBvKey { key ->
                     when (key) {
                         BvKey.Menu -> {
@@ -244,28 +297,11 @@ internal fun ShortsTv(
                     }
                 }
         ) {
-            // 竖屏保持原型 273×486；横屏用 16:9 大画面，顶部与竖屏框对齐，下方留出信息条
-            val frameWidth by animateDpAsState(
-                if (portrait) FrameWidth else LandscapeFrameWidth,
-                frameSpec,
-                label = "shortsTvFrameWidth",
-            )
-            val frameHeight by animateDpAsState(
-                if (portrait) FrameHeight else LandscapeFrameHeight,
-                frameSpec,
-                label = "shortsTvFrameHeight",
-            )
-            val frameX by animateDpAsState(
-                if (portrait) 300.dp else LandscapeFrameX,
-                frameSpec,
-                label = "shortsTvFrameX",
-            )
-            val frameY by animateDpAsState(
-                if (portrait) 27.dp else LandscapeFrameY,
-                frameSpec,
-                label = "shortsTvFrameY",
-            )
-            val frameCenter = with(density) { Offset(frameWidth.toPx() / 2, frameHeight.toPx() / 2) }
+            val screenHeight = maxHeight
+            val frameCenter = with(density) {
+                if (landscape) Offset(maxWidth.toPx() / 2, screenHeight.toPx() / 2)
+                else Offset((PortraitX + PortraitWidth * 0.5f).toPx(), screenHeight.toPx() / 2)
+            }
 
             Ambient(current?.cover)
             Box(
@@ -274,13 +310,15 @@ internal fun ShortsTv(
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = .5f))
             )
 
-            // 播放队列：上一条、当前、下两条
-            Column(
-                Modifier.offset(x = 110.dp, y = 60.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                for (i in (safeIndex - 1)..(safeIndex + 2)) {
-                    QueueThumb(item = items.getOrNull(i), isCurrent = i == safeIndex)
+            // 播放队列只在竖屏保留；横屏全屏时收起
+            if (portrait) {
+                Column(
+                    Modifier.offset(x = 110.dp, y = 60.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    for (i in (safeIndex - 1)..(safeIndex + 2)) {
+                        QueueThumb(item = items.getOrNull(i), isCurrent = i == safeIndex)
+                    }
                 }
             }
 
@@ -290,13 +328,20 @@ internal fun ShortsTv(
             val slidePx = with(density) { 40.dp.roundToPx() }
             Box(
                 Modifier
-                    .offset(x = frameX, y = frameY)
-                    .size(frameWidth, frameHeight)
+                    .then(
+                        if (portrait) Modifier
+                            .offset(x = PortraitX)
+                            .width(PortraitWidth)
+                            .fillMaxHeight()
+                        else Modifier.fillMaxSize()
+                    )
                     .onPreviewKeyEvent { event ->
                         val key = event.toBvKey() ?: return@onPreviewKeyEvent false
                         val down = event.type == KeyEventType.KeyDown
                         val up = event.type == KeyEventType.KeyUp
                         val repeat = event.nativeKeyEvent.repeatCount
+                        // 任意按键都把横屏信息层唤回，并重新计时
+                        if (down && repeat == 0) revealInfo()
                         when (key) {
                             BvKey.Up -> {
                                 if (down) go(-1)
@@ -357,8 +402,16 @@ internal fun ShortsTv(
                                     }
                                 } else if (up && rightPending) {
                                     rightPending = false
-                                    // 横屏的信息条在画面下方，右边没有可聚焦项，直接把焦点交给第一个操作按钮
-                                    if (!landscape || !runCatching { landscapeActionsRequester.requestFocus() }.getOrDefault(false)) {
+                                    if (landscape) {
+                                        // 信息层可能已经自动隐藏，先唤回再请求焦点
+                                        revealInfo()
+                                        scope.launch {
+                                            withFrameNanos { }
+                                            if (!runCatching { landscapeActionsRequester.requestFocus() }.getOrDefault(false)) {
+                                                focusManager.moveFocus(FocusDirection.Right)
+                                            }
+                                        }
+                                    } else {
                                         focusManager.moveFocus(FocusDirection.Right)
                                     }
                                 }
@@ -396,8 +449,8 @@ internal fun ShortsTv(
                         }
                     }
                     .focusRequester(frameRequester)
-                    .bvFocus(scale = 1.05f, corner = 24.dp, glow = 16.dp, addFocusable = true)
-                    .clip(RoundedCornerShape(24.dp))
+                    .bvFocus(scale = if (landscape) 1f else 1.05f, corner = 0.dp, glow = 16.dp, addFocusable = true)
+                    .clip(RoundedCornerShape(0.dp))
                     .background(Color.Black)
             ) {
                 AnimatedContent(
@@ -414,22 +467,24 @@ internal fun ShortsTv(
                             if (!item.isPortrait) Ambient(item.cover)
                             ShortsVideo(pool, item, Modifier.fillMaxSize(), crop = !landscape)
                             CinemaScrim()
-                            ShortsProgress(
-                                pool = pool,
-                                item = item,
-                                modifier = Modifier
-                                    .align(Alignment.BottomStart)
-                                    .padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
-                                seekable = false,
-                                overrideMs = seekTarget.takeIf { it >= 0 && pool.currentAid == item.aid },
-                            )
+                            if (portrait) {
+                                ShortsProgress(
+                                    pool = pool,
+                                    item = item,
+                                    modifier = Modifier
+                                        .align(Alignment.BottomStart)
+                                        .padding(start = 14.dp, end = 14.dp, bottom = 14.dp),
+                                    seekable = false,
+                                    overrideMs = seekTarget.takeIf { it >= 0 && pool.currentAid == item.aid },
+                                )
+                            }
                         }
                     }
                 }
                 HeartLayer(hearts)
             }
 
-            // 信息区：竖屏在右侧；横屏改成画面下方的一条横向信息条
+            // 信息区：竖屏在右侧常驻；横屏是画面底部的信息层，播放 3 秒无操作后整体淡出
             if (current != null) {
                 if (portrait) {
                     TvInfo(
@@ -439,21 +494,31 @@ internal fun ShortsTv(
                         actions = actions,
                         onOpenComments = { panelOpen = true },
                         modifier = Modifier
-                            .offset(x = 600.dp, y = 60.dp)
-                            .width(312.dp),
+                            .offset(x = 632.dp, y = 60.dp)
+                            .width(280.dp),
                     )
                 } else {
-                    TvLandscapeInfo(
-                        item = current,
-                        vm = vm,
-                        actions = actions,
-                        onOpenComments = { panelOpen = true },
-                        firstActionRequester = landscapeActionsRequester,
-                        frameRequester = frameRequester,
+                    AnimatedVisibility(
+                        visible = infoVisible,
+                        enter = fadeIn(fadeSpec),
+                        exit = fadeOut(fadeSpec),
                         modifier = Modifier
-                            .offset(x = frameX, y = frameY + frameHeight + 8.dp)
-                            .width(frameWidth),
-                    )
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth(),
+                    ) {
+                        TvLandscapeInfo(
+                            item = current,
+                            vm = vm,
+                            pool = pool,
+                            actions = actions,
+                            onOpenComments = { panelOpen = true },
+                            firstActionRequester = landscapeActionsRequester,
+                            frameRequester = frameRequester,
+                            seekOverrideMs = seekTarget.takeIf { it >= 0 && pool.currentAid == current.aid },
+                            onFocusChanged = { infoFocused = it },
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
             }
 
@@ -645,116 +710,180 @@ private fun TvInfo(
 }
 
 /**
- * 横屏视频的信息条（画面下方）：第一行标题 + 5 个操作按钮，第二行作者 / 关注 / 标签与点赞数。
- * 横屏时右边没有可聚焦项，→ 由外壳直接请求 firstActionRequester；← 从第一个按钮或关注按钮回到视频。
+ * 横屏视频的全屏信息层：底部渐变上叠 UP 主 / 标题 / 5 个操作按钮和进度条。
+ * 播放 3 秒无操作后由外层整体淡出；→ 由外层请求 firstActionRequester，← 从第一个按钮或关注按钮回到视频。
  */
 @Composable
 private fun TvLandscapeInfo(
     item: ShortsItem,
     vm: ShortsViewModel,
+    pool: ShortsPlayerPool,
     actions: ShortsActions,
     onOpenComments: () -> Unit,
     firstActionRequester: FocusRequester,
     frameRequester: FocusRequester,
+    seekOverrideMs: Long?,
+    onFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state = vm.actionStateOf(item.aid)
     val following = vm.isFollowing(item.author.mid) == true
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                item.title,
-                modifier = Modifier.weight(1f),
-                style = BvType.TitleLarge.copy(lineHeight = 27.5.sp),
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+    val meta = item.metaLine()
+    val likeLabel = item.likeCount?.let { shortsCount(it) }.orEmpty()
+    val favoriteLabel = item.favoriteCount?.let { shortsCount(it) }.orEmpty()
+    val commentLabel = item.replyCount?.let { shortsCount(it) }.orEmpty()
+    Box(
+        modifier
+            .background(
+                Brush.verticalGradient(
+                    0f to Color.Transparent,
+                    0.35f to Color.Black.copy(alpha = .55f),
+                    1f to Color.Black.copy(alpha = .9f),
+                )
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TvActionButton(
-                    icon = Icons.Filled.ThumbUp,
-                    description = stringResource(R.string.shorts_like),
-                    active = state.liked,
-                    onClick = { actions.like(item) },
-                    modifier = Modifier
-                        .focusRequester(firstActionRequester)
-                        .focusProperties { left = frameRequester },
-                )
-                TvActionButton(
-                    icon = BvIcons.Coin,
-                    description = stringResource(R.string.shorts_coin),
-                    active = state.coinCount > 0,
-                    onClick = { actions.coin(item) },
-                )
-                TvActionButton(
-                    icon = Icons.Filled.Star,
-                    description = stringResource(R.string.shorts_favorite),
-                    active = state.favoured,
-                    onClick = { actions.favorite(item) },
-                )
-                TvActionButton(
-                    icon = Icons.Filled.ChatBubble,
-                    description = stringResource(R.string.shorts_comment),
-                    active = false,
-                    onClick = onOpenComments,
-                )
-                TvActionButton(
-                    icon = Icons.Filled.Info,
-                    description = stringResource(R.string.shorts_detail),
-                    active = false,
-                    onClick = { actions.openVideo(item) },
-                )
+            .onFocusChanged { onFocusChanged(it.hasFocus) }
+            .padding(start = 96.dp, end = 48.dp, top = 120.dp, bottom = 27.dp),
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        BvAvatar(url = item.author.face, size = 44.dp, fallbackText = item.author.name)
+                        Column(
+                            Modifier.weight(1f, fill = false),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text(
+                                item.author.name,
+                                style = BvType.Body.copy(fontWeight = FontWeight.Bold),
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                            item.authorFans?.let { fans ->
+                                Text(
+                                    stringResource(R.string.shorts_fans, shortsCount(fans)),
+                                    style = BvType.Meta,
+                                    color = Color.White.copy(alpha = .8f),
+                                    maxLines = 1,
+                                )
+                            }
+                        }
+                        if (item.author.mid > 0) {
+                            BvButton(
+                                text = stringResource(if (following) R.string.shorts_followed else R.string.shorts_follow),
+                                onClick = { actions.follow(item) },
+                                modifier = Modifier.focusProperties { left = frameRequester },
+                                style = BvButtonStyle.Tonal,
+                                icon = if (following) Icons.Filled.Check else Icons.Filled.Add,
+                                height = 34.dp,
+                                horizontalPadding = 14.dp,
+                            )
+                        }
+                    }
+                    Text(
+                        item.title,
+                        style = BvType.Display.copy(fontSize = 32.sp, lineHeight = 38.sp),
+                        color = Color.White,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    if (meta.isNotEmpty()) {
+                        Text(
+                            meta,
+                            style = BvType.Meta.copy(fontSize = 13.sp, lineHeight = 18.sp),
+                            color = Color.White.copy(alpha = .85f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    LandscapeAction(
+                        icon = Icons.Filled.ThumbUp,
+                        description = stringResource(R.string.shorts_like),
+                        label = likeLabel,
+                        active = state.liked,
+                        onClick = { actions.like(item) },
+                        modifier = Modifier
+                            .focusRequester(firstActionRequester)
+                            .focusProperties { left = frameRequester },
+                    )
+                    LandscapeAction(
+                        icon = BvIcons.Coin,
+                        description = stringResource(R.string.shorts_coin),
+                        label = stringResource(R.string.shorts_coin),
+                        active = state.coinCount > 0,
+                        onClick = { actions.coin(item) },
+                    )
+                    LandscapeAction(
+                        icon = Icons.Filled.Star,
+                        description = stringResource(R.string.shorts_favorite),
+                        label = favoriteLabel,
+                        active = state.favoured,
+                        onClick = { actions.favorite(item) },
+                    )
+                    LandscapeAction(
+                        icon = Icons.Filled.ChatBubble,
+                        description = stringResource(R.string.shorts_comment),
+                        label = commentLabel,
+                        active = false,
+                        onClick = onOpenComments,
+                    )
+                    LandscapeAction(
+                        icon = Icons.Filled.Info,
+                        description = stringResource(R.string.shorts_detail),
+                        label = stringResource(R.string.shorts_detail),
+                        active = false,
+                        onClick = { actions.openVideo(item) },
+                    )
+                }
             }
+            ShortsProgress(
+                pool = pool,
+                item = item,
+                modifier = Modifier.fillMaxWidth(),
+                seekable = false,
+                overrideMs = seekOverrideMs,
+            )
         }
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            BvAvatar(url = item.author.face, size = 32.dp, fallbackText = item.author.name)
+    }
+}
+
+/** 横屏信息层的操作按钮：图标 + 下方计数 / 文案。 */
+@Composable
+private fun LandscapeAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    label: String,
+    active: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        TvActionButton(
+            icon = icon,
+            description = description,
+            active = active,
+            onClick = onClick,
+            modifier = modifier,
+        )
+        if (label.isNotEmpty()) {
             Text(
-                item.author.name,
-                modifier = Modifier.weight(1f, fill = false),
-                style = BvType.Body.copy(fontWeight = FontWeight.Bold),
-                color = MaterialTheme.colorScheme.onSurface,
+                label,
+                style = BvType.Meta.copy(fontWeight = FontWeight.SemiBold),
+                color = Color.White.copy(alpha = .9f),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
-            item.authorFans?.let { fans ->
-                Text(
-                    stringResource(R.string.shorts_fans, shortsCount(fans)),
-                    style = BvType.Meta,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                )
-            }
-            if (item.author.mid > 0) {
-                BvButton(
-                    text = stringResource(if (following) R.string.shorts_followed else R.string.shorts_follow),
-                    onClick = { actions.follow(item) },
-                    modifier = Modifier.focusProperties { left = frameRequester },
-                    style = BvButtonStyle.Tonal,
-                    icon = if (following) Icons.Filled.Check else Icons.Filled.Add,
-                    height = 32.dp,
-                    horizontalPadding = 12.dp,
-                    textStyle = BvType.Label,
-                )
-            }
-            Spacer(Modifier.weight(1f))
-            val meta = item.metaLine()
-            if (meta.isNotEmpty()) {
-                Text(
-                    meta,
-                    style = BvType.Meta.copy(fontSize = 12.sp, lineHeight = 16.sp),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
         }
     }
 }

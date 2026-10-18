@@ -3,6 +3,7 @@ package dev.aaa1115910.bv.ui.designsystem.nav
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -36,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -56,6 +58,7 @@ import dev.aaa1115910.bv.ui.designsystem.focus.bvFocus
 import dev.aaa1115910.bv.ui.designsystem.focus.focusContainerColor
 import dev.aaa1115910.bv.ui.designsystem.focus.focusContentColor
 import dev.aaa1115910.bv.ui.navigation.TopLevel
+import kotlinx.coroutines.delay
 
 /** 电视导航轨里「搜索」也是一个可选中项。 */
 sealed interface TvRailTarget {
@@ -79,14 +82,30 @@ fun TvRail(
     selectedRequester: FocusRequester,
     modifier: Modifier = Modifier,
     onFocusChanged: (Boolean) -> Unit = {},
+    autoHide: Boolean = false,
 ) {
     var open by remember { mutableStateOf(false) }
     var wasFocused by remember { mutableStateOf(false) }
+    var hidden by remember { mutableStateOf(false) }
     // 进入导航轨、或导轨聚焦期间页面被切走（例如返回键）时，把焦点同步到当前页面对应的项。
     // 补一次是因为 onFocusChanged 时目标可能还没挂上 focusRequester。
     LaunchedEffect(current, wasFocused) {
         if (wasFocused) runCatching { selectedRequester.requestFocus() }
     }
+    // 全屏页面播放中自动隐藏导航轨；焦点进入或离开自动隐藏页面时立即恢复显示。
+    LaunchedEffect(autoHide, wasFocused) {
+        if (!autoHide || wasFocused) {
+            hidden = false
+        } else {
+            delay(3_000L)
+            hidden = true
+        }
+    }
+    val railAlpha by animateFloatAsState(
+        if (hidden) 0f else 1f,
+        MaterialTheme.motionScheme.defaultEffectsSpec(),
+        label = "tvRailAlpha",
+    )
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>()
     val width by animateDpAsState(if (open) 196.dp else 76.dp, spatial, label = "tvRailWidth")
     val hPad by animateDpAsState(if (open) 14.dp else 0.dp, spatial, label = "tvRailPad")
@@ -99,6 +118,7 @@ fun TvRail(
         modifier
             .width(width)
             .fillMaxHeight()
+            .alpha(railAlpha)
             .drawBehind {
                 if (open) {
                     // box-shadow: 24px 0 48px -24px rgb(0 0 0 / .7)

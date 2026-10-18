@@ -49,6 +49,9 @@ import org.koin.compose.koinInject
 /** 手机布局下一级页面滚动内容底部需要留出的导航栏高度（64dp + 系统导航栏 inset）。 */
 val LocalBottomBarPadding = compositionLocalOf { 0.dp }
 
+/** 电视全屏页面（刷刷）用 ← 或左缘手势把焦点移回导航轨，从而唤起自动隐藏的导航轨。 */
+val LocalTvRailReveal = compositionLocalOf<(() -> Unit)?> { null }
+
 /**
  * 应用外壳（第 8.3 节）：
  * - Bar：NavHost 铺满，一级页面时 PhoneNavBar 叠在底部；
@@ -90,15 +93,21 @@ fun AppShell(nav: NavHostController) {
     val showTabletRail = (profile.navKind == NavKind.Rail || profile.navKind == NavKind.RailExpanded) &&
         (current != null || onSearchPage)
     val showTvRail = isTv && (current != null || onSearchPage)
+    // 刷刷全屏播放时导航轨自动隐藏；← 或左缘手势通过 LocalTvRailReveal 把它唤回
+    val hideTvRail = isTv && current == TopLevel.Shorts
     val barPadding = 64.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     val userViewModel: UserViewModel = koinViewModel()
     val railRequester = remember { FocusRequester() }
     var railFocused by remember { mutableStateOf(false) }
     var lastBack by remember { mutableLongStateOf(0L) }
+    val revealRail: () -> Unit = remember(railRequester) {
+        { runCatching { railRequester.requestFocus() } }
+    }
 
     CompositionLocalProvider(
         LocalVideoCardActions provides actions,
+        LocalTvRailReveal provides revealRail,
         // 原型尺寸精确到 dp，不让 M3 把小按钮的布局撑到 48dp
         LocalMinimumInteractiveComponentSize provides Dp.Unspecified,
     ) {
@@ -165,6 +174,7 @@ fun AppShell(nav: NavHostController) {
                     onSettings = { nav.navigate(SettingsRoute()) },
                     selectedRequester = railRequester,
                     onFocusChanged = { railFocused = it },
+                    autoHide = hideTvRail,
                     modifier = Modifier.align(Alignment.CenterStart),
                 )
             }
