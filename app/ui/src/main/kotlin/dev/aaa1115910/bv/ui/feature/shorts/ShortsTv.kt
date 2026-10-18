@@ -476,8 +476,9 @@ internal fun ShortsTv(
                         Box(Modifier.fillMaxSize()) {
                             if (!item.isPortrait) Ambient(item.cover)
                             ShortsVideo(pool, item, Modifier.fillMaxSize(), crop = !landscape)
-                            CinemaScrim()
+                            // 竖屏框常驻上下渐变（进度条可读性）；横屏的渐变在信息层里，随隐藏一起淡出
                             if (portrait) {
+                                CinemaScrim()
                                 ShortsProgress(
                                     pool = pool,
                                     item = item,
