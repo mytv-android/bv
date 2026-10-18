@@ -322,11 +322,13 @@ private fun TvPosterRow(
         TvRowPivot {
             LazyRow(
                 state = rowState,
+                // 视口从导航轨右边缘（收起 76dp）开始：往右翻的时候榜单不会滑到侧边栏下面
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(start = 76.dp)
                     .focusRestorer()
                     .focusGroup(),
-                contentPadding = PaddingValues(start = 100.dp, end = 48.dp, top = 12.dp, bottom = 12.dp),
+                contentPadding = PaddingValues(start = 24.dp, end = 48.dp, top = 12.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 items(posters.size, contentType = { "poster" }) { index ->

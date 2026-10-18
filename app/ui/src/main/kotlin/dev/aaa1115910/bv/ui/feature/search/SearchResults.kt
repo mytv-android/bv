@@ -105,6 +105,7 @@ internal fun SearchCategoryChips(
     modifier: Modifier = Modifier,
     selectOnFocus: Boolean = false,
     selectedRequester: FocusRequester? = null,
+    large: Boolean = false,
 ) {
     Row(
         modifier
@@ -121,6 +122,8 @@ internal fun SearchCategoryChips(
                 onClick = { onSelect(category) },
                 selectOnFocus = selectOnFocus,
                 modifier = if (isSelected && selectedRequester != null) Modifier.focusRequester(selectedRequester) else Modifier,
+                contentPadding = if (large) PaddingValues(horizontal = 22.dp, vertical = 12.dp) else PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                textStyle = if (large) BvType.Body.copy(fontWeight = FontWeight.SemiBold) else BvType.Small.copy(fontWeight = FontWeight.Medium),
             )
         }
     }
@@ -334,14 +337,19 @@ internal fun SearchResultsPane(
     }
 }
 
-/** 「视频」区块标题：右侧「按播放量 ›」，点击打开筛选。 */
+/** 「视频」区块标题：右侧「按播放量 ›」，点击打开筛选。电视上顶部有大号「筛选」按钮，不再显示这个小入口。 */
 @Composable
-private fun VideoSectionHeader(state: SearchUiState, onFilter: () -> Unit, modifier: Modifier = Modifier) {
+private fun VideoSectionHeader(
+    state: SearchUiState,
+    onFilter: () -> Unit,
+    modifier: Modifier = Modifier,
+    showAction: Boolean = true,
+) {
     SectionHeader(
         title = stringResource(R.string.search_section_video),
         modifier = modifier,
-        action = stringResource(R.string.search_sort_action, stringResource(state.result.selectedOrder.labelRes())),
-        onAction = onFilter,
+        action = if (showAction) stringResource(R.string.search_sort_action, stringResource(state.result.selectedOrder.labelRes())) else null,
+        onAction = if (showAction) onFilter else null,
     )
 }
 
@@ -395,7 +403,7 @@ private fun AllResultsGrid(
             }
             if (videos.isNotEmpty()) {
                 item(key = "videoHeader", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                    VideoSectionHeader(state, onFilter)
+                    VideoSectionHeader(state, onFilter, showAction = !tv)
                 }
             }
             val leading = videos.take(AllLeadingVideos)
@@ -449,7 +457,7 @@ private fun VideoResultsGrid(
     val videos = state.videoCards()
     if (videos.isEmpty()) {
         Column(modifier) {
-            VideoSectionHeader(state, onFilter, Modifier.padding(contentPadding))
+            VideoSectionHeader(state, onFilter, Modifier.padding(contentPadding), showAction = !tv)
             EmptyResult(loading, onRetry = { state.refresh() }, Modifier.weight(1f))
         }
         return
@@ -466,7 +474,7 @@ private fun VideoResultsGrid(
             verticalArrangement = Arrangement.spacedBy(spacing),
         ) {
             item(key = "videoHeader", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
-                VideoSectionHeader(state, onFilter)
+                VideoSectionHeader(state, onFilter, showAction = !tv)
             }
             items(videos.size, contentType = { "video" }) { index ->
                 val card = videos[index]

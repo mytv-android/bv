@@ -29,6 +29,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,7 +39,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -81,6 +81,12 @@ fun TvRail(
     onFocusChanged: (Boolean) -> Unit = {},
 ) {
     var open by remember { mutableStateOf(false) }
+    var wasFocused by remember { mutableStateOf(false) }
+    // 进入导航轨、或导轨聚焦期间页面被切走（例如返回键）时，把焦点同步到当前页面对应的项。
+    // 补一次是因为 onFocusChanged 时目标可能还没挂上 focusRequester。
+    LaunchedEffect(current, wasFocused) {
+        if (wasFocused) runCatching { selectedRequester.requestFocus() }
+    }
     val spatial = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>()
     val width by animateDpAsState(if (open) 196.dp else 76.dp, spatial, label = "tvRailWidth")
     val hPad by animateDpAsState(if (open) 14.dp else 0.dp, spatial, label = "tvRailPad")
@@ -108,8 +114,15 @@ fun TvRail(
                 }
                 drawRect(background)
             }
-            .onFocusChanged { open = it.hasFocus; onFocusChanged(it.hasFocus) }
-            .focusRestorer(selectedRequester)
+            .onFocusChanged {
+                val focused = it.hasFocus
+                // 从内容区进入导航轨时，焦点固定到当前页面对应的项。
+                // 不能用 focusRestorer：它会记住上次停留的项（常见是「搜索」），切换页面后焦点会落回搜索，确认键就打开了搜索页。
+                if (focused && !wasFocused) runCatching { selectedRequester.requestFocus() }
+                wasFocused = focused
+                open = focused
+                onFocusChanged(focused)
+            }
             .focusGroup()
             // 弹簧会过冲，内边距不能为负
             .padding(vertical = 27.dp, horizontal = hPad.coerceAtLeast(0.dp)),

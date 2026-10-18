@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -98,12 +99,21 @@ import kotlinx.coroutines.launch
 private val FrameWidth = 273.dp
 private val FrameHeight = 486.dp
 
+/** 横屏视频的框：放在左侧播放队列与右侧信息区之间的空当里，16:9。 */
+private val LandscapeFrameWidth = 410.dp
+private val LandscapeFrameHeight = LandscapeFrameWidth * 9f / 16f
+private val LandscapeFrameX = 180.dp
+
+/** 按住 ← 多久后开始快退；短按则把焦点移回左侧导航轨。 */
+private const val LeftHoldSeekMs = 350L
+
 /**
  * 电视刷刷（原型 shortsTv）：整屏氛围光 + 左侧播放队列 + 中间视频框（初始焦点）+ 右侧信息区。
  * 导航轨由外壳叠加。整页包在当前视频的 CoverTheme 里，换条时颜色动画过渡。
  *
- * 遥控器（焦点在视频框上）：↑ / 频道+ 上一条，↓ / 频道− 下一条；← 快退 5 秒（连按加速，沿用旧电视播放器）；
- * → 单按移到右侧按钮，按住或快退快进过程中继续按为快进；确认暂停 / 继续；长按确认点赞；菜单键打开评论面板。
+ * 遥控器（焦点在视频框上）：↑ / 频道+ 上一条，↓ / 频道− 下一条；← 单按移到左侧导航轨（与其他页面一致），
+ * 按住才快退 5 秒并连按加速（媒体快退键始终快退）；→ 单按移到右侧按钮，按住或快退快进过程中继续按为快进；
+ * 确认暂停 / 继续；长按确认点赞；菜单键打开评论面板。
  */
 @Composable
 internal fun ShortsTv(
@@ -125,7 +135,8 @@ internal fun ShortsTv(
     val focusManager = LocalFocusManager.current
     val reduceMotion = LocalThemePrefs.current.reduceMotion
     val density = LocalDensity.current
-    val frameCenter = with(density) { Offset(FrameWidth.toPx() / 2, FrameHeight.toPx() / 2) }
+    val portrait = current?.isPortrait != false
+    val frameSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Dp>()
 
     // 快进快退（沿用旧电视播放器：200ms 内连按计数，每 5 次步长加 5 秒）
     var seekTarget by remember { mutableLongStateOf(-1L) }
@@ -134,6 +145,10 @@ internal fun ShortsTv(
     var seekJob by remember { mutableStateOf<Job?>(null) }
     var centerPending by remember { mutableStateOf(false) }
     var rightPending by remember { mutableStateOf(false) }
+    // ←：短按回导航轨，按住才快退（快退任务在按住 350ms 后启动）
+    var leftPending by remember { mutableStateOf(false) }
+    var leftSeeking by remember { mutableStateOf(false) }
+    var leftHoldJob by remember { mutableStateOf<Job?>(null) }
 
     // 停稳 150ms 后开始播放当前条
     LaunchedEffect(safeIndex, current?.aid, items.getOrNull(safeIndex + 1)?.aid) {
@@ -196,7 +211,7 @@ internal fun ShortsTv(
     }
 
     CoverTheme(current?.cover, forceDark = true) {
-        Box(
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .onBvKey { key ->
@@ -220,6 +235,29 @@ internal fun ShortsTv(
                     }
                 }
         ) {
+            // 竖屏视频保持原型 273×486；横屏视频换成 16:9 大框，放在队列与信息区之间
+            val frameWidth by animateDpAsState(
+                if (portrait) FrameWidth else LandscapeFrameWidth,
+                frameSpec,
+                label = "shortsTvFrameWidth",
+            )
+            val frameHeight by animateDpAsState(
+                if (portrait) FrameHeight else LandscapeFrameHeight,
+                frameSpec,
+                label = "shortsTvFrameHeight",
+            )
+            val frameX by animateDpAsState(
+                if (portrait) 300.dp else LandscapeFrameX,
+                frameSpec,
+                label = "shortsTvFrameX",
+            )
+            val frameY by animateDpAsState(
+                if (portrait) 27.dp else ((maxHeight - frameHeight) / 2).coerceAtLeast(27.dp),
+                frameSpec,
+                label = "shortsTvFrameY",
+            )
+            val frameCenter = with(density) { Offset(frameWidth.toPx() / 2, frameHeight.toPx() / 2) }
+
             Ambient(current?.cover)
             Box(
                 Modifier
@@ -243,8 +281,8 @@ internal fun ShortsTv(
             val slidePx = with(density) { 40.dp.roundToPx() }
             Box(
                 Modifier
-                    .offset(x = 300.dp, y = 27.dp)
-                    .size(FrameWidth, FrameHeight)
+                    .offset(x = frameX, y = frameY)
+                    .size(frameWidth, frameHeight)
                     .onPreviewKeyEvent { event ->
                         val key = event.toBvKey() ?: return@onPreviewKeyEvent false
                         val down = event.type == KeyEventType.KeyDown
@@ -261,7 +299,35 @@ internal fun ShortsTv(
                                 true
                             }
 
-                            BvKey.Left, BvKey.Rewind -> {
+                            BvKey.Left -> {
+                                if (down) {
+                                    if (repeat == 0) {
+                                        leftPending = true
+                                        leftSeeking = false
+                                        leftHoldJob?.cancel()
+                                        leftHoldJob = scope.launch {
+                                            delay(LeftHoldSeekMs)
+                                            if (leftPending) {
+                                                leftSeeking = true
+                                                seek(false)
+                                            }
+                                        }
+                                    } else if (leftSeeking) {
+                                        seek(false)
+                                    }
+                                } else if (up) {
+                                    leftHoldJob?.cancel()
+                                    leftHoldJob = null
+                                    val tap = leftPending && !leftSeeking
+                                    leftPending = false
+                                    leftSeeking = false
+                                    // 短按 ← 与其它页面一致：焦点移到左侧导航轨；没有可移动目标时兜底快退
+                                    if (tap && !focusManager.moveFocus(FocusDirection.Left)) seek(false)
+                                }
+                                true
+                            }
+
+                            BvKey.Rewind -> {
                                 if (down) seek(false)
                                 true
                             }

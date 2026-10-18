@@ -28,6 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Mic
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -63,8 +64,9 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import dev.aaa1115910.biliapi.repositories.SearchType
 import dev.aaa1115910.bv.appui.R
+import dev.aaa1115910.bv.ui.designsystem.component.BvButton
+import dev.aaa1115910.bv.ui.designsystem.component.BvButtonStyle
 import dev.aaa1115910.bv.ui.designsystem.component.BvListItem
-import dev.aaa1115910.bv.ui.designsystem.component.SectionHeader
 import dev.aaa1115910.bv.ui.designsystem.component.VideoCard
 import dev.aaa1115910.bv.ui.designsystem.focus.BvKey
 import dev.aaa1115910.bv.ui.designsystem.focus.TvRowPivot
@@ -167,10 +169,14 @@ private fun SearchTvInput(
             }
         }
     }
+    // 搜索按钮 / 联想 / 热搜 / 历史：直接进入全屏结果，省掉遥控器在结果行里找按钮的步骤
     val pick: (String) -> Unit = { word ->
         state.input.keyword = word
         state.input.addSearchHistory(word)
         state.refresh(word)
+        // 从全屏结果返回时把焦点还给结果行
+        onArea(TvFocusArea.Results)
+        onEnterFull()
     }
 
     // 左列最下面一行按 ↓ 直接进入结果行（结果行在右下方，不在默认的焦点搜索方向上）
@@ -223,25 +229,30 @@ private fun SearchTvInput(
             TvKey(
                 text = stringResource(R.string.search_tv_space),
                 onClick = { if (state.input.keyword.isNotEmpty()) state.input.keyword = state.input.keyword + " " },
-                modifier = Modifier
-                    .weight(1f)
-                    .then(if (voiceAvailable) Modifier else downToResults),
+                modifier = Modifier.weight(1f),
             )
             TvKey(
                 text = stringResource(R.string.search_tv_delete),
                 onClick = { state.input.keyword = state.input.keyword.dropLast(1) },
-                modifier = Modifier
-                    .weight(1f)
-                    .then(if (voiceAvailable) Modifier else downToResults),
+                modifier = Modifier.weight(1f),
             )
             TvKey(
                 text = stringResource(R.string.search_tv_clear),
                 onClick = { state.input.keyword = "" },
-                modifier = Modifier
-                    .weight(1f)
-                    .then(if (voiceAvailable) Modifier else downToResults),
+                modifier = Modifier.weight(1f),
             )
         }
+        // 输入完按 ↓ 到这里：确认直接打开全屏结果
+        BvButton(
+            text = stringResource(R.string.search_tv_search),
+            onClick = { keyword.trim().takeIf { it.isNotEmpty() }?.let(pick) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (voiceAvailable) Modifier else downToResults),
+            icon = Icons.Rounded.Search,
+            large = true,
+            enabled = keyword.isNotBlank(),
+        )
         if (voiceAvailable) {
             TvWideButton(
                 icon = Icons.Rounded.Mic,
@@ -321,12 +332,28 @@ private fun SearchTvInput(
                 .padding(start = 430.dp, top = 330.dp)
                 .fillMaxWidth()
         ) {
-            SectionHeader(
-                title = stringResource(R.string.search_results_for, state.submitted),
-                modifier = Modifier.padding(start = 4.dp, end = 48.dp),
-                action = stringResource(R.string.search_tv_full_results),
-                onAction = onEnterFull,
-            )
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(start = 4.dp, end = 48.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.search_results_for, state.submitted),
+                    modifier = Modifier.weight(1f),
+                    style = BvType.Section,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                BvButton(
+                    text = stringResource(R.string.search_tv_open_full),
+                    onClick = onEnterFull,
+                    style = BvButtonStyle.Tonal,
+                    height = 40.dp,
+                )
+            }
             when {
                 cards.isEmpty() && state.isLoading(SearchType.Video) -> Box(
                     Modifier
@@ -401,6 +428,7 @@ private fun SearchTvFull(
                 onSelect = { state.category = it },
                 selectOnFocus = true,
                 selectedRequester = chipRequester,
+                large = true,
             )
             Text(
                 stringResource(R.string.search_results_for, state.submitted),
@@ -409,6 +437,13 @@ private fun SearchTvFull(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
+            )
+            BvButton(
+                text = stringResource(R.string.search_filter_title),
+                onClick = onFilter,
+                style = BvButtonStyle.Tonal,
+                icon = Icons.Rounded.Tune,
+                height = 44.dp,
             )
         }
         SearchResultsPane(
