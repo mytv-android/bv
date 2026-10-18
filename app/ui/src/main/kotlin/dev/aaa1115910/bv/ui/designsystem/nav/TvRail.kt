@@ -45,6 +45,8 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -87,6 +89,7 @@ fun TvRail(
     var open by remember { mutableStateOf(false) }
     var wasFocused by remember { mutableStateOf(false) }
     var hidden by remember { mutableStateOf(false) }
+    var collapsed by remember { mutableStateOf(false) }
     // 进入导航轨、或导轨聚焦期间页面被切走（例如返回键）时，把焦点同步到当前页面对应的项。
     // 补一次是因为 onFocusChanged 时目标可能还没挂上 focusRequester。
     LaunchedEffect(current, wasFocused) {
@@ -99,6 +102,16 @@ fun TvRail(
         } else {
             delay(3_000L)
             hidden = true
+        }
+    }
+    // 淡出结束后把整条导轨折叠成 0 尺寸：alpha(0) 依旧参与触摸命中，
+    // 不折叠的话全屏页面左缘的手势会被隐藏的导轨项当成点击。
+    LaunchedEffect(hidden) {
+        if (hidden) {
+            delay(700L)
+            collapsed = true
+        } else {
+            collapsed = false
         }
     }
     val railAlpha by animateFloatAsState(
@@ -116,6 +129,15 @@ fun TvRail(
     )
     Column(
         modifier
+            .layout { measurable, constraints ->
+                if (collapsed) {
+                    measurable.measure(Constraints(0, 0, 0, 0))
+                    layout(0, 0) {}
+                } else {
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
+            }
             .width(width)
             .fillMaxHeight()
             .alpha(railAlpha)
