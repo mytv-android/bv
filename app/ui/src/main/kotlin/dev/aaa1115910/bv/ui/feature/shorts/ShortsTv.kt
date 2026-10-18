@@ -64,6 +64,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
@@ -506,9 +507,11 @@ internal fun ShortsTv(
                         visible = infoVisible,
                         enter = fadeIn(fadeSpec),
                         exit = fadeOut(fadeSpec),
+                        // 聚焦的视频框带 zIndex(1f)，信息层必须压在它上面
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .fillMaxWidth(),
+                            .fillMaxWidth()
+                            .zIndex(2f),
                     ) {
                         TvLandscapeInfo(
                             item = current,
@@ -529,7 +532,9 @@ internal fun ShortsTv(
             // 评论面板（菜单键），样式同播放器菜单面板
             AnimatedVisibility(
                 visible = panelOpen && current != null,
-                modifier = Modifier.align(Alignment.TopEnd),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .zIndex(3f),
                 enter = slideInHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) { it } +
                     fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
                 exit = slideOutHorizontally(MaterialTheme.motionScheme.defaultSpatialSpec()) { it } +
