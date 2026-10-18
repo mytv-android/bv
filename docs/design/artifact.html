@@ -691,12 +691,14 @@ kbd { font: 600 12px var(--font-mono); padding: 1px 6px; border-radius: 6px; bac
     <div class="sec-head">
       <span class="eyebrow">07 · 新入口「刷刷」</span>
       <h2>一直往下刷，刷到的每条都带着自己的颜色</h2>
-      <p class="lede">「刷刷」是新的一级入口：全屏竖向翻页，一次一条，自动播放。每条视频的操作按钮、进度条和背后的氛围光都用它封面的颜色重新生成。左边的手机画面可以直接滚动。</p>
+      <p class="lede">「刷刷」是新的一级入口：一次一条，自动播放。电视上画面铺满整个舞台——横屏全屏、竖屏顶天立地。横屏播放 3 秒后导航轨、标题、按钮和进度条一起隐藏，只剩画面；按任意方向键唤回信息，按 ← 或用手势唤出导航轨。竖屏只隐藏导航轨，信息常驻。每条视频的操作按钮、进度条和氛围光都用它封面的颜色重新生成。左边的手机画面可以直接滚动。</p>
     </div>
     <div class="split" style="grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr);margin-bottom:40px">
       <figure class="dv"><div class="fit" id="shortsPhone" data-maxh="700"></div><figcaption>手机 · <b>上下滑动试试</b></figcaption></figure>
       <div style="display:grid;gap:20px;min-width:0;align-content:start">
-        <figure class="dv"><div class="fit" data-device="tv" data-screen="shorts"></div><figcaption>电视 · <b>↑↓ 换条，← → 快退快进，确认键暂停</b></figcaption></figure>
+        <figure class="dv"><div class="fit" data-device="tv" data-screen="shortsFull"></div><figcaption>电视 · 横屏视频 <b>全屏舞台 · 播放中</b></figcaption></figure>
+        <figure class="dv"><div class="fit" data-device="tv" data-screen="shortsFullIdle"></div><figcaption>电视 · 横屏视频 <b>3 秒后：只剩画面</b></figcaption></figure>
+        <figure class="dv"><div class="fit" data-device="tv" data-screen="shortsFullPortrait"></div><figcaption>电视 · 竖屏视频 <b>顶天立地 · 只隐藏导航轨</b></figcaption></figure>
         <div class="tbl-wrap">
           <table style="min-width:560px">
             <thead><tr><th>操作</th><th>手机 / 平板</th><th>电视遥控器</th><th>键盘鼠标</th></tr></thead>
@@ -705,7 +707,9 @@ kbd { font: 600 12px var(--font-mono); padding: 1px 6px; border-radius: 6px; bac
               <tr><td>暂停 / 继续</td><td>单击画面</td><td>确认键</td><td>空格</td></tr>
               <tr><td>点赞</td><td>双击画面（爱心形状弹出）</td><td>长按确认键</td><td><kbd>L</kbd></td></tr>
               <tr><td>倍速</td><td>长按 2×，松手恢复</td><td>按住 → 键</td><td>按住 → 键</td></tr>
-              <tr><td>快进 / 快退</td><td>拖动波浪进度条</td><td>← → 每次 5 秒，连按加速</td><td>← →</td></tr>
+              <tr><td>快进 / 快退</td><td>拖动波浪进度条</td><td>按住 → / 长按 ←，每次 5 秒并加速</td><td>按住 ← / →</td></tr>
+              <tr><td>呼出导航轨</td><td>—</td><td>播放中自动隐藏；← 或手势呼出（横屏时信息也一起隐藏）</td><td><kbd>←</kbd></td></tr>
+              <tr><td>唤回信息层</td><td>—</td><td>横屏 3 秒后隐藏；任意方向键唤回（竖屏常驻）</td><td>任意方向键</td></tr>
               <tr><td>评论</td><td>底部抽屉（平板为右侧栏）</td><td>菜单键，右侧面板</td><td><kbd>C</kbd></td></tr>
               <tr><td>去 UP 主页 / 完整详情</td><td>左滑 / 点标题</td><td>→ 移到操作栏选择</td><td>点击</td></tr>
             </tbody>
@@ -1112,6 +1116,69 @@ function shortsTv() {
   </div>` + tvhint('↑↓ 换一条 · 确认键暂停 · 菜单键评论');
 }
 
+/* 横屏视频的操作状态：视频铺满 960×540，底部信息叠在渐变上；导航轨已自动隐藏 */
+const shortAct = ([i, label, on], size = 46, radius = 12) => `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+  <span style="width:${size}px;height:${size}px;display:grid;place-items:center;border-radius:${on ? 16 : '50%'};background:${on ? 'var(--primary)' : 'rgb(255 255 255 / .18)'};color:${on ? 'var(--on-primary)' : '#fff'};backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)">${ic(i)}</span>
+  <span style="font:600 11px var(--font-display);color:#fff;text-shadow:0 1px 3px rgb(0 0 0 / .65)">${label}</span></div>`;
+
+function shortsTvFull() {
+  const s = SHORTS[2];
+  return `<div class="m-abs" style="inset:0;overflow:hidden;background:#000">${img(s.c, 'W')}</div>
+  <div class="m-scrim-b" style="background:linear-gradient(0deg, rgb(0 0 0 / .86), transparent 46%), linear-gradient(180deg, rgb(0 0 0 / .5), transparent 26%)"></div>
+  <div class="m-abs" style="left:96px;right:400px;bottom:96px;display:flex;flex-direction:column;gap:10px;z-index:2;color:#fff">
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="m-av p" style="width:44px;height:44px">${s.up[0]}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <b style="font:700 16px var(--font-body)">@${s.up}</b>
+        <span style="font-size:12px;opacity:.85">粉丝 23.4万 · ${s.tags}</span>
+      </div>
+      <span class="m-btn fill" style="height:34px;padding:0 16px;margin-left:6px">${ic('add')}关注</span>
+    </div>
+    <div style="font:800 32px/1.2 var(--font-display);letter-spacing:-.01em;max-width:560px;text-shadow:0 2px 12px rgb(0 0 0 / .5)">${s.t}</div>
+    <div style="display:flex;gap:14px;font-size:13px;opacity:.85">${s.like} 点赞 · ${s.cm} 评论 · 今天 05:12</div>
+  </div>
+  <div class="m-abs" style="right:48px;bottom:96px;display:flex;gap:16px;align-items:flex-start;z-index:2">
+    ${[['like', s.like, 1], ['coin', s.fav, 0], ['star', s.fav, 0], ['comment', s.cm, 0], ['info', '详情', 0]].map(a => shortAct(a)).join('')}
+  </div>
+  <div class="m-abs" style="left:96px;right:48px;bottom:52px;z-index:2">${wavy(.42, 816)}</div>
+  ${tvhint('↑↓ 换一条 · ← 呼出导航 · 长按 ← 快退 · 菜单键评论')}`;
+}
+
+/* 竖屏视频：顶天立地（304×540 全高），左侧队列、右侧信息叠在氛围光上 */
+function shortsTvFullPortrait() {
+  const s = SHORTS[0];
+  return `<div class="m-ambient" style="opacity:.65">${img(s.c, 'P')}</div>
+  <div class="m-abs" style="inset:0;background:color-mix(in srgb, var(--surface) 58%, transparent)"></div>
+  <div class="m-abs" style="left:300px;top:0;width:304px;height:540px;overflow:hidden;background:#000;z-index:2">
+    ${img(s.c, 'P')}
+    <div class="m-abs" style="inset:0;background:linear-gradient(0deg, rgb(0 0 0 / .72), transparent 34%)"></div>
+    <div class="m-abs" style="left:14px;right:14px;bottom:14px">${wavy(.42, 276)}</div>
+  </div>
+  <div class="m-abs" style="left:110px;top:60px;display:flex;flex-direction:column;gap:10px;z-index:2">
+    ${[11, 10, 0, 6].map((c, i) => `<div style="width:54px;height:96px;border-radius:12px;overflow:hidden;${i === 2 ? 'box-shadow:0 0 0 3px var(--primary)' : 'opacity:.55'}">${img(c, 'P')}</div>`).join('')}
+  </div>
+  <div class="m-abs" style="right:48px;top:60px;width:280px;display:flex;flex-direction:column;gap:12px;z-index:2;color:#fff">
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="m-av p" style="width:44px;height:44px">${s.up[0]}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <b style="font:700 16px var(--font-body)">@${s.up}</b>
+        <span style="font-size:12px;opacity:.85">粉丝 23.4万 · ${s.tags}</span>
+      </div>
+      <span class="m-btn fill" style="height:34px;padding:0 14px">${ic('add')}关注</span>
+    </div>
+    <div style="font:800 26px/1.25 var(--font-display);text-shadow:0 2px 12px rgb(0 0 0 / .5)">${s.t}</div>
+    <div style="font-size:13px;opacity:.85">${s.like} 点赞 · ${s.cm} 评论 · 今天 05:12</div>
+    <div style="display:flex;gap:8px">${[['like', s.like, 1], ['coin', s.fav, 0], ['star', s.fav, 0], ['comment', s.cm, 0], ['info', '详情', 0]].map(a => shortAct(a, 44)).join('')}</div>
+  </div>
+  ${tvhint('↑↓ 换一条 · ← 呼出导航 · 菜单键评论')}`;
+}
+
+/* 横屏播放 3 秒后：导航轨、标题/操作/进度条和提示全部隐藏，只剩画面 */
+function shortsTvFullIdle() {
+  const s = SHORTS[2];
+  return `<div class="m-abs" style="inset:0;overflow:hidden;background:#000">${img(s.c, 'W')}</div>`;
+}
+
 /* ---------- VIDEO DETAIL ---------- */
 const ACTIONS = [['like', '3.2万', 1], ['coin', '8961'], ['star', '1.4万'], ['later', '稍后'], ['share', '分享']];
 const btnGroup = () => `<div class="m-bg">${ACTIONS.map(([i, l, on]) => `<div class="${on ? 'on' : ''}">${ic(i)}${l}</div>`).join('')}</div>`;
@@ -1348,6 +1415,21 @@ const SCREENS = [
     rules: { phone: ['全屏竖向翻页，底部导航变为半透明深色，不打断画面。', '右侧操作列：头像（带关注）、点赞、投币、收藏、评论、分享；点赞后按钮由圆形变为圆角方形。', '横屏视频居中显示，上下用封面模糊后的氛围光填满。'],
              tablet: ['视频保持 9:16 居中，左右是氛围光；右侧固定显示信息和评论（SupportingPane）。', '竖向浮动工具栏放操作，左侧上一条 / 下一条按钮方便鼠标和触控笔。'],
              tv: ['视频居中，左侧是播放队列缩略图，右侧是信息面板。', '↑↓ 换条，← → 快退快进；→ 移到右侧操作按钮。', '背景整屏氛围光，颜色来自当前视频封面，换条时颜色用弹簧动画过渡。'] } },
+  { id: 'shortsFull', name: '刷刷 · 横屏全屏', fn: { phone: shortsPhone, tablet: shortsTablet, tv: shortsTvFull },
+    comps: ['LinearWavyProgressIndicator', 'MaterialShapes.Heart'],
+    rules: { phone: ['此原型针对电视横屏；手机形态见「刷刷」。'],
+             tablet: ['此原型针对电视横屏；平板形态见「刷刷」。'],
+             tv: ['横屏视频铺满 960×540 画面，不再缩在竖屏框里，也不再占用右侧信息区。', '标题、UP 主、5 个操作按钮、进度条和呼出导航提示都叠在画面底部。', '播放 3 秒无操作后全部隐藏，只剩画面；按任意方向键唤回信息，← 或手势额外唤出导航轨。横屏不显示播放队列，↑↓ 直接换条。'] } },
+  { id: 'shortsFullIdle', name: '刷刷 · 横屏全屏（3 秒后）', fn: { phone: shortsPhone, tablet: shortsTablet, tv: shortsTvFullIdle },
+    comps: ['LinearWavyProgressIndicator', 'MaterialShapes.Heart'],
+    rules: { phone: ['此原型针对电视横屏；手机形态见「刷刷」。'],
+             tablet: ['此原型针对电视横屏；平板形态见「刷刷」。'],
+             tv: ['3 秒无操作后的状态：导航轨、标题、UP 主、操作按钮、进度条和提示全部隐藏，只剩视频画面。', '按任意方向键唤回底部信息；按 ← 或用手势同时唤出导航轨。', '暂停时信息保持显示。'] } },
+  { id: 'shortsFullPortrait', name: '刷刷 · 竖屏全高', fn: { phone: shortsPhone, tablet: shortsTablet, tv: shortsTvFullPortrait },
+    comps: ['LinearWavyProgressIndicator', 'MaterialShapes.Heart'],
+    rules: { phone: ['此原型针对电视竖屏视频；手机形态见「刷刷」。'],
+             tablet: ['此原型针对电视竖屏视频；平板形态见「刷刷」。'],
+             tv: ['竖屏视频按屏幕高度铺满（304×540），上下不留框，左右用封面氛围光填满。', '左侧播放队列、右侧信息与操作按钮叠在氛围光上；进度条在画面底部。', '竖屏只隐藏导航轨，标题/操作/进度条常驻；← 或手势呼出导航，↑↓ 换条。'] } },
   { id: 'detail', name: '视频详情', fn: { phone: detailPhone, tablet: detailTablet, tv: detailTv },
     comps: ['ButtonGroup', 'ToggleButton', 'SupportingPaneScaffold', 'FilterChip', 'LinearWavyProgressIndicator'],
     rules: { phone: ['整页用封面颜色做局部主题（CoverTheme）。', '点赞 / 投币 / 收藏 / 稍后 / 分享是一组相连按钮（ButtonGroup），选中项变成胶囊形。', '简介和评论用标签切换；评论的回复用底部抽屉。'],

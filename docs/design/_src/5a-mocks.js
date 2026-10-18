@@ -100,6 +100,69 @@ function shortsTv() {
   </div>` + tvhint('↑↓ 换一条 · 确认键暂停 · 菜单键评论');
 }
 
+/* 横屏视频的操作状态：视频铺满 960×540，底部信息叠在渐变上；导航轨已自动隐藏 */
+const shortAct = ([i, label, on], size = 46, radius = 12) => `<div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+  <span style="width:${size}px;height:${size}px;display:grid;place-items:center;border-radius:${on ? 16 : '50%'};background:${on ? 'var(--primary)' : 'rgb(255 255 255 / .18)'};color:${on ? 'var(--on-primary)' : '#fff'};backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)">${ic(i)}</span>
+  <span style="font:600 11px var(--font-display);color:#fff;text-shadow:0 1px 3px rgb(0 0 0 / .65)">${label}</span></div>`;
+
+function shortsTvFull() {
+  const s = SHORTS[2];
+  return `<div class="m-abs" style="inset:0;overflow:hidden;background:#000">${img(s.c, 'W')}</div>
+  <div class="m-scrim-b" style="background:linear-gradient(0deg, rgb(0 0 0 / .86), transparent 46%), linear-gradient(180deg, rgb(0 0 0 / .5), transparent 26%)"></div>
+  <div class="m-abs" style="left:96px;right:400px;bottom:96px;display:flex;flex-direction:column;gap:10px;z-index:2;color:#fff">
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="m-av p" style="width:44px;height:44px">${s.up[0]}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <b style="font:700 16px var(--font-body)">@${s.up}</b>
+        <span style="font-size:12px;opacity:.85">粉丝 23.4万 · ${s.tags}</span>
+      </div>
+      <span class="m-btn fill" style="height:34px;padding:0 16px;margin-left:6px">${ic('add')}关注</span>
+    </div>
+    <div style="font:800 32px/1.2 var(--font-display);letter-spacing:-.01em;max-width:560px;text-shadow:0 2px 12px rgb(0 0 0 / .5)">${s.t}</div>
+    <div style="display:flex;gap:14px;font-size:13px;opacity:.85">${s.like} 点赞 · ${s.cm} 评论 · 今天 05:12</div>
+  </div>
+  <div class="m-abs" style="right:48px;bottom:96px;display:flex;gap:16px;align-items:flex-start;z-index:2">
+    ${[['like', s.like, 1], ['coin', s.fav, 0], ['star', s.fav, 0], ['comment', s.cm, 0], ['info', '详情', 0]].map(a => shortAct(a)).join('')}
+  </div>
+  <div class="m-abs" style="left:96px;right:48px;bottom:52px;z-index:2">${wavy(.42, 816)}</div>
+  ${tvhint('↑↓ 换一条 · ← 呼出导航 · 长按 ← 快退 · 菜单键评论')}`;
+}
+
+/* 竖屏视频：顶天立地（304×540 全高），左侧队列、右侧信息叠在氛围光上 */
+function shortsTvFullPortrait() {
+  const s = SHORTS[0];
+  return `<div class="m-ambient" style="opacity:.65">${img(s.c, 'P')}</div>
+  <div class="m-abs" style="inset:0;background:color-mix(in srgb, var(--surface) 58%, transparent)"></div>
+  <div class="m-abs" style="left:300px;top:0;width:304px;height:540px;overflow:hidden;background:#000;z-index:2">
+    ${img(s.c, 'P')}
+    <div class="m-abs" style="inset:0;background:linear-gradient(0deg, rgb(0 0 0 / .72), transparent 34%)"></div>
+    <div class="m-abs" style="left:14px;right:14px;bottom:14px">${wavy(.42, 276)}</div>
+  </div>
+  <div class="m-abs" style="left:110px;top:60px;display:flex;flex-direction:column;gap:10px;z-index:2">
+    ${[11, 10, 0, 6].map((c, i) => `<div style="width:54px;height:96px;border-radius:12px;overflow:hidden;${i === 2 ? 'box-shadow:0 0 0 3px var(--primary)' : 'opacity:.55'}">${img(c, 'P')}</div>`).join('')}
+  </div>
+  <div class="m-abs" style="right:48px;top:60px;width:280px;display:flex;flex-direction:column;gap:12px;z-index:2;color:#fff">
+    <div style="display:flex;gap:10px;align-items:center">
+      <div class="m-av p" style="width:44px;height:44px">${s.up[0]}</div>
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <b style="font:700 16px var(--font-body)">@${s.up}</b>
+        <span style="font-size:12px;opacity:.85">粉丝 23.4万 · ${s.tags}</span>
+      </div>
+      <span class="m-btn fill" style="height:34px;padding:0 14px">${ic('add')}关注</span>
+    </div>
+    <div style="font:800 26px/1.25 var(--font-display);text-shadow:0 2px 12px rgb(0 0 0 / .5)">${s.t}</div>
+    <div style="font-size:13px;opacity:.85">${s.like} 点赞 · ${s.cm} 评论 · 今天 05:12</div>
+    <div style="display:flex;gap:8px">${[['like', s.like, 1], ['coin', s.fav, 0], ['star', s.fav, 0], ['comment', s.cm, 0], ['info', '详情', 0]].map(a => shortAct(a, 44)).join('')}</div>
+  </div>
+  ${tvhint('↑↓ 换一条 · ← 呼出导航 · 菜单键评论')}`;
+}
+
+/* 横屏播放 3 秒后：导航轨、标题/操作/进度条和提示全部隐藏，只剩画面 */
+function shortsTvFullIdle() {
+  const s = SHORTS[2];
+  return `<div class="m-abs" style="inset:0;overflow:hidden;background:#000">${img(s.c, 'W')}</div>`;
+}
+
 /* ---------- VIDEO DETAIL ---------- */
 const ACTIONS = [['like', '3.2万', 1], ['coin', '8961'], ['star', '1.4万'], ['later', '稍后'], ['share', '分享']];
 const btnGroup = () => `<div class="m-bg">${ACTIONS.map(([i, l, on]) => `<div class="${on ? 'on' : ''}">${ic(i)}${l}</div>`).join('')}</div>`;

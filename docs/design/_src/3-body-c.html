@@ -4,12 +4,14 @@
     <div class="sec-head">
       <span class="eyebrow">07 · 新入口「刷刷」</span>
       <h2>一直往下刷，刷到的每条都带着自己的颜色</h2>
-      <p class="lede">「刷刷」是新的一级入口：全屏竖向翻页，一次一条，自动播放。每条视频的操作按钮、进度条和背后的氛围光都用它封面的颜色重新生成。左边的手机画面可以直接滚动。</p>
+      <p class="lede">「刷刷」是新的一级入口：一次一条，自动播放。电视上画面铺满整个舞台——横屏全屏、竖屏顶天立地。横屏播放 3 秒后导航轨、标题、按钮和进度条一起隐藏，只剩画面；按任意方向键唤回信息，按 ← 或用手势唤出导航轨。竖屏只隐藏导航轨，信息常驻。每条视频的操作按钮、进度条和氛围光都用它封面的颜色重新生成。左边的手机画面可以直接滚动。</p>
     </div>
     <div class="split" style="grid-template-columns:minmax(0,.8fr) minmax(0,1.6fr);margin-bottom:40px">
       <figure class="dv"><div class="fit" id="shortsPhone" data-maxh="700"></div><figcaption>手机 · <b>上下滑动试试</b></figcaption></figure>
       <div style="display:grid;gap:20px;min-width:0;align-content:start">
-        <figure class="dv"><div class="fit" data-device="tv" data-screen="shorts"></div><figcaption>电视 · <b>↑↓ 换条，← → 快退快进，确认键暂停</b></figcaption></figure>
+        <figure class="dv"><div class="fit" data-device="tv" data-screen="shortsFull"></div><figcaption>电视 · 横屏视频 <b>全屏舞台 · 播放中</b></figcaption></figure>
+        <figure class="dv"><div class="fit" data-device="tv" data-screen="shortsFullIdle"></div><figcaption>电视 · 横屏视频 <b>3 秒后：只剩画面</b></figcaption></figure>
+        <figure class="dv"><div class="fit" data-device="tv" data-screen="shortsFullPortrait"></div><figcaption>电视 · 竖屏视频 <b>顶天立地 · 只隐藏导航轨</b></figcaption></figure>
         <div class="tbl-wrap">
           <table style="min-width:560px">
             <thead><tr><th>操作</th><th>手机 / 平板</th><th>电视遥控器</th><th>键盘鼠标</th></tr></thead>
@@ -18,7 +20,9 @@
               <tr><td>暂停 / 继续</td><td>单击画面</td><td>确认键</td><td>空格</td></tr>
               <tr><td>点赞</td><td>双击画面（爱心形状弹出）</td><td>长按确认键</td><td><kbd>L</kbd></td></tr>
               <tr><td>倍速</td><td>长按 2×，松手恢复</td><td>按住 → 键</td><td>按住 → 键</td></tr>
-              <tr><td>快进 / 快退</td><td>拖动波浪进度条</td><td>← → 每次 5 秒，连按加速</td><td>← →</td></tr>
+              <tr><td>快进 / 快退</td><td>拖动波浪进度条</td><td>按住 → / 长按 ←，每次 5 秒并加速</td><td>按住 ← / →</td></tr>
+              <tr><td>呼出导航轨</td><td>—</td><td>播放中自动隐藏；← 或手势呼出（横屏时信息也一起隐藏）</td><td><kbd>←</kbd></td></tr>
+              <tr><td>唤回信息层</td><td>—</td><td>横屏 3 秒后隐藏；任意方向键唤回（竖屏常驻）</td><td>任意方向键</td></tr>
               <tr><td>评论</td><td>底部抽屉（平板为右侧栏）</td><td>菜单键，右侧面板</td><td><kbd>C</kbd></td></tr>
               <tr><td>去 UP 主页 / 完整详情</td><td>左滑 / 点标题</td><td>→ 移到操作栏选择</td><td>点击</td></tr>
             </tbody>
