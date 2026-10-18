@@ -593,12 +593,14 @@ private fun TvVideoRow(
             TvRowPivot {
                 LazyRow(
                     state = rowState,
+                    // 视口从导航轨右边缘（收起 76dp）开始：往右翻时卡片不会滑到侧栏下面
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(start = 76.dp)
                         .focusRequester(requester)
                         .focusRestorer()
                         .focusGroup(),
-                    contentPadding = PaddingValues(start = 102.dp, end = 48.dp, top = 12.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = 26.dp, end = 48.dp, top = 12.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
                     items(cards.size, contentType = { "video" }) { index ->

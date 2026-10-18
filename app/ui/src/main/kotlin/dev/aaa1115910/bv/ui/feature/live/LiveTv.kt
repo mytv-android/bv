@@ -305,14 +305,17 @@ private fun TvAreaContent(
             names = parentNames,
             selected = vm.selectedParent,
             onSelect = { vm.selectArea(it, 0) },
-            contentPadding = PaddingValues(start = 96.dp, end = 48.dp, top = 12.dp, bottom = 6.dp),
+            // 视口从导航轨右边缘（收起 76dp）开始，标签不会滑到侧栏下面
+            modifier = Modifier.padding(start = 76.dp),
+            contentPadding = PaddingValues(start = 20.dp, end = 48.dp, top = 12.dp, bottom = 6.dp),
         )
         if (childNames.isNotEmpty()) {
             LiveChipRow(
                 names = childNames,
                 selected = vm.selectedChild,
                 onSelect = { vm.selectArea(vm.selectedParent, it) },
-                contentPadding = PaddingValues(start = 96.dp, end = 48.dp, bottom = 6.dp),
+                modifier = Modifier.padding(start = 76.dp),
+                contentPadding = PaddingValues(start = 20.dp, end = 48.dp, bottom = 6.dp),
             )
         }
         Box(Modifier.fillMaxWidth().weight(1f)) {
