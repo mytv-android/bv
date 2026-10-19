@@ -1,15 +1,16 @@
 package dev.aaa1115910.bv.ui.designsystem.component
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -22,6 +23,19 @@ import coil.compose.AsyncImage
 @Composable
 fun TvBackdrop(cover: String?, modifier: Modifier = Modifier, heightFraction: Float = 0.76f) {
     val surface = MaterialTheme.colorScheme.surface
+    val horizontal = remember(surface) {
+        Brush.horizontalGradient(
+            0f to surface,
+            0.3f to surface.copy(alpha = 0.7f),
+            0.62f to Color.Transparent,
+        )
+    }
+    val vertical = remember(surface) {
+        Brush.verticalGradient(
+            0.52f to Color.Transparent,
+            0.98f to surface,
+        )
+    }
     Box(modifier.fillMaxSize()) {
         Box(
             Modifier
@@ -43,26 +57,14 @@ fun TvBackdrop(cover: String?, modifier: Modifier = Modifier, heightFraction: Fl
                     )
                 }
             }
+            // 两层渐变在同一个显示列表里绘制，少一个全屏 RenderNode
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            0f to surface,
-                            0.3f to surface.copy(alpha = 0.7f),
-                            0.62f to Color.Transparent,
-                        )
-                    )
-            )
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.verticalGradient(
-                            0.52f to Color.Transparent,
-                            0.98f to surface,
-                        )
-                    )
+                    .drawBehind {
+                        drawRect(horizontal)
+                        drawRect(vertical)
+                    }
             )
         }
     }

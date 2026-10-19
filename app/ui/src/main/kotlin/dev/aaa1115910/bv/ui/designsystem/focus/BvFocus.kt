@@ -7,6 +7,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -15,7 +16,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -30,17 +30,36 @@ import dev.aaa1115910.bv.ui.designsystem.adaptive.BvInputMode
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import kotlin.math.min
 
-/** 外侧 3dp 描边 + 光晕，带淡入淡出动画。 */
-fun Modifier.focusRing(visible: Boolean, corner: Dp, glow: Dp = 14.dp): Modifier = composed {
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, MaterialTheme.motionScheme.fastEffectsSpec(), label = "focusRing")
+/**
+ * 外侧 3dp 描边 + 光晕，带淡入淡出动画。
+ * 动画值只在 graphicsLayer / draw 阶段读取，避免光晕每帧重组整棵内容。
+ */
+fun Modifier.focusRing(visible: Boolean, corner: Dp, glow: Dp = 14.dp): Modifier =
+    focusRing(visible, { corner }, glow)
+
+/** [corner] 以 lambda 提供，用于随焦点动画变化的圆角（只在 layer / draw 阶段读取）。 */
+fun Modifier.focusRing(visible: Boolean, corner: () -> Dp, glow: Dp = 14.dp): Modifier = composed {
+    val alphaState = animateFloatAsState(
+        if (visible) 1f else 0f,
+        MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "focusRing",
+    )
     val color = MaterialTheme.colorScheme.primary
     this
-        .shadow(elevation = glow * alpha, shape = RoundedCornerShape(corner), clip = false, ambientColor = color, spotColor = color)
+        .graphicsLayer {
+            shadowElevation = glow.toPx() * alphaState.value
+            shape = RoundedCornerShape(corner())
+            clip = false
+            ambientShadowColor = color
+            spotShadowColor = color
+        }
         .drawWithContent {
             drawContent()
+            val alpha = alphaState.value
             if (alpha > 0f) {
+                val c = corner()
                 val w = 3.dp.toPx()
-                val r = min(corner.toPx() + w / 2, (min(size.width, size.height) + w) / 2)
+                val r = min(c.toPx() + w / 2, (min(size.width, size.height) + w) / 2)
                 drawRoundRect(
                     color = color.copy(alpha = alpha),
                     topLeft = Offset(-w / 2, -w / 2),
@@ -75,12 +94,23 @@ fun Modifier.bvFocus(
         .then(if (addFocusable) Modifier.focusable() else Modifier)
 }
 
+/** 卡片焦点状态：圆角以 [State] 暴露，调用方在 layer / draw 阶段读取，避免弹簧动画每帧重组整张卡。 */
+@Stable
+class CardFocus internal constructor(
+    val show: Boolean,
+    val corner: State<Dp>,
+)
+
 /** 卡片用：给出是否显示焦点效果、以及封面圆角（16→22dp 弹簧）。 */
 @Composable
-fun rememberCardFocus(focused: Boolean): Pair<Boolean, Dp> {
+fun rememberCardFocus(focused: Boolean): CardFocus {
     val show = focused && LocalDeviceProfile.current.input == BvInputMode.DPad
-    val corner by animateDpAsState(if (show) 22.dp else 16.dp, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "cardCorner")
-    return show to corner
+    val corner = animateDpAsState(
+        if (show) 22.dp else 16.dp,
+        MaterialTheme.motionScheme.defaultSpatialSpec(),
+        label = "cardCorner",
+    )
+    return remember(show, corner) { CardFocus(show, corner) }
 }
 
 /** 焦点效果是否应当显示：只在方向键 / 键盘输入模式下显示。 */

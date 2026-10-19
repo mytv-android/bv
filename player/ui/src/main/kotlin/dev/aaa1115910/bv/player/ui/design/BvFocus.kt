@@ -24,7 +24,6 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -53,14 +52,28 @@ internal val LocalPlayerReduceMotion = compositionLocalOf { false }
 internal fun rememberDpadMode(isTv: Boolean): Boolean =
     isTv || LocalInputModeManager.current.inputMode == InputMode.Keyboard
 
-/** 外侧 3dp 描边 + 光晕，带淡入淡出动画。 */
+/**
+ * 外侧 3dp 描边 + 光晕，带淡入淡出动画。
+ * 动画值只在 graphicsLayer / draw 阶段读取，避免光晕每帧重组整棵内容。
+ */
 internal fun Modifier.focusRing(visible: Boolean, corner: Dp, glow: Dp = 14.dp): Modifier = composed {
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, MaterialTheme.motionScheme.fastEffectsSpec(), label = "focusRing")
+    val alphaState = animateFloatAsState(
+        if (visible) 1f else 0f,
+        MaterialTheme.motionScheme.fastEffectsSpec(),
+        label = "focusRing",
+    )
     val color = MaterialTheme.colorScheme.primary
     this
-        .shadow(elevation = glow * alpha, shape = RoundedCornerShape(corner), clip = false, ambientColor = color, spotColor = color)
+        .graphicsLayer {
+            shadowElevation = glow.toPx() * alphaState.value
+            shape = RoundedCornerShape(corner)
+            clip = false
+            ambientShadowColor = color
+            spotShadowColor = color
+        }
         .drawWithContent {
             drawContent()
+            val alpha = alphaState.value
             if (alpha > 0f) {
                 val w = 3.dp.toPx()
                 val r = min(corner.toPx() + w / 2, (min(size.width, size.height) + w) / 2)

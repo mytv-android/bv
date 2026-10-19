@@ -1,6 +1,5 @@
 package dev.aaa1115910.bv.ui.feature.video
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -82,11 +81,8 @@ internal fun VideoDetailTv(
         runCatching { playRequester.requestFocus() }
     }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-    ) {
+    Box(Modifier.fillMaxSize()) {
+        // Ambient 已经用 surface 铺底，这里不再重复画一层全屏背景
         Ambient(ui.cover, Modifier.fillMaxSize())
         TvBackdrop(ui.cover, Modifier.fillMaxSize(), heightFraction = 0.70f)
 

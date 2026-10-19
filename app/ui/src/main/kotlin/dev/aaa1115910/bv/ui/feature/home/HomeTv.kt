@@ -603,7 +603,11 @@ private fun TvVideoRow(
                     contentPadding = PaddingValues(start = 26.dp, end = 48.dp, top = 12.dp, bottom = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
-                    items(cards.size, contentType = { "video" }) { index ->
+                    items(
+                        count = cards.size,
+                        key = { index -> "${cards[index].avid}-$index" },
+                        contentType = { "video" },
+                    ) { index ->
                         val card = cards[index]
                         VideoCard(
                             data = card,
@@ -722,12 +726,20 @@ private fun TvGridContent(
             horizontalArrangement = Arrangement.spacedBy(18.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
-            items(cards.size, contentType = { "video" }) { index ->
+            items(
+                count = cards.size,
+                key = { index -> "${cards[index].avid}-$index" },
+                contentType = { "video" },
+            ) { index ->
                 val card = cards[index]
                 VideoCard(data = card, onClick = { onOpen(card) })
             }
             if (loading) {
-                item(span = { GridItemSpan(maxLineSpan) }, contentType = "loading") { LoadMoreIndicator() }
+                item(
+                    key = "loading",
+                    span = { GridItemSpan(maxLineSpan) },
+                    contentType = "loading",
+                ) { LoadMoreIndicator() }
             }
         }
     }

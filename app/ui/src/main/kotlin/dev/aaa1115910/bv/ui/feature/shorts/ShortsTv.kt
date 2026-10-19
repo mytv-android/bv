@@ -309,12 +309,9 @@ internal fun ShortsTv(
                 else Offset((PortraitX + PortraitWidth * 0.5f).toPx(), screenHeight.toPx() / 2)
             }
 
-            Ambient(current?.cover)
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.surface.copy(alpha = .5f))
-            )
+            // 横屏视频框铺满整屏且有不透明黑底，氛围光完全不可见；只在竖屏绘制。
+            // 原来的 50% surface 遮罩折进 Ambient 的 alpha（0.55 × 0.5 = 0.275），省掉一层全屏混合。
+            if (portrait) Ambient(current?.cover, alpha = 0.275f)
 
             // 播放队列只在竖屏保留；横屏全屏时收起
             if (portrait) {

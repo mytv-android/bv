@@ -52,6 +52,7 @@ import dev.aaa1115910.bv.ui.designsystem.adaptive.BvInputMode
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.designsystem.focus.focusRing
 import dev.aaa1115910.bv.ui.designsystem.focus.rememberCardFocus
+import dev.aaa1115910.bv.ui.designsystem.focus.showFocus
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.util.ImageSize
 import dev.aaa1115910.bv.util.resizedImageUrl
@@ -204,9 +205,9 @@ fun CardFrame(
 ) {
     val interaction = interactionSource ?: remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val (show, corner) = rememberCardFocus(focused)
+    val focus = rememberCardFocus(focused)
     val scale by animateFloatAsState(
-        if (show) 1.08f else 1f,
+        if (focus.show) 1.08f else 1f,
         MaterialTheme.motionScheme.fastSpatialSpec(),
         label = "cardScale"
     )
@@ -214,7 +215,7 @@ fun CardFrame(
     Column(
         modifier = modifier
             .then(if (width != null) Modifier.width(width) else Modifier)
-            .zIndex(if (show) 1f else 0f)
+            .zIndex(if (focus.show) 1f else 0f)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .combinedClickable(
                 interactionSource = interaction,
@@ -228,8 +229,11 @@ fun CardFrame(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(aspectRatio)
-                .focusRing(show, corner)
-                .clip(RoundedCornerShape(corner))
+                .focusRing(focus.show, { focus.corner.value })
+                .graphicsLayer {
+                    shape = RoundedCornerShape(focus.corner.value)
+                    clip = true
+                }
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                 .then(if (touch) Modifier.indication(interaction, ripple()) else Modifier)
         ) {
@@ -260,7 +264,7 @@ fun VideoRow(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    val (show, _) = rememberCardFocus(focused)
+    val show = showFocus(focused)
     val actions = LocalVideoCardActions.current
     var menu by remember { mutableStateOf(false) }
     Row(

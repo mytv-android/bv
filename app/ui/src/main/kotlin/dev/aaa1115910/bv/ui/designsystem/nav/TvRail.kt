@@ -37,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -45,6 +44,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.graphics.Color
@@ -117,7 +117,7 @@ fun TvRail(
             collapsed = false
         }
     }
-    val railAlpha by animateFloatAsState(
+    val railAlpha = animateFloatAsState(
         if (hidden) 0f else 1f,
         MaterialTheme.motionScheme.defaultEffectsSpec(),
         label = "tvRailAlpha",
@@ -143,7 +143,7 @@ fun TvRail(
             }
             .width(width)
             .fillMaxHeight()
-            .alpha(railAlpha)
+            .graphicsLayer { alpha = railAlpha.value }
             .drawBehind {
                 if (open) {
                     // box-shadow: 24px 0 48px -24px rgb(0 0 0 / .7)
