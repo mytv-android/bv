@@ -9,6 +9,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.okhttp.OkHttpDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.Renderer
@@ -40,6 +41,15 @@ import java.util.Locale
 
 /** 低于该倍速不启用跳过静音：压缩音频时间轴会让作为主时钟的音频位置快进，画面跟着跳帧 */
 private const val SKIP_SILENCE_MIN_SPEED = 2.5f
+
+/**
+ * 起播门限：media3 默认要缓冲 1000ms 才开始播放，点开/切集/seek 后要空等这 1 秒。
+ * 压到 300ms，配合进程级 OkHttpClient 预热做到点开即出画面。
+ */
+private const val BUFFER_FOR_PLAYBACK_MS = 300
+
+/** 卡顿恢复门限：比首次起播留一点余量，避免弱网下刚恢复又立刻断流 */
+private const val BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS = 1_000
 
 /** 同一个视频最多自动切换 CDN 候选地址的次数（播放失败与频繁缓冲共用此预算） */
 private const val MAX_CDN_SWITCHES = 3
@@ -121,6 +131,17 @@ class ExoMediaPlayer(
         mPlayer = ExoPlayer
             .Builder(context)
             .setRenderersFactory(renderersFactory)
+            // 只压低起播/恢复门限，最小/最大缓冲时长保持 media3 默认，兼顾弱网容错
+            .setLoadControl(
+                DefaultLoadControl.Builder()
+                    .setBufferDurationsMs(
+                        DefaultLoadControl.DEFAULT_MIN_BUFFER_MS,
+                        DefaultLoadControl.DEFAULT_MAX_BUFFER_MS,
+                        BUFFER_FOR_PLAYBACK_MS,
+                        BUFFER_FOR_PLAYBACK_AFTER_REBUFFER_MS,
+                    )
+                    .build()
+            )
             .setSeekForwardIncrementMs(1000 * 10)
             .setSeekBackIncrementMs(1000 * 5)
             .build()
