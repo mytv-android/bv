@@ -11,10 +11,13 @@ import android.os.CountDownTimer
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -22,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -35,8 +39,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
 import dev.aaa1115910.biliapi.entity.video.Subtitle
 import dev.aaa1115910.biliapi.http.entity.video.ClipInfo
@@ -71,6 +79,7 @@ import dev.aaa1115910.bv.player.ui.design.LocalPlayerDpad
 import dev.aaa1115910.bv.player.ui.design.LocalPlayerReduceMotion
 import dev.aaa1115910.bv.player.ui.design.rememberDpadMode
 import dev.aaa1115910.bv.player.ui.touch.TouchController
+import dev.aaa1115910.bv.player.ui.touch.VideoZoomState
 import dev.aaa1115910.bv.player.ui.tv.TvController
 import dev.aaa1115910.bv.util.countDownTimer
 import dev.aaa1115910.bv.util.fInfo
@@ -82,6 +91,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 /**
  * 统一播放器入口（第 11 节）：合并旧 `player/mobile` 与 `player/tv` 的 `BvPlayer`。
@@ -170,6 +180,10 @@ fun BvPlayerScreen(
     val loadStateData = LocalVideoPlayerLoadStateData.current
     val videoInfoData = LocalVideoPlayerVideoInfoData.current
 
+    // 双指缩放只用于触摸端全屏：SurfaceView 放大会超出内嵌容器
+    val videoZoomState = remember { VideoZoomState() }
+    val zoomEnabled = !isTv && isFullScreen
+
     val latestVideoInfo by rememberUpdatedState(videoInfoData)
     val latestIsTv by rememberUpdatedState(isTv)
     val latestOnSendHeartbeat by rememberUpdatedState(onSendHeartbeat)
@@ -197,6 +211,11 @@ fun BvPlayerScreen(
         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
         label = "aspectRatio",
     )
+
+    // 换集、切画幅比例、全屏状态变化后回到 1x
+    LaunchedEffect(configData.currentVideoCid, aspectRatioSetting, isFullScreen) {
+        videoZoomState.reset()
+    }
 
     var hideBackToHistoryTimer: CountDownTimer? by remember { mutableStateOf(null) }
 
@@ -605,11 +624,50 @@ fun BvPlayerScreen(
             else -> Modifier.aspectRatio(aspectRatio)
         }
 
-        BvVideoPlayer(
-            modifier = videoModifier.align(Alignment.Center),
-            videoPlayer = videoPlayer,
-            playerListener = videoPlayerListener,
-        )
+        if (zoomEnabled) {
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
+                val baseSize = resolveVideoBaseSize(
+                    maxWidth = maxWidth,
+                    maxHeight = maxHeight,
+                    aspectRatio = aspectRatio,
+                    setting = aspectRatioSetting,
+                )
+                val density = LocalDensity.current
+                val baseWidthPx = with(density) { baseSize.width.toPx() }
+                val baseHeightPx = with(density) { baseSize.height.toPx() }
+                SideEffect {
+                    videoZoomState.contentSize = IntSize(
+                        baseWidthPx.roundToInt(),
+                        baseHeightPx.roundToInt(),
+                    )
+                }
+
+                BvVideoPlayer(
+                    modifier = Modifier
+                        .requiredSize(
+                            width = baseSize.width * videoZoomState.scale,
+                            height = baseSize.height * videoZoomState.scale,
+                        )
+                        .offset {
+                            IntOffset(
+                                videoZoomState.offset.x.roundToInt(),
+                                videoZoomState.offset.y.roundToInt(),
+                            )
+                        },
+                    videoPlayer = videoPlayer,
+                    playerListener = videoPlayerListener,
+                )
+            }
+        } else {
+            BvVideoPlayer(
+                modifier = videoModifier.align(Alignment.Center),
+                videoPlayer = videoPlayer,
+                playerListener = videoPlayerListener,
+            )
+        }
 
         // 弹幕层：显示区域 / 透明度 / 蒙版都由引擎 config 内部处理，View 铺满视频区域即可
         BvDanmakuPlayer(
@@ -666,6 +724,7 @@ fun BvPlayerScreen(
                 onExitFullScreen = onExitFullScreen,
                 onEmbeddedMore = onEmbeddedMore,
                 content = videoSurface,
+                zoomState = if (zoomEnabled) videoZoomState else null,
             )
         }
     }
@@ -693,3 +752,23 @@ internal class PlayerController(
     /** 临时倍速（触摸端长按 2×、电视端长按确认键用设置值）；null 恢复为当前设置的倍速。不写入设置。 */
     val setTemporarySpeed: (Float?) -> Unit,
 )
+
+/** 与 [videoSurface] 中非缩放分支的画幅规则保持一致，返回视频基础显示尺寸。 */
+private fun resolveVideoBaseSize(
+    maxWidth: Dp,
+    maxHeight: Dp,
+    aspectRatio: Float,
+    setting: VideoAspectRatio,
+): DpSize {
+    val ratio = aspectRatio.takeIf { it > 0f && it.isFinite() } ?: (16f / 9f)
+    return when (setting) {
+        VideoAspectRatio.EqualWidth -> DpSize(maxWidth, maxWidth / ratio)
+        VideoAspectRatio.EqualHeight -> DpSize(maxHeight * ratio, maxHeight)
+        VideoAspectRatio.Stretch -> DpSize(maxWidth, maxHeight)
+        else -> if (maxWidth / maxHeight > ratio) {
+            DpSize(maxHeight * ratio, maxHeight)
+        } else {
+            DpSize(maxWidth, maxWidth / ratio)
+        }
+    }
+}

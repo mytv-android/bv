@@ -8,6 +8,11 @@
 package dev.aaa1115910.bv.player.ui.touch
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateCentroid
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -22,8 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntSize
 import kotlin.math.absoluteValue
 
 /**
@@ -41,6 +49,7 @@ internal fun Modifier.detectPlayerGestures(
     onBrightnessDrag: (move: Float) -> Unit,
     onSeekDrag: (move: Float) -> Unit,
     onDragEnd: (volumeMove: Float, brightnessMove: Float, seekMove: Float) -> Unit,
+    zoomState: VideoZoomState? = null,
 ): Modifier = composed {
     val currentSpeedState = rememberUpdatedState(currentSpeed)
     val onTapState = rememberUpdatedState(onTap)
@@ -65,6 +74,7 @@ internal fun Modifier.detectPlayerGestures(
     var longPressing by remember { mutableStateOf(false) }
     var isMovingVolume by remember { mutableStateOf(false) }
     var isMovingBrightness by remember { mutableStateOf(false) }
+    var isPanning by remember { mutableStateOf(false) }
 
     pointerInput(Unit) {
         detectTapGestures(
@@ -97,6 +107,12 @@ internal fun Modifier.detectPlayerGestures(
 
             detectDragGestures(
                 onDragStart = {
+                    isPanning = false
+                    if (zoomState?.isZoomed == true) {
+                        isPanning = true
+                        return@detectDragGestures
+                    }
+
                     val inHorizontalSafetyArea =
                         it.x > componentWidth * horizontalSafetyArea * 0.5f && it.x < componentWidth * (1 - horizontalSafetyArea * 0.5f)
                     val inVerticalSafetyArea =
@@ -112,6 +128,10 @@ internal fun Modifier.detectPlayerGestures(
                     }
                 },
                 onDragEnd = {
+                    if (isPanning) {
+                        isPanning = false
+                        return@detectDragGestures
+                    }
                     if (!inSafetyArea) return@detectDragGestures
 
                     if (isHorizontal) {
@@ -129,8 +149,22 @@ internal fun Modifier.detectPlayerGestures(
                     determinedDirection = false
                     isMovingVolume = false
                     isMovingBrightness = false
+                },
+                onDragCancel = {
+                    isPanning = false
+                    horizontalPointMove = 0f
+                    verticalPointMove = 0f
+                    determinedDirection = false
+                    isMovingVolume = false
+                    isMovingBrightness = false
+                    inSafetyArea = false
                 }
-            ) { _, dragAmount ->
+            ) { change, dragAmount ->
+                if (isPanning) {
+                    zoomState?.onPan(dragAmount)
+                    change.consume()
+                    return@detectDragGestures
+                }
                 if (!inSafetyArea) return@detectDragGestures
                 horizontalPointMove += dragAmount.x
                 verticalPointMove += dragAmount.y
@@ -156,4 +190,65 @@ internal fun Modifier.detectPlayerGestures(
                 }
             }
         }
+        .pointerInput(zoomState) {
+            val state = zoomState ?: return@pointerInput
+            detectPinchGestures(
+                onStart = {
+                    state.viewportSize = IntSize(componentWidth, componentHeight)
+                    state.gestureCenter = Offset(componentWidth / 2f, componentHeight / 2f)
+                },
+                onGesture = { centroid, pan, zoom -> state.onZoom(centroid, pan, zoom) },
+                onEnd = { state.onGestureEnd() },
+            )
+        }
 }
+
+/**
+ * 双指捏合 + 平移。只有第二根手指落下后才消费事件，
+ * 从而取消单击/长按/单指拖动，不影响其它手势。
+ */
+private suspend fun PointerInputScope.detectPinchGestures(
+    onStart: () -> Unit,
+    onGesture: (centroid: Offset, pan: Offset, zoom: Float) -> Unit,
+    onEnd: () -> Unit,
+) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var zooming = false
+        var pastSlop = false
+        var pendingPan = Offset.Zero
+        var pendingZoom = 1f
+        do {
+            val event = awaitPointerEvent()
+            if (event.changes.size >= 2) {
+                // 第二指落下立即消费，取消 tap / 长按 / seek / 亮度 / 音量
+                event.changes.forEach { it.consume() }
+                val zoomChange = event.calculateZoom()
+                val panChange = event.calculatePan()
+                pendingPan += panChange
+                pendingZoom *= zoomChange
+                if (!pastSlop) {
+                    pastSlop = (1f - pendingZoom).absoluteValue > ZoomSlop ||
+                        pendingPan.getDistance() > viewConfiguration.touchSlop
+                }
+                if (pastSlop) {
+                    val isFirst = !zooming
+                    if (isFirst) {
+                        zooming = true
+                        onStart()
+                    }
+                    onGesture(
+                        event.calculateCentroid(useCurrent = true),
+                        if (isFirst) pendingPan else panChange,
+                        if (isFirst) pendingZoom else zoomChange,
+                    )
+                    pendingPan = Offset.Zero
+                    pendingZoom = 1f
+                }
+            }
+        } while (event.changes.any { it.pressed })
+        if (zooming) onEnd()
+    }
+}
+
+private const val ZoomSlop = 0.02f

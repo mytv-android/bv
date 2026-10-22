@@ -94,6 +94,7 @@ internal fun TouchController(
     onExitFullScreen: () -> Unit,
     onEmbeddedMore: (() -> Unit)?,
     content: @Composable BoxScope.() -> Unit,
+    zoomState: VideoZoomState? = null,
 ) {
     val context = LocalContext.current
     val seekData = LocalVideoPlayerSeekData.current
@@ -281,7 +282,8 @@ internal fun TouchController(
                                 controller.seekTo((moveStartTime + seekMoveMs).coerceAtLeast(0L))
                                 Log.i(TAG, "Seek move $seekMoveMs")
                             }
-                        }
+                        },
+                        zoomState = zoomState,
                     )
             )
 
