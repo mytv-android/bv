@@ -200,13 +200,14 @@ private class BvFocusNode(
         val color = currentValueOf(LocalFocusColor)
         val cornerPx = corner.toPx()
         val glowPx = glow.toPx()
+        val contentScope = this
         drawScale(currentScale, pivot = center) {
             if (alpha > 0f && color != Color.Unspecified) {
-                drawFocusGlow(color, alpha, cornerPx, glowPx)
+                contentScope.drawFocusGlow(color, alpha, cornerPx, glowPx)
             }
-            drawContent()
+            contentScope.drawContent()
             if (alpha > 0f && color != Color.Unspecified) {
-                drawFocusRing(color, alpha, cornerPx)
+                contentScope.drawFocusRing(color, alpha, cornerPx)
             }
         }
     }
