@@ -6,6 +6,7 @@ import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import dev.aaa1115910.bv.entity.ThemePrefs
 import dev.aaa1115910.bv.entity.ThemeSource
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.designsystem.adaptive.rememberDeviceProfile
+import dev.aaa1115910.bv.ui.designsystem.focus.LocalFocusColor
 import dev.aaa1115910.bv.util.Prefs
 
 val LocalThemePrefs = staticCompositionLocalOf { ThemePrefs() }
@@ -85,7 +87,13 @@ fun BvTheme(forceDark: Boolean = false, content: @Composable () -> Unit) {
             contrastLevel = prefs.contrast,
             specVersion = ColorSpec.SpecVersion.SPEC_2025,
             animate = true,
-            content = content,
+            content = {
+                CompositionLocalProvider(
+                    LocalFocusColor provides MaterialTheme.colorScheme.primary,
+                ) {
+                    content()
+                }
+            },
         )
     }
 }

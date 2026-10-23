@@ -76,6 +76,7 @@ import dev.aaa1115910.bv.player.entity.VideoPlayerDebugInfoData
 import dev.aaa1115910.bv.player.entity.VideoPlayerSeekData
 import dev.aaa1115910.bv.player.entity.VideoPlayerStateData
 import dev.aaa1115910.bv.player.ui.design.LocalPlayerDpad
+import dev.aaa1115910.bv.player.ui.design.LocalPlayerFocusColor
 import dev.aaa1115910.bv.player.ui.design.LocalPlayerReduceMotion
 import dev.aaa1115910.bv.player.ui.design.rememberDpadMode
 import dev.aaa1115910.bv.player.ui.touch.TouchController
@@ -690,6 +691,7 @@ fun BvPlayerScreen(
     val dpad = rememberDpadMode(isTv)
 
     CompositionLocalProvider(
+        LocalPlayerFocusColor provides MaterialTheme.colorScheme.primary,
         LocalVideoPlayerStateData provides VideoPlayerStateData(
             isPlaying = isPlaying,
             isBuffering = isBuffering,

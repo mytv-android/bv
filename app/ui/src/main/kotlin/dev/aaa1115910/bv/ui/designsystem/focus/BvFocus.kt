@@ -1,74 +1,97 @@
 package dev.aaa1115910.bv.ui.designsystem.focus
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.composed
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.FocusEventModifierNode
+import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.scale as drawScale
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
+import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.ObserverModifierNode
+import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.node.observeReads
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import dev.aaa1115910.bv.ui.designsystem.adaptive.BvInputMode
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
+import kotlinx.coroutines.launch
 import kotlin.math.min
+
+/** 焦点描边/光晕颜色，由 BvTheme 从 MaterialTheme.colorScheme.primary 注入。 */
+val LocalFocusColor = staticCompositionLocalOf { Color.Unspecified }
 
 /**
  * 外侧 3dp 描边 + 光晕，带淡入淡出动画。
- * 动画值只在 graphicsLayer / draw 阶段读取，避免光晕每帧重组整棵内容。
+ * 动画值只在 Draw 阶段读取，不触发重组。
  */
 fun Modifier.focusRing(visible: Boolean, corner: Dp, glow: Dp = 14.dp): Modifier =
     focusRing(visible, { corner }, glow)
 
-/** [corner] 以 lambda 提供，用于随焦点动画变化的圆角（只在 layer / draw 阶段读取）。 */
-fun Modifier.focusRing(visible: Boolean, corner: () -> Dp, glow: Dp = 14.dp): Modifier = composed {
-    val alphaState = animateFloatAsState(
-        if (visible) 1f else 0f,
-        MaterialTheme.motionScheme.fastEffectsSpec(),
-        label = "focusRing",
-    )
-    val color = MaterialTheme.colorScheme.primary
-    this
-        .graphicsLayer {
-            shadowElevation = glow.toPx() * alphaState.value
-            shape = RoundedCornerShape(corner())
-            clip = false
-            ambientShadowColor = color
-            spotShadowColor = color
+/** [corner] 以 lambda 提供，用于随焦点动画变化的圆角（只在 Draw 阶段读取）。 */
+fun Modifier.focusRing(visible: Boolean, corner: () -> Dp, glow: Dp = 14.dp): Modifier =
+    this then FocusRingElement(visible, corner, glow)
+
+private data class FocusRingElement(
+    val visible: Boolean,
+    val corner: () -> Dp,
+    val glow: Dp,
+) : ModifierNodeElement<FocusRingNode>() {
+    override fun create() = FocusRingNode(visible, corner, glow)
+
+    override fun update(node: FocusRingNode) = node.update(visible, corner, glow)
+}
+
+private class FocusRingNode(
+    private var visible: Boolean,
+    private var corner: () -> Dp,
+    private var glow: Dp,
+) : Modifier.Node(), DrawModifierNode, CompositionLocalConsumerModifierNode {
+    private val alpha = Animatable(if (visible) 1f else 0f)
+
+    fun update(visible: Boolean, corner: () -> Dp, glow: Dp) {
+        val changed = this.visible != visible
+        this.visible = visible
+        this.corner = corner
+        this.glow = glow
+        if (changed) {
+            val spec = currentValueOf(MaterialTheme.LocalMotionScheme).fastEffectsSpec<Float>()
+            coroutineScope.launch { alpha.animateTo(if (visible) 1f else 0f, spec) }
         }
-        .drawWithContent {
+    }
+
+    override fun ContentDrawScope.draw() {
+        val a = alpha.value
+        val color = currentValueOf(LocalFocusColor)
+        if (a > 0f && color != Color.Unspecified) {
+            val cornerPx = corner().toPx()
+            drawFocusGlow(color, a, cornerPx, glow.toPx())
             drawContent()
-            val alpha = alphaState.value
-            if (alpha > 0f) {
-                val c = corner()
-                val w = 3.dp.toPx()
-                val r = min(c.toPx() + w / 2, (min(size.width, size.height) + w) / 2)
-                drawRoundRect(
-                    color = color.copy(alpha = alpha),
-                    topLeft = Offset(-w / 2, -w / 2),
-                    size = Size(size.width + w, size.height + w),
-                    cornerRadius = CornerRadius(r),
-                    style = Stroke(w),
-                )
-            }
+            drawFocusRing(color, a, cornerPx)
+        } else {
+            drawContent()
         }
+    }
 }
 
 /**
@@ -81,17 +104,151 @@ fun Modifier.bvFocus(
     glow: Dp = 14.dp,
     addFocusable: Boolean = false,
     onFocused: ((Boolean) -> Unit)? = null,
-): Modifier = composed {
-    val profile = LocalDeviceProfile.current
-    var focused by remember { mutableStateOf(false) }
-    val show = focused && profile.input == BvInputMode.DPad
-    val s by animateFloatAsState(if (show) scale else 1f, MaterialTheme.motionScheme.fastSpatialSpec(), label = "bvFocusScale")
+): Modifier =
     this
-        .zIndex(if (show) 1f else 0f)
-        .graphicsLayer { scaleX = s; scaleY = s }
-        .focusRing(show, corner, glow)
-        .onFocusChanged { focused = it.hasFocus; onFocused?.invoke(it.hasFocus) }
+        .then(BvFocusElement(scale, corner, glow, onFocused))
         .then(if (addFocusable) Modifier.focusable() else Modifier)
+
+private data class BvFocusElement(
+    val scale: Float,
+    val corner: Dp,
+    val glow: Dp,
+    val onFocused: ((Boolean) -> Unit)?,
+) : ModifierNodeElement<BvFocusNode>() {
+    override fun create() = BvFocusNode(scale, corner, glow, onFocused)
+
+    override fun update(node: BvFocusNode) = node.update(scale, corner, glow, onFocused)
+}
+
+private class BvFocusNode(
+    private var scale: Float,
+    private var corner: Dp,
+    private var glow: Dp,
+    private var onFocused: ((Boolean) -> Unit)?,
+) : Modifier.Node(),
+    FocusEventModifierNode,
+    DrawModifierNode,
+    LayoutModifierNode,
+    CompositionLocalConsumerModifierNode,
+    ObserverModifierNode {
+
+    private var focused = false
+    private var show = false
+    private val scaleProgress = Animatable(0f)
+    private val ringAlpha = Animatable(0f)
+
+    override fun onAttach() {
+        observeReads { currentValueOf(LocalDeviceProfile) }
+        refreshShow(animate = false)
+    }
+
+    override fun onObservedReadsChanged() {
+        refreshShow(animate = true)
+    }
+
+    override fun onFocusEvent(focusState: FocusState) {
+        val newFocused = focusState.hasFocus
+        if (focused == newFocused) return
+        focused = newFocused
+        onFocused?.invoke(newFocused)
+        refreshShow(animate = true)
+    }
+
+    fun update(scale: Float, corner: Dp, glow: Dp, onFocused: ((Boolean) -> Unit)?) {
+        this.scale = scale
+        this.corner = corner
+        this.glow = glow
+        this.onFocused = onFocused
+    }
+
+    private fun refreshShow(animate: Boolean) {
+        val newShow = focused && currentValueOf(LocalDeviceProfile).input == BvInputMode.DPad
+        if (newShow == show) return
+        show = newShow
+        // zIndex 在 placement 阶段生效，焦点切换时重新测量一次即可
+        invalidateMeasurement()
+        val motion = currentValueOf(MaterialTheme.LocalMotionScheme)
+        coroutineScope.launch {
+            if (animate) {
+                launch { scaleProgress.animateTo(if (show) 1f else 0f, motion.fastSpatialSpec<Float>()) }
+                launch { ringAlpha.animateTo(if (show) 1f else 0f, motion.fastEffectsSpec<Float>()) }
+            } else {
+                scaleProgress.snapTo(if (show) 1f else 0f)
+                ringAlpha.snapTo(if (show) 1f else 0f)
+            }
+        }
+    }
+
+    override fun MeasureScope.measure(
+        measurable: Measurable,
+        constraints: Constraints,
+    ): MeasureResult {
+        val placeable = measurable.measure(constraints)
+        val zIndex = if (show) 1f else 0f
+        return layout(placeable.width, placeable.height) {
+            placeable.place(0, 0, zIndex)
+        }
+    }
+
+    override fun ContentDrawScope.draw() {
+        // LocalDeviceProfile 是 static local，输入模式变化时这里兜底，避免焦点效果滞留
+        val dpadActive = currentValueOf(LocalDeviceProfile).input == BvInputMode.DPad
+        val progress = if (dpadActive) scaleProgress.value else 0f
+        val currentScale = 1f + (scale - 1f) * progress
+        val alpha = if (dpadActive) ringAlpha.value else 0f
+        val color = currentValueOf(LocalFocusColor)
+        val cornerPx = corner.toPx()
+        val glowPx = glow.toPx()
+        drawScale(currentScale, pivot = center) {
+            if (alpha > 0f && color != Color.Unspecified) {
+                drawFocusGlow(color, alpha, cornerPx, glowPx)
+            }
+            drawContent()
+            if (alpha > 0f && color != Color.Unspecified) {
+                drawFocusRing(color, alpha, cornerPx)
+            }
+        }
+    }
+}
+
+private fun ContentDrawScope.drawFocusRing(color: Color, alpha: Float, cornerPx: Float) {
+    val width = 3.dp.toPx()
+    val radius = min(
+        cornerPx + width / 2,
+        (min(size.width, size.height) + width) / 2,
+    )
+    drawRoundRect(
+        color = color.copy(alpha = alpha),
+        topLeft = Offset(-width / 2, -width / 2),
+        size = Size(size.width + width, size.height + width),
+        cornerRadius = CornerRadius(radius),
+        style = Stroke(width),
+    )
+}
+
+/**
+ * 用多层外扩描边模拟原来的 elevation 阴影光晕：颜色跟随主题 primary，
+ * 透明度随焦点动画淡入淡出，且不依赖 graphicsLayer。
+ */
+private fun ContentDrawScope.drawFocusGlow(
+    color: Color,
+    alpha: Float,
+    cornerPx: Float,
+    glowPx: Float,
+) {
+    if (glowPx <= 0f) return
+    val layers = 6
+    val step = glowPx / layers
+    for (i in layers downTo 1) {
+        val spread = step * i
+        drawRoundRect(
+            color = color.copy(alpha = alpha * 0.05f),
+            topLeft = Offset(-spread, -spread),
+            size = Size(size.width + spread * 2, size.height + spread * 2),
+            cornerRadius = CornerRadius(cornerPx + spread),
+            style = Stroke(step * 1.6f),
+        )
+    }
 }
 
 /** 卡片焦点状态：圆角以 [State] 暴露，调用方在 layer / draw 阶段读取，避免弹簧动画每帧重组整张卡。 */
