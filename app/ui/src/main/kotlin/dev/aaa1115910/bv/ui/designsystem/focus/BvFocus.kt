@@ -185,7 +185,7 @@ private class BvFocusNode(
         constraints: Constraints,
     ): MeasureResult {
         val placeable = measurable.measure(constraints)
-        val zIndex = if (show) 1f else 0f
+        val zIndex = if (show && currentValueOf(LocalDeviceProfile).input == BvInputMode.DPad) 1f else 0f
         return layout(placeable.width, placeable.height) {
             placeable.place(0, 0, zIndex)
         }
