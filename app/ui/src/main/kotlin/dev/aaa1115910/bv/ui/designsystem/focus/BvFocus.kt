@@ -29,6 +29,7 @@ import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.ObserverModifierNode
 import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.node.invalidateMeasurement
 import androidx.compose.ui.node.observeReads
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp

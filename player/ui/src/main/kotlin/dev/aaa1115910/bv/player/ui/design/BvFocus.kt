@@ -36,6 +36,7 @@ import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.node.invalidateMeasurement
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp

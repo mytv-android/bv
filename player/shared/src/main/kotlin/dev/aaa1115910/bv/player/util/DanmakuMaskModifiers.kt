@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.unit.toIntSize
 import com.caverock.androidsvg.SVG
 import dev.aaa1115910.biliapi.entity.danmaku.DanmakuMaskFrame
