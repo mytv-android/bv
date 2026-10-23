@@ -60,6 +60,7 @@ fun BvTabRow(
     val bounds = remember { mutableStateMapOf<Int, Long>() }
     val indicatorX = remember { Animatable(0f) }
     val indicatorW = remember { Animatable(0f) }
+    val motionScheme = MaterialTheme.motionScheme
     LaunchedEffect(selected) {
         snapshotFlow { bounds[selected] }
             .filterNotNull()
@@ -70,13 +71,13 @@ fun BvTabRow(
                 launch {
                     indicatorX.animateTo(
                         x + width * 0.2f,
-                        MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
+                        motionScheme.defaultSpatialSpec<Float>(),
                     )
                 }
                 launch {
                     indicatorW.animateTo(
                         width * 0.6f,
-                        MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
+                        motionScheme.defaultSpatialSpec<Float>(),
                     )
                 }
             }

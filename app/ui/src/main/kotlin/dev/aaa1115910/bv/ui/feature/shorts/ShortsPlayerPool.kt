@@ -659,7 +659,7 @@ internal fun ShortsVideo(
         val boxRatio = if (containerH > 0) containerW.toFloat() / containerH else ratio
         // 完整显示时宽于容器的视频按宽度铺满；裁剪时窄于容器的视频按宽度铺满
         val fitWidth = (ratio > boxRatio) != crop
-        val w = (if (fitWidth) containerW else containerH * ratio).roundToInt().coerceAtLeast(1)
+        val w = (if (fitWidth) containerW.toFloat() else containerH * ratio).roundToInt().coerceAtLeast(1)
         val h = (if (fitWidth) containerW / ratio else containerH.toFloat()).roundToInt().coerceAtLeast(1)
         val video = measurables[0].measure(Constraints.fixed(w, h))
         val status = measurables.getOrNull(1)?.measure(
