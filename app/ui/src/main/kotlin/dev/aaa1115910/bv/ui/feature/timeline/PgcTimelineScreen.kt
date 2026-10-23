@@ -131,7 +131,7 @@ private fun TimelinePhone(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = bottom),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(day.episodes) { episode ->
+                    items(day.episodes, key = { it.seasonId }, contentType = { "episode" }) { episode ->
                         TimelineEpisodeRow(
                             episode = episode,
                             followed = follow.isFollowed(episode.seasonId),
@@ -177,7 +177,7 @@ private fun TimelineTablet(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                itemsIndexed(day.episodes) { _, episode ->
+                itemsIndexed(day.episodes, key = { _, episode -> episode.seasonId }, contentType = { _, _ -> "episode" }) { _, episode ->
                     TimelinePoster(episode, onClick = { onOpen(episode) })
                 }
             }
@@ -243,7 +243,7 @@ private fun TimelineTv(
                     horizontalArrangement = Arrangement.spacedBy(18.dp),
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
-                    itemsIndexed(shown.episodes) { index, episode ->
+                    itemsIndexed(shown.episodes, key = { _, episode -> episode.seasonId }, contentType = { _, _ -> "episode" }) { index, episode ->
                         TimelinePoster(
                             episode,
                             onClick = { onOpen(episode) },
@@ -289,7 +289,7 @@ private fun TimelineDayChips(
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(model.timelines) { index, timeline ->
+        itemsIndexed(model.timelines, key = { _, timeline -> timeline.dayOfWeek }, contentType = { _, _ -> "day" }) { index, timeline ->
             val label = if (timeline.isToday) today else stringResource(
                 R.string.timeline_day_label,
                 weekdays.getOrElse(timeline.dayOfWeek - 1) { "" },

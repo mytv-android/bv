@@ -131,7 +131,7 @@ internal fun PgcPhone(nav: NavController, state: PgcUiState) {
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(names) { index, name ->
+            itemsIndexed(names, key = { _, name -> name }, contentType = { _, _ -> "tab" }) { index, name ->
                 BvChip(text = name, selected = index == state.tab, onClick = { state.onTab(index) })
             }
         }
@@ -214,7 +214,7 @@ internal fun PgcPhone(nav: NavController, state: PgcUiState) {
                                 }
                             }
                         } else {
-                            itemsIndexed(episodes, contentType = { _, _ -> "episode" }) { index, episode ->
+                            itemsIndexed(episodes, key = { _, episode -> episode.seasonId }, contentType = { _, _ -> "episode" }) { index, episode ->
                                 TimelineEpisodeRow(
                                     episode = episode,
                                     followed = state.follow.isFollowed(episode.seasonId),
@@ -240,7 +240,7 @@ internal fun PgcPhone(nav: NavController, state: PgcUiState) {
                             )
                         }
                     }
-                    itemsIndexed(feed.ranks, contentType = { _, _ -> "row" }) { _, rank ->
+                    itemsIndexed(feed.ranks, key = { _, rank -> "rank-${rank.title}" }, contentType = { _, _ -> "row" }) { _, rank ->
                         PhoneFeedRow(
                             title = rank.title,
                             posters = rank.items,
@@ -403,7 +403,7 @@ private fun PhoneFeedRow(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(posters.size, contentType = { "poster" }) { index ->
+            items(posters.size, key = { posters[it].seasonId }, contentType = { "poster" }) { index ->
                 val item = posters[index]
                 PosterCard(data = item.toCard(), onClick = { onOpen(item) }, width = 112.dp)
             }

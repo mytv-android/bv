@@ -106,7 +106,11 @@ internal fun DynamicTablet(state: DynamicPageState, actions: DynamicActions) {
                             contentPadding = PaddingValues(start = 8.dp, end = 8.dp, bottom = navBottom + 16.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
-                            items(state.items, contentType = { "dynamic" }) { item ->
+                            items(
+                                state.items,
+                                key = { item -> item.id?.takeIf { it.isNotBlank() } ?: item.commentId },
+                                contentType = { "dynamic" },
+                            ) { item ->
                                 DynamicCard(
                                     item = item,
                                     onClick = { state.select(item) },

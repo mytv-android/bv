@@ -291,7 +291,7 @@ private fun TvPgcRows(nav: NavController, state: PgcUiState, tabName: String, li
                     )
                 }
             }
-            itemsIndexed(feed.ranks, contentType = { _, _ -> "row" }) { _, rank ->
+            itemsIndexed(feed.ranks, key = { _, rank -> "rank-${rank.title}" }, contentType = { _, _ -> "row" }) { _, rank ->
                 TvPosterRow(
                     title = rank.title,
                     posters = rank.items,
@@ -331,7 +331,7 @@ private fun TvPosterRow(
                 contentPadding = PaddingValues(start = 24.dp, end = 48.dp, top = 12.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                items(posters.size, contentType = { "poster" }) { index ->
+                items(posters.size, key = { posters[it].seasonId }, contentType = { "poster" }) { index ->
                     val item = posters[index]
                     PosterCard(data = item.toCard(), onClick = { onOpen(item) }, width = 112.dp)
                 }

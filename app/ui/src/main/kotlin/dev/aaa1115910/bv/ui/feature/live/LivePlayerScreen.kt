@@ -553,8 +553,8 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
                     nav = nav,
                     title = vm.roomInfo?.title.orEmpty(),
                     uname = vm.roomInfo?.uname.orEmpty(),
-                    watchedText = watchedText,
-                    popularity = popularity,
+                    watchedText = { watchedText },
+                    popularity = { popularity },
                     modifier = Modifier.align(Alignment.TopStart),
                 )
                 if (!isTv) {
@@ -665,8 +665,8 @@ private fun LiveInfoBar(
     nav: NavController,
     title: String,
     uname: String,
-    watchedText: String?,
-    popularity: Int,
+    watchedText: () -> String?,
+    popularity: () -> Int,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -701,7 +701,7 @@ private fun LiveInfoBar(
             }
         }
         Text(
-            text = liveStatsLine(watchedText, popularity),
+            text = liveStatsLine(watchedText(), popularity()),
             style = BvType.Small,
             color = Color.White.copy(alpha = 0.7f),
             maxLines = 1,

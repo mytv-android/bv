@@ -225,7 +225,11 @@ private fun TvDynamicRow(
                 contentPadding = PaddingValues(start = 24.dp, end = 48.dp, top = 12.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.spacedBy(18.dp),
             ) {
-                itemsIndexed(items, contentType = { _, _ -> "card" }) { index, item ->
+                itemsIndexed(
+                    items,
+                    key = { _, item -> item.id?.takeIf { it.isNotBlank() } ?: item.commentId },
+                    contentType = { _, _ -> "card" },
+                ) { index, item ->
                     DynamicTvCard(
                         item = item,
                         onClick = { onOpen(item) },

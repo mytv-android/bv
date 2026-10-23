@@ -116,7 +116,11 @@ internal fun VideoDetailTv(
                             .focusGroup(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        itemsIndexed(ui.seasons, key = { _, s -> s.seasonId }) { _, season ->
+                        itemsIndexed(
+                            items = ui.seasons,
+                            key = { _, s -> s.seasonId },
+                            contentType = { _, _ -> "season" },
+                        ) { _, season ->
                             BvChip(
                                 text = season.title,
                                 selected = season.seasonId == ui.currentSeasonId,
@@ -219,7 +223,11 @@ internal fun VideoDetailTv(
                                 contentPadding = PaddingValues(start = 4.dp, end = 48.dp, top = 10.dp, bottom = 12.dp),
                                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                             ) {
-                                itemsIndexed(row.episodes, key = { index, ep -> "${ep.cid}-$index" }) { _, episode ->
+                                itemsIndexed(
+                                    items = row.episodes,
+                                    key = { _, ep -> ep.cid },
+                                    contentType = { _, _ -> "episode" },
+                                ) { _, episode ->
                                     TvEpisodeCard(
                                         episode = episode,
                                         onClick = { callbacks.onPlay(row, episode) },
@@ -246,7 +254,11 @@ internal fun VideoDetailTv(
                                 contentPadding = PaddingValues(start = 4.dp, end = 48.dp, top = 10.dp, bottom = 12.dp),
                                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                             ) {
-                                itemsIndexed(ui.related, key = { index, video -> "related-$index-${video.avid}" }) { _, video ->
+                                itemsIndexed(
+                                    items = ui.related,
+                                    key = { _, video -> video.avid },
+                                    contentType = { _, _ -> "related" },
+                                ) { _, video ->
                                     VideoCard(
                                         data = video,
                                         onClick = { callbacks.onRelatedClick(video) },

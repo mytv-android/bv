@@ -421,7 +421,11 @@ private fun TabletInfoPanel(
                 contentPadding = PaddingValues(bottom = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                itemsIndexed(upcoming, key = { _, entry -> entry.aid }) { index, next ->
+                itemsIndexed(
+                    items = upcoming,
+                    key = { _, entry -> entry.aid },
+                    contentType = { _, _ -> "video" },
+                ) { index, next ->
                     VideoRow(
                         data = next.toCardData(),
                         onClick = {

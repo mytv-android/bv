@@ -132,6 +132,7 @@ internal fun ToViewContent(
             },
             emptyMessage = stringResource(R.string.toview_empty),
             firstRequester = firstRequester,
+            itemKey = { it.card.avid },
         ) { _, item, itemModifier ->
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 VideoCard(

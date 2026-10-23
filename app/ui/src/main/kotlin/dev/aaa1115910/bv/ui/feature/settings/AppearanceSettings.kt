@@ -381,7 +381,7 @@ private fun TvScaleSetting() {
     val base = remember(context) { context.resources.displayMetrics.widthPixels / 960f }
     var value by remember { mutableFloatStateOf(((current * 10).roundToInt() / 10f).coerceIn(0.5f, 5f)) }
     val percent = if (base > 0f) (value / base * 100).roundToInt() else 100
-    SettingSliderGroup(
+    PrefSliderGroup(
         label = stringResource(R.string.settings_appearance_scale),
         valueText = stringResource(R.string.settings_appearance_scale_value, percent),
         value = value,
@@ -389,9 +389,9 @@ private fun TvScaleSetting() {
             val rounded = ((v * 10).roundToInt() / 10f).coerceIn(0.5f, 5f)
             if (rounded != value) {
                 value = rounded
-                Prefs.density = rounded
             }
         },
+        save = { Prefs.density = it },
         valueRange = 0.5f..5f,
         steps = 44,
     )

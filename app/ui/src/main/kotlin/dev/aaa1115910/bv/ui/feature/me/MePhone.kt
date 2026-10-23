@@ -88,7 +88,11 @@ internal fun MePhone(nav: NavController, state: MeState) {
                 contentPadding = PaddingValues(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(continueItems) { entry ->
+                items(
+                    items = continueItems,
+                    key = { it.card.avid },
+                    contentType = { "video" },
+                ) { entry ->
                     VideoCard(
                         data = entry.card,
                         onClick = { nav.openHistory(entry) },

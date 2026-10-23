@@ -340,7 +340,7 @@ internal fun LazyGridScope.ugcCards(
     onOpen: (dev.aaa1115910.bv.entity.carddata.VideoCardData) -> Unit,
 ) {
     val count = (list.size - skip).coerceAtLeast(0)
-    items(count, contentType = { "video" }) { index ->
+    items(count, key = { index -> list[index + skip].aid }, contentType = { "video" }) { index ->
         val item = list.getOrNull(index + skip)
         if (item != null) {
             val card = remember(item) { item.toCard() }

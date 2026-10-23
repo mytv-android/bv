@@ -19,6 +19,16 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
+private val BottomScrim = Brush.verticalGradient(
+    0.6f to Color.Transparent,
+    1f to Color.Black.copy(alpha = 0.78f),
+)
+
+private val TopScrim = Brush.verticalGradient(
+    0f to Color.Black.copy(alpha = 0.45f),
+    0.22f to Color.Transparent,
+)
+
 /**
  * 第 7.9 节 `CinemaScrim`（原型 `.m-scrim-b`），铺满父容器的两层渐变：
  * - 下：从底部 Black α0.78 到 40% 高度处透明；
@@ -30,18 +40,8 @@ internal fun CinemaScrim(modifier: Modifier = Modifier) {
         modifier = modifier
             .fillMaxSize()
             .drawBehind {
-                drawRect(
-                    Brush.verticalGradient(
-                        0.6f to Color.Transparent,
-                        1f to Color.Black.copy(alpha = 0.78f),
-                    )
-                )
-                drawRect(
-                    Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.45f),
-                        0.22f to Color.Transparent,
-                    )
-                )
+                drawRect(BottomScrim)
+                drawRect(TopScrim)
             }
     )
 }

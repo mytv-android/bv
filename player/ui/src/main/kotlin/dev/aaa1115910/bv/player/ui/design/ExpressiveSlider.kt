@@ -7,7 +7,6 @@
 
 package dev.aaa1115910.bv.player.ui.design
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -22,6 +21,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
@@ -61,43 +61,62 @@ internal fun ExpressiveSlider(
             )
         },
         track = { state ->
-            Canvas(
+            Box(
                 Modifier
                     .fillMaxWidth()
                     .height(16.dp)
-            ) {
-                val x = state.coercedValueAsFraction * size.width
-                val gap = 6.dp.toPx()
-                val halfHandle = 2.dp.toPx()
-                val activeEnd = x - halfHandle - gap
-                if (activeEnd > 0f) {
-                    drawSegment(0f, activeEnd, 8.dp, 3.dp, primary)
-                }
-                val inactiveStart = x + halfHandle + gap
-                if (inactiveStart < size.width) {
-                    drawSegment(inactiveStart, size.width, 3.dp, 8.dp, inactive)
-                }
-            }
+                    // 进度在 Draw 阶段读取；Path 按尺寸缓存，拖动时只 rewind 不重新分配
+                    .drawWithCache {
+                        val gap = 6.dp.toPx()
+                        val halfHandle = 2.dp.toPx()
+                        val activePath = Path()
+                        val inactivePath = Path()
+                        onDrawBehind {
+                            val x = state.coercedValueAsFraction * size.width
+                            val activeEnd = x - halfHandle - gap
+                            if (activeEnd > 0f) {
+                                drawSegment(activePath, 0f, activeEnd, 8.dp, 3.dp, primary)
+                            }
+                            val inactiveStart = x + halfHandle + gap
+                            if (inactiveStart < size.width) {
+                                drawSegment(
+                                    inactivePath,
+                                    inactiveStart,
+                                    size.width,
+                                    3.dp,
+                                    8.dp,
+                                    inactive,
+                                )
+                            }
+                        }
+                    }
+            )
         },
     )
 }
 
-private fun DrawScope.drawSegment(start: Float, end: Float, startCorner: Dp, endCorner: Dp, color: Color) {
+private fun DrawScope.drawSegment(
+    path: Path,
+    start: Float,
+    end: Float,
+    startCorner: Dp,
+    endCorner: Dp,
+    color: Color,
+) {
     val s = CornerRadius(startCorner.toPx())
     val e = CornerRadius(endCorner.toPx())
-    val path = Path().apply {
-        addRoundRect(
-            RoundRect(
-                left = start,
-                top = 0f,
-                right = end,
-                bottom = size.height,
-                topLeftCornerRadius = s,
-                topRightCornerRadius = e,
-                bottomRightCornerRadius = e,
-                bottomLeftCornerRadius = s,
-            )
+    path.rewind()
+    path.addRoundRect(
+        RoundRect(
+            left = start,
+            top = 0f,
+            right = end,
+            bottom = size.height,
+            topLeftCornerRadius = s,
+            topRightCornerRadius = e,
+            bottomRightCornerRadius = e,
+            bottomLeftCornerRadius = s,
         )
-    }
+    )
     drawPath(path, color)
 }

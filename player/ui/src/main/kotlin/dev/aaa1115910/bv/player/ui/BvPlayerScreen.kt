@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -28,7 +27,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,8 +37,10 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
@@ -199,9 +199,8 @@ fun BvPlayerScreen(
     var exception by remember { mutableStateOf<Exception?>(null) }
     var showBackToHistory by remember { mutableStateOf(false) }
 
-    var duration by remember { mutableLongStateOf(0L) }
-    var bufferedPercentage by remember { mutableIntStateOf(0) }
-    var currentPosition by remember { mutableLongStateOf(0L) }
+    // 轮询结果只给心跳/弹幕回调使用，不放进 Composition，避免 10Hz 重组整屏
+    val progressSnapshot = remember { PlayerProgressSnapshot() }
     var lastPlayed by remember { mutableLongStateOf(0L) }
 
     var aspectRatioSetting by remember { mutableStateOf(configData.currentVideoAspectRatio) }
@@ -274,8 +273,8 @@ fun BvPlayerScreen(
     /** [fromPlayer] 为 false 时用最近一次轮询到的进度（退出时播放内核可能已被释放）。 */
     val sendHeartbeat: (fromPlayer: Boolean) -> Unit = { fromPlayer ->
         if (!latestConfig.incognitoMode) {
-            val position = if (fromPlayer) videoPlayer.currentPosition else currentPosition
-            val total = if (fromPlayer) videoPlayer.duration else duration
+            val position = if (fromPlayer) videoPlayer.currentPosition else progressSnapshot.position
+            val total = if (fromPlayer) videoPlayer.duration else progressSnapshot.duration
             val currentTime = (position.coerceAtLeast(0L) / 1000).toInt()
             val totalTime = (total.coerceAtLeast(0L) / 1000).toInt()
             //播放完后上报的时间应为 -1
@@ -361,11 +360,11 @@ fun BvPlayerScreen(
             }
 
             override fun onSeekBack(seekBackIncrementMs: Long) {
-                mDanmakuView?.notifySeek(currentPosition)
+                mDanmakuView?.notifySeek(progressSnapshot.position)
             }
 
             override fun onSeekForward(seekForwardIncrementMs: Long) {
-                mDanmakuView?.notifySeek(currentPosition)
+                mDanmakuView?.notifySeek(progressSnapshot.position)
             }
         }
     }
@@ -407,17 +406,18 @@ fun BvPlayerScreen(
         }
     }
 
-    // 进度轮询 + 跳过 PGC 片头/片尾
+    // 进度轮询 + 跳过 PGC 片头/片尾。
+    // 轮询结果写进普通对象（不写 Compose State），界面进度由 PlayerSeekDataProvider 单独提供。
     LaunchedEffect(Unit) {
         while (true) {
-            currentPosition = videoPlayer.currentPosition.coerceAtLeast(0L)
-            duration = videoPlayer.duration.coerceAtLeast(0L)
-            bufferedPercentage = videoPlayer.bufferedPercentage
+            val position = videoPlayer.currentPosition.coerceAtLeast(0L)
+            progressSnapshot.position = position
+            progressSnapshot.duration = videoPlayer.duration.coerceAtLeast(0L)
 
             val config = latestConfig
             val clips = config.clipInfoList
             if (config.skipPgcIntroOutro && videoPlayer.isPlaying && !clips.isNullOrEmpty()) {
-                val positionSeconds = (currentPosition / 1000).toInt()
+                val positionSeconds = (position / 1000).toInt()
                 val matched = clips.withIndex().firstOrNull { (index, clip) ->
                     index !in processedClipIndices &&
                             clip.isSkippable() &&
@@ -647,10 +647,14 @@ fun BvPlayerScreen(
 
                 BvVideoPlayer(
                     modifier = Modifier
-                        .requiredSize(
-                            width = baseSize.width * videoZoomState.scale,
-                            height = baseSize.height * videoZoomState.scale,
-                        )
+                        // 缩放值在 Layout 阶段读取：双指缩放只触发重测量，不重组
+                        .layout { measurable, _ ->
+                            val scale = videoZoomState.scale
+                            val width = (baseSize.width * scale).roundToPx().coerceAtLeast(1)
+                            val height = (baseSize.height * scale).roundToPx().coerceAtLeast(1)
+                            val placeable = measurable.measure(Constraints.fixed(width, height))
+                            layout(width, height) { placeable.place(0, 0) }
+                        }
                         .offset {
                             IntOffset(
                                 videoZoomState.offset.x.roundToInt(),
@@ -686,11 +690,6 @@ fun BvPlayerScreen(
     val dpad = rememberDpadMode(isTv)
 
     CompositionLocalProvider(
-        LocalVideoPlayerSeekData provides VideoPlayerSeekData(
-            duration = duration,
-            position = currentPosition,
-            bufferedPercentage = bufferedPercentage
-        ),
         LocalVideoPlayerStateData provides VideoPlayerStateData(
             isPlaying = isPlaying,
             isBuffering = isBuffering,
@@ -704,30 +703,65 @@ fun BvPlayerScreen(
         LocalPlayerDpad provides dpad,
         LocalPlayerReduceMotion provides reduceMotion,
     ) {
-        if (isTv) {
-            TvController(
-                modifier = modifier,
-                controller = controller,
-                ownerName = ownerName,
-                onOpenComments = onOpenComments,
-                showRemoteControlHint = showRemoteControlHint,
-                onRemoteControlHintDismiss = onRemoteControlHintDismiss,
-                content = videoSurface,
-            )
-        } else {
-            TouchController(
-                modifier = modifier,
-                controller = controller,
-                isTablet = isTablet,
-                isFullScreen = isFullScreen,
-                onEnterFullScreen = onEnterFullScreen,
-                onExitFullScreen = onExitFullScreen,
-                onEmbeddedMore = onEmbeddedMore,
-                content = videoSurface,
-                zoomState = if (zoomEnabled) videoZoomState else null,
-            )
+        PlayerSeekDataProvider(videoPlayer) {
+            if (isTv) {
+                TvController(
+                    modifier = modifier,
+                    controller = controller,
+                    ownerName = ownerName,
+                    onOpenComments = onOpenComments,
+                    showRemoteControlHint = showRemoteControlHint,
+                    onRemoteControlHintDismiss = onRemoteControlHintDismiss,
+                    content = videoSurface,
+                )
+            } else {
+                TouchController(
+                    modifier = modifier,
+                    controller = controller,
+                    isTablet = isTablet,
+                    isFullScreen = isFullScreen,
+                    onEnterFullScreen = onEnterFullScreen,
+                    onExitFullScreen = onExitFullScreen,
+                    onEmbeddedMore = onEmbeddedMore,
+                    content = videoSurface,
+                    zoomState = if (zoomEnabled) videoZoomState else null,
+                )
+            }
         }
     }
+}
+
+/** 进度轮询结果，供心跳、弹幕等回调读取；不参与 Compose 快照。 */
+private class PlayerProgressSnapshot {
+    @Volatile
+    var position: Long = 0L
+
+    @Volatile
+    var duration: Long = 0L
+}
+
+/**
+ * 播放进度只在这个子树里更新：100ms 一次的进度变化只会重组读取
+ * [LocalVideoPlayerSeekData] 的控制层，不再让整个播放页跟着重组。
+ */
+@Composable
+private fun PlayerSeekDataProvider(
+    videoPlayer: AbstractVideoPlayer,
+    content: @Composable () -> Unit,
+) {
+    val seekData = remember { VideoPlayerSeekData() }
+    LaunchedEffect(videoPlayer, seekData) {
+        while (true) {
+            seekData.position = videoPlayer.currentPosition.coerceAtLeast(0L)
+            seekData.duration = videoPlayer.duration.coerceAtLeast(0L)
+            seekData.bufferedPercentage = videoPlayer.bufferedPercentage
+            delay(100)
+        }
+    }
+    CompositionLocalProvider(
+        LocalVideoPlayerSeekData provides seekData,
+        content = content,
+    )
 }
 
 /** 只处理片头/片尾，忽略 HE、多视图、广告等其他 Clip 类型；时间区间无效时也不处理。 */

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -184,7 +185,14 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
                             latest,
                             file,
                             object : ProgressListener {
+                                private var lastUiUpdate = 0L
+
                                 override suspend fun onProgress(bytesSentTotal: Long, contentLength: Long?) {
+                                    // 网络分块可能非常频繁：UI 最多 10Hz 更新一次
+                                    val now = SystemClock.elapsedRealtime()
+                                    val finished = contentLength != null && bytesSentTotal >= contentLength
+                                    if (!finished && now - lastUiUpdate < 100L) return
+                                    lastUiUpdate = now
                                     withContext(Dispatchers.Main) {
                                         downloaded = bytesSentTotal
                                         total = contentLength ?: 0L

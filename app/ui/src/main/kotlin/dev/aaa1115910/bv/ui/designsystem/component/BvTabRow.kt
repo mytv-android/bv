@@ -1,7 +1,7 @@
 package dev.aaa1115910.bv.ui.designsystem.component
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -12,24 +12,33 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInParent
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.packInts
+import androidx.compose.ui.util.unpackInt1
+import androidx.compose.ui.util.unpackInt2
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.designsystem.focus.bvFocus
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
@@ -46,21 +55,32 @@ fun BvTabRow(
     modifier: Modifier = Modifier,
     horizontalPadding: Dp = 16.dp,
 ) {
-    val density = LocalDensity.current
     val isTv = LocalDeviceProfile.current.isTv
-    // 每个 Tab 的 x 与宽度（px）
-    val bounds = remember { mutableStateMapOf<Int, Pair<Int, Int>>() }
-    val target = bounds[selected]
-    val indicatorX by animateDpAsState(
-        with(density) { ((target?.first ?: 0) + (target?.second ?: 0) * 0.2f).toDp() },
-        MaterialTheme.motionScheme.defaultSpatialSpec(),
-        label = "tabIndicatorX"
-    )
-    val indicatorW by animateDpAsState(
-        with(density) { ((target?.second ?: 0) * 0.6f).toDp() },
-        MaterialTheme.motionScheme.defaultSpatialSpec(),
-        label = "tabIndicatorW"
-    )
+    // 每个 Tab 的 x 与宽度（px）。只在布局阶段写入/读取，不在 Composition 里读
+    val bounds = remember { mutableStateMapOf<Int, Long>() }
+    val indicatorX = remember { Animatable(0f) }
+    val indicatorW = remember { Animatable(0f) }
+    LaunchedEffect(selected) {
+        snapshotFlow { bounds[selected] }
+            .filterNotNull()
+            .distinctUntilChanged()
+            .collect { packed ->
+                val x = unpackInt1(packed).toFloat()
+                val width = unpackInt2(packed).toFloat()
+                launch {
+                    indicatorX.animateTo(
+                        x + width * 0.2f,
+                        MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    )
+                }
+                launch {
+                    indicatorW.animateTo(
+                        width * 0.6f,
+                        MaterialTheme.motionScheme.defaultSpatialSpec(),
+                    )
+                }
+            }
+    }
     Box(modifier.fillMaxWidth()) {
         Row(
             Modifier
@@ -78,7 +98,9 @@ fun BvTabRow(
                 Text(
                     title,
                     modifier = Modifier
-                        .onPlaced { bounds[index] = it.positionInParent().x.toInt() to it.size.width }
+                        .onPlaced {
+                            bounds[index] = packInts(it.positionInParent().x.toInt(), it.size.width)
+                        }
                         .bvFocus(corner = 8.dp, onFocused = { if (it && isTv && !isSelected) onSelect(index) })
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
@@ -96,18 +118,22 @@ fun BvTabRow(
             thickness = 1.dp,
             color = MaterialTheme.colorScheme.outlineVariant
         )
-        if (target != null) {
-            Box(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .offset(x = horizontalPadding + indicatorX)
-                    .width(indicatorW.coerceAtLeast(0.dp))
-                    .height(3.dp)
-                    .background(
-                        MaterialTheme.colorScheme.primary,
-                        RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
+        Box(
+            Modifier
+                .align(Alignment.BottomStart)
+                .offset { IntOffset((horizontalPadding.toPx() + indicatorX.value).roundToInt(), 0) }
+                .layout { measurable, constraints ->
+                    val width = indicatorW.value.roundToInt().coerceIn(0, constraints.maxWidth)
+                    val placeable = measurable.measure(
+                        constraints.copy(minWidth = width, maxWidth = width)
                     )
-            )
-        }
+                    layout(width, placeable.height) { placeable.place(0, 0) }
+                }
+                .height(3.dp)
+                .background(
+                    MaterialTheme.colorScheme.primary,
+                    RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)
+                )
+        )
     }
 }

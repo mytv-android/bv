@@ -222,8 +222,9 @@ internal class HomeState(
     val featured: List<UgcItem> get() = recommend.recommendVideoList.take(5)
 
     /** 继续观看 = 历史记录前 10 条；未登录时为空（整个区块隐藏）。 */
-    val continueWatching: List<ContinueItem>
-        get() = if (!user.isLogin) emptyList() else history.histories.take(10).map { it.toContinueItem() }
+    val continueWatching: List<ContinueItem> by derivedStateOf {
+        if (!user.isLogin) emptyList() else history.histories.take(10).map { it.toContinueItem() }
+    }
 
     fun extraOf(aid: Long): FeaturedExtra? = HomeMemory.extras[aid]
     fun isLiked(aid: Long): Boolean = HomeMemory.liked[aid] == true

@@ -171,6 +171,7 @@ internal fun FavoriteContent(
                 if (folders.isEmpty()) R.string.favorite_no_folder else R.string.favorite_empty
             ),
             firstRequester = firstRequester,
+            itemKey = { it.avid },
         ) { _, card, itemModifier ->
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 VideoCard(

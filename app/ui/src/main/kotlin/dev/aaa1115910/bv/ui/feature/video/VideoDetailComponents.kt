@@ -274,7 +274,9 @@ internal fun DetailEpisodeChips(
     contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
 ) {
     val state = rememberLazyListState()
-    val currentIndex = row.episodes.indexOfFirst { it.cid == currentCid }
+    val currentIndex = remember(row.episodes, currentCid) {
+        row.episodes.indexOfFirst { it.cid == currentCid }
+    }
     LaunchedEffect(currentIndex) {
         if (currentIndex > 0) runCatching { state.animateScrollToItem((currentIndex - 1).coerceAtLeast(0)) }
     }
@@ -284,7 +286,11 @@ internal fun DetailEpisodeChips(
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(row.episodes, key = { index, ep -> "${ep.cid}-$index" }) { _, ep ->
+        itemsIndexed(
+            items = row.episodes,
+            key = { _, ep -> ep.cid },
+            contentType = { _, _ -> "episode" },
+        ) { _, ep ->
             BvChip(
                 text = ep.label,
                 selected = ep.cid == currentCid,
@@ -308,7 +314,11 @@ internal fun DetailSeasonChips(
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(ui.seasons, key = { _, s -> s.seasonId }) { _, season ->
+        itemsIndexed(
+            items = ui.seasons,
+            key = { _, s -> s.seasonId },
+            contentType = { _, _ -> "season" },
+        ) { _, season ->
             BvChip(
                 text = season.title,
                 selected = season.seasonId == ui.currentSeasonId,

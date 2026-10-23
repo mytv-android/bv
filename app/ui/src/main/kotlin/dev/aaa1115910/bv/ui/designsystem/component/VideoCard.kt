@@ -57,6 +57,10 @@ import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.util.ImageSize
 import dev.aaa1115910.bv.util.resizedImageUrl
 
+private val CardStatsScrim = Brush.verticalGradient(
+    listOf(Color.Transparent, Color.Black.copy(alpha = .6f))
+)
+
 /** 视频卡长按菜单的动作（「从这里开始刷」「稍后再看」「UP 主主页」），由应用外壳提供。 */
 @Stable
 interface VideoCardActions {
@@ -97,7 +101,7 @@ fun VideoCard(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .6f))))
+                        .background(CardStatsScrim)
                         .padding(start = 8.dp, end = 8.dp, top = 18.dp, bottom = 6.dp)
                 ) {
                     Text(

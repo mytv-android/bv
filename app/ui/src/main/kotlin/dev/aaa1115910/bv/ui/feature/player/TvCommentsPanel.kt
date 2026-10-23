@@ -144,7 +144,11 @@ internal fun TvCommentsPanel(
                     contentPadding = PaddingValues(top = 4.dp, bottom = 22.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    items(commentVm.comments) { comment ->
+                    items(
+                        items = commentVm.comments,
+                        key = { it.rpid },
+                        contentType = { "comment" },
+                    ) { comment ->
                         val qrLinkOfComment = remember(comment.rpid, comment.content) {
                             commentQrLink(comment.content)
                         }

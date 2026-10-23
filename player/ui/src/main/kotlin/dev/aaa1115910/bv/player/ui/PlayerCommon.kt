@@ -30,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -149,13 +150,13 @@ internal fun BottomSubtitle(modifier: Modifier = Modifier) {
     val config = LocalVideoPlayerConfigData.current
     val seekData = LocalVideoPlayerSeekData.current
     val subtitleData = config.currentSubtitleData
-    val time = seekData.position
 
-    var currentText by remember { mutableStateOf("") }
-
-    LaunchedEffect(time, subtitleData) {
-        runCatching {
-            currentText = subtitleData.find { it.isShowing(time) }?.content ?: ""
+    // 进度每 100ms 变化，但只有真正换字幕时才需要重组
+    val currentText by remember(seekData, subtitleData) {
+        derivedStateOf {
+            runCatching {
+                subtitleData.find { it.isShowing(seekData.position) }?.content ?: ""
+            }.getOrDefault("")
         }
     }
 

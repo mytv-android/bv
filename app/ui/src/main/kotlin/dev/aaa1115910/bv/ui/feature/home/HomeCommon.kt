@@ -73,7 +73,11 @@ internal fun ContinueRow(
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(spacing),
     ) {
-        itemsIndexed(items) { _, item ->
+        itemsIndexed(
+            items,
+            key = { _, item -> "${item.card.historyBusiness}_${item.card.historyKid ?: item.card.avid}" },
+            contentType = { _, _ -> "continue" },
+        ) { _, item ->
             VideoCard(
                 data = item.card,
                 onClick = { onOpen(item.card) },
@@ -109,7 +113,11 @@ internal fun RegionChipRow(
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(names) { index, name ->
+        itemsIndexed(
+            names,
+            key = { _, name -> name },
+            contentType = { _, _ -> "region" },
+        ) { index, name ->
             BvChip(text = name, selected = index == selected, onClick = { onSelect(index) })
         }
     }

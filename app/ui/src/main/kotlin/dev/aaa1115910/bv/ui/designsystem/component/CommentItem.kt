@@ -186,10 +186,13 @@ private fun CommentText(
     var internalExpanded by remember { mutableStateOf(false) }
     val expanded = textExpanded ?: internalExpanded
     var overflow by remember { mutableStateOf(false) }
-    Text(
+    val annotated = remember(content, emoteNames) {
         buildAnnotatedString {
             content.forEach { if (it in emoteNames) appendInlineContent(it) else append(it) }
-        },
+        }
+    }
+    Text(
+        annotated,
         style = BvType.Small.copy(lineHeight = 19.5.sp),
         color = MaterialTheme.colorScheme.onSurface,
         inlineContent = inline,

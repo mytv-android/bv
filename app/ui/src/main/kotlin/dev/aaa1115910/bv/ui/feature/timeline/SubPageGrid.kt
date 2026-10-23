@@ -212,6 +212,7 @@ internal fun <T> SubPageGrid(
     firstRequester: FocusRequester? = null,
     state: LazyGridState = rememberLazyGridState(),
     header: (LazyGridScope.() -> Unit)? = null,
+    itemKey: ((T) -> Any)? = null,
     itemContent: @Composable (index: Int, item: T, modifier: Modifier) -> Unit,
 ) {
     state.LoadMoreEffect { if (list.isNotEmpty()) onLoadMore?.invoke() }
@@ -264,7 +265,11 @@ internal fun <T> SubPageGrid(
                     )
                 }
             } else {
-                items(count = list.size, contentType = { "item" }) { index ->
+                items(
+                    count = list.size,
+                    key = itemKey?.let { keyOf -> { index: Int -> keyOf(list[index]) } },
+                    contentType = { "item" },
+                ) { index ->
                     val item = list[index]
                     itemContent(
                         index,

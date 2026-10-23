@@ -407,7 +407,7 @@ private fun AllResultsGrid(
                 }
             }
             val leading = videos.take(AllLeadingVideos)
-            items(leading.size, contentType = { "video" }) { index ->
+            items(leading.size, key = { leading[it].avid }, contentType = { "video" }) { index ->
                 val card = leading[index]
                 VideoCard(data = card, onClick = { openers.video(card) }, showStats = true)
             }
@@ -424,7 +424,11 @@ private fun AllResultsGrid(
                                 .focusGroup(),
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
-                            items(pgcs, key = { "${it.bangumi}-${it.seasonId}" }) { item ->
+                            items(
+                                items = pgcs,
+                                key = { "${it.bangumi}-${it.seasonId}" },
+                                contentType = { "pgc" },
+                            ) { item ->
                                 PgcWideCard(item, onOpen = { openers.pgc(item) }, modifier = Modifier.width(420.dp))
                             }
                         }
@@ -432,7 +436,7 @@ private fun AllResultsGrid(
                 }
             }
             val rest = videos.drop(AllLeadingVideos)
-            items(rest.size, contentType = { "video" }) { index ->
+            items(rest.size, key = { rest[it].avid }, contentType = { "video" }) { index ->
                 val card = rest[index]
                 VideoCard(data = card, onClick = { openers.video(card) }, showStats = true)
             }
@@ -476,7 +480,7 @@ private fun VideoResultsGrid(
             item(key = "videoHeader", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
                 VideoSectionHeader(state, onFilter, showAction = !tv)
             }
-            items(videos.size, contentType = { "video" }) { index ->
+            items(videos.size, key = { videos[it].avid }, contentType = { "video" }) { index ->
                 val card = videos[index]
                 VideoCard(data = card, onClick = { openers.video(card) }, showStats = true)
             }
@@ -516,7 +520,7 @@ private fun PgcResultsGrid(
             horizontalArrangement = Arrangement.spacedBy(spacing),
             verticalArrangement = Arrangement.spacedBy(spacing),
         ) {
-            items(pgcList.size, contentType = { "pgc" }) { index ->
+            items(pgcList.size, key = { pgcList[it].seasonId }, contentType = { "pgc" }) { index ->
                 val item = pgcList[index]
                 if (tv) {
                     PosterCard(
@@ -564,7 +568,7 @@ private fun UserResultsGrid(
             horizontalArrangement = Arrangement.spacedBy(spacing),
             verticalArrangement = Arrangement.spacedBy(spacing / 2),
         ) {
-            items(users.size, contentType = { "user" }) { index ->
+            items(users.size, key = { users[it].mid }, contentType = { "user" }) { index ->
                 val user = users[index]
                 UserResultItem(user, follow, onOpen = { openers.user(user) })
             }
@@ -630,7 +634,7 @@ internal fun SearchResultsList(
                 PgcWideCard(item, onOpen = { openers.pgc(item) }, modifier = Modifier.fillMaxWidth())
             }
             if (showVideos) {
-                items(videos.size, contentType = { "video" }) { index ->
+                items(videos.size, key = { videos[it].avid }, contentType = { "video" }) { index ->
                     val card = videos[index]
                     VideoRow(data = card, onClick = { openers.video(card) })
                 }

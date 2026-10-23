@@ -1,6 +1,11 @@
 package dev.aaa1115910.bv.player.entity
 
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -12,11 +17,16 @@ import dev.aaa1115910.biliapi.entity.video.VideoShot
 import dev.aaa1115910.bilisubtitle.entity.SubtitleItem
 import dev.aaa1115910.bv.player.danmaku.DanmakuLaneDensity
 
-data class VideoPlayerSeekData(
-    val duration: Long = 1,
-    val position: Long = 0,
-    val bufferedPercentage: Int = 0
-)
+/**
+ * 播放进度以可变 State 持有：CompositionLocal 的值保持不变，
+ * 只有真正读取对应字段的组件才会在进度更新时重组。
+ */
+@Stable
+class VideoPlayerSeekData {
+    var duration by mutableLongStateOf(1L)
+    var position by mutableLongStateOf(0L)
+    var bufferedPercentage by mutableIntStateOf(0)
+}
 
 data class VideoPlayerSeekThumbData(
     val idleIcon: String = "",

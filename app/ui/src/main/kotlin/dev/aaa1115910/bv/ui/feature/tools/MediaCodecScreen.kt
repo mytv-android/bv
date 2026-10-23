@@ -288,7 +288,11 @@ private fun CodecList(
             contentPadding = contentPadding,
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            itemsIndexed(decoders) { index, codec ->
+            itemsIndexed(
+                items = decoders,
+                key = { _, codec -> "${codec.media}-${codec.name}-${codec.mimeType}" },
+                contentType = { _, _ -> "codec" },
+            ) { index, codec ->
                 val video = codec.media == CodecMedia.Video
                 val isSelected = codec == selected
                 BvListItem(

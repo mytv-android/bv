@@ -131,7 +131,7 @@ internal fun LazyGridScope.liveCards(
     list: List<LiveRoomItem>,
     onOpen: (LiveRoomItem) -> Unit,
 ) {
-    items(list.size, contentType = { "live" }) { index ->
+    items(list.size, key = { index -> list[index].roomId }, contentType = { "live" }) { index ->
         val item = list[index]
         LiveRoomCard(item = item, onClick = { onOpen(item) })
     }
@@ -207,7 +207,11 @@ internal fun LiveChipRow(
         contentPadding = contentPadding,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        itemsIndexed(names) { index, name ->
+        itemsIndexed(
+            names,
+            key = { _, name -> name },
+            contentType = { _, _ -> "tab" },
+        ) { index, name ->
             BvChip(
                 text = name,
                 selected = index == selected,

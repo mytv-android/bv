@@ -51,10 +51,10 @@ data class SizeChangeContent(
 fun ImageComposeOrigin(
     modifier: Modifier = Modifier,
     model: Any,
-    scale: Float = DEFAULT_SCALE,
-    offsetX: Float = DEFAULT_OFFSET_X,
-    offsetY: Float = DEFAULT_OFFSET_Y,
-    rotation: Float = DEFAULT_ROTATION,
+    scale: () -> Float = { DEFAULT_SCALE },
+    offsetX: () -> Float = { DEFAULT_OFFSET_X },
+    offsetY: () -> Float = { DEFAULT_OFFSET_Y },
+    rotation: () -> Float = { DEFAULT_ROTATION },
     gesture: RawGesture = RawGesture(),
     onMounted: () -> Unit = {},
     onSizeChange: suspend (SizeChangeContent) -> Unit = {},
@@ -96,17 +96,7 @@ fun ImageComposeOrigin(
             }
         }
     }
-    // 图片显示的真实大小
-    val rSize by remember {
-        derivedStateOf {
-            IntSize(
-                (uSize.width * scale).toInt(),
-                (uSize.height * scale).toInt()
-            )
-        }
-    }
-
-    LaunchedEffect(key1 = oSize, key2 = bSize, key3 = rSize) {
+    LaunchedEffect(key1 = oSize, key2 = bSize, key3 = uSize) {
         val maxScale = when {
             superSize -> {
                 oSize.width.toFloat() / uSize.width.toFloat()
@@ -226,11 +216,13 @@ fun ImageComposeOrigin(
         val imageModifier = Modifier
             .graphicsLayer {
                 if (imageSpecified) {
-                    scaleX = scale
-                    scaleY = scale
-                    translationX = offsetX
-                    translationY = offsetY
-                    rotationZ = rotation
+                    // 手势值在 Draw 阶段读取，缩放/拖动不再重组整个页面
+                    val s = scale()
+                    scaleX = s
+                    scaleY = s
+                    translationX = offsetX()
+                    translationY = offsetY()
+                    rotationZ = rotation()
                 }
             }
             .size(

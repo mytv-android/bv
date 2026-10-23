@@ -130,10 +130,18 @@ internal fun SuggestionList(
     val histories = state.input.matchedSearchHistories.map { it.keyword }.distinct()
     val suggests = state.input.suggests.filter { it !in histories }.distinct()
     LazyColumn(modifier = modifier, contentPadding = contentPadding) {
-        items(histories, key = { "h$it" }) { text ->
+        items(
+            items = histories,
+            key = { "h$it" },
+            contentType = { "history" },
+        ) { text ->
             SuggestionRow(text, keyword, Icons.Rounded.History) { onPick(text) }
         }
-        items(suggests, key = { "s$it" }) { text ->
+        items(
+            items = suggests,
+            key = { "s$it" },
+            contentType = { "suggest" },
+        ) { text ->
             SuggestionRow(text, keyword, Icons.Rounded.Search) { onPick(text) }
         }
     }

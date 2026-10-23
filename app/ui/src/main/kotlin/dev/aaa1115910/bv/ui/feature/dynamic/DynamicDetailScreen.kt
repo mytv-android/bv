@@ -280,7 +280,11 @@ internal fun DynamicDetailPane(
                 )
             }
             if (tab == 0) {
-                items(commentVm.comments, contentType = { "comment" }) { comment ->
+                items(
+                    commentVm.comments,
+                    key = { comment -> comment.rpid },
+                    contentType = { "comment" },
+                ) { comment ->
                     CommentItem(
                         comment = comment,
                         modifier = if (isTv) {

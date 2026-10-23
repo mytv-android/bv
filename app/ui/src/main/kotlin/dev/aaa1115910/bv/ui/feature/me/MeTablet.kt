@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -246,10 +247,13 @@ private fun ColumnScope.HistoryPane(
 
     val entries = data.entries
     val today = remember(entries.size) { startOfTodaySeconds() }
-    val groups = remember(entries.toList(), filter, today) {
-        val filtered = entries.filter { filter.accepts(it) }
-        HistoryDay.entries.mapNotNull { day ->
-            filtered.filter { it.day(today) == day }.takeIf { it.isNotEmpty() }?.let { day to it }
+    // 直接观察 SnapshotStateList，省掉每次重组都 toList() 的拷贝和 O(N) equals
+    val groups by remember(today, filter) {
+        derivedStateOf {
+            val filtered = entries.filter { filter.accepts(it) }
+            HistoryDay.entries.mapNotNull { day ->
+                filtered.filter { it.day(today) == day }.takeIf { it.isNotEmpty() }?.let { day to it }
+            }
         }
     }
 
@@ -287,7 +291,11 @@ private fun ColumnScope.HistoryPane(
                     item(key = "day_${day.name}", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
                         SectionHeader(title = stringResource(day.label))
                     }
-                    items(count = list.size, contentType = { "video" }) { index ->
+                    items(
+                        count = list.size,
+                        key = { index -> list[index].card.avid },
+                        contentType = { "video" },
+                    ) { index ->
                         val entry = list[index]
                         VideoCard(
                             data = entry.card,

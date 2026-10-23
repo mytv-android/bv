@@ -30,7 +30,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
@@ -197,7 +197,7 @@ fun TransformItemView(
     }
     Box(
         modifier = modifier
-            .onGloballyPositioned {
+            .onPlaced {
                 itemState.onPositionChange(
                     position = it.positionInRoot(),
                     size = it.size,
@@ -220,7 +220,7 @@ fun TransformContentView(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .onGloballyPositioned {
+            .onPlaced {
                 transformContentState.containerSize = it.size
                 transformContentState.containerOffset = it.positionInRoot()
             },

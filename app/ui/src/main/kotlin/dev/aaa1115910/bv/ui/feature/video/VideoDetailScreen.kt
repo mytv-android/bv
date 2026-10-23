@@ -117,17 +117,30 @@ fun VideoDetailScreen(nav: NavController, route: VideoRoute) {
         }
     }
 
-    val ui = detail?.takeUnless { it.redirectToEp }?.let { d ->
-        buildVideoDetailUi(
-            context = context,
-            d = d,
-            related = detailVm.relatedVideos.toList(),
-            followerCount = actionsVm.followerCount,
-            likeDelta = actionsVm.likeDelta,
-            coinDelta = actionsVm.coinDelta,
-            lastPlayedCid = holder.lastPlayedCid,
-            lastPlayedTimeSec = holder.lastPlayedTimeSec,
-        )
+    val relatedVideos = detailVm.relatedVideos.toList()
+    // 详情 UI 的构建包含字符串格式化、日期解析和列表映射，只在输入真正变化时重建
+    val ui = remember(
+        detail,
+        relatedVideos,
+        actionsVm.followerCount,
+        actionsVm.likeDelta,
+        actionsVm.coinDelta,
+        holder.lastPlayedCid,
+        holder.lastPlayedTimeSec,
+        context,
+    ) {
+        detail?.takeUnless { it.redirectToEp }?.let { d ->
+            buildVideoDetailUi(
+                context = context,
+                d = d,
+                related = relatedVideos,
+                followerCount = actionsVm.followerCount,
+                likeDelta = actionsVm.likeDelta,
+                coinDelta = actionsVm.coinDelta,
+                lastPlayedCid = holder.lastPlayedCid,
+                lastPlayedTimeSec = holder.lastPlayedTimeSec,
+            )
+        }
     }
 
     val navigateToPlayer: (VideoDetail, PlayRequest) -> Unit = { d, request ->
@@ -147,7 +160,8 @@ fun VideoDetailScreen(nav: NavController, route: VideoRoute) {
         )
     }
 
-    val handlers = DetailHandlers(
+    val handlers = remember(detail, actionsVm, nav, lifecycleOwner, holder, profile) {
+        DetailHandlers(
         onBack = {
             if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) nav.popBackStack()
         },
@@ -177,10 +191,13 @@ fun VideoDetailScreen(nav: NavController, route: VideoRoute) {
         onSeasonSelect = {},
         onRelatedClick = { video -> nav.openVideo(video) },
         onTagClick = { tag -> nav.navigate(TagRoute(tag.id)) },
-    )
+        )
+    }
 
     // 电视「▶ 继续 P{n} · {mm:ss}」/「▶ 播放」
-    val lastPageIndex = detail?.pages?.indexOfFirst { it.cid == holder.lastPlayedCid } ?: -1
+    val lastPageIndex = remember(detail, holder.lastPlayedCid) {
+        detail?.pages?.indexOfFirst { it.cid == holder.lastPlayedCid } ?: -1
+    }
     val tvPlayLabel = if (lastPageIndex >= 0 && holder.lastPlayedTimeSec > 0) {
         stringResource(
             R.string.video_detail_continue,

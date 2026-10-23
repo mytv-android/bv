@@ -206,7 +206,11 @@ internal fun AccountsContent(
                             )
                         }
                     }
-                    itemsIndexed(users, contentType = { _, _ -> "account" }) { _, user ->
+                    itemsIndexed(
+                        items = users,
+                        key = { _, user -> user.uid },
+                        contentType = { _, _ -> "account" },
+                    ) { _, user ->
                         AccountRow(
                             user = user,
                             current = user.uid == currentUid,

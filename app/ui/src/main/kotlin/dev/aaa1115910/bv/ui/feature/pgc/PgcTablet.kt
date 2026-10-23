@@ -197,7 +197,7 @@ internal fun PgcTablet(nav: NavController, state: PgcUiState) {
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
-                items(feed.hot.size, contentType = { "poster" }) { index ->
+                items(feed.hot.size, key = { feed.hot[it].seasonId }, contentType = { "poster" }) { index ->
                     val item = feed.hot[index]
                     PosterCard(data = item.toCard(), onClick = { nav.openSeason(item.seasonId) })
                 }

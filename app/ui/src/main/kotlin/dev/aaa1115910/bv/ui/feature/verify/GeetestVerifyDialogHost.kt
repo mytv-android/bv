@@ -5,10 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.geetest.sdk.GT3ConfigBean
 import com.geetest.sdk.GT3ErrorBean
@@ -34,11 +32,12 @@ fun GeetestVerifyDialogHost(
     val context = LocalContext.current
     val currentOnResult by rememberUpdatedState(onResult)
     val currentOnCancelled by rememberUpdatedState(onCancelled)
-    var gt3GeetestUtils: GT3GeetestUtils? by remember { mutableStateOf(null) }
-    val gt3ConfigBean by remember { mutableStateOf(GT3ConfigBean()) }
+    // 只给回调使用，不参与 Composition，无需 Snapshot state
+    val utilsRef = remember { GeetestUtilsRef() }
+    val gt3ConfigBean = remember { GT3ConfigBean() }
 
     DisposableEffect(context) {
-        gt3GeetestUtils = GT3GeetestUtils(context)
+        utilsRef.value = GT3GeetestUtils(context)
         gt3ConfigBean.apply {
             pattern = 1
             isCanceledOnTouchOutside = false
@@ -63,35 +62,39 @@ fun GeetestVerifyDialogHost(
                 override fun onDialogResult(result: String) {
                     runCatching {
                         val geetestResult = Json.decodeFromString<GeetestResult>(result)
-                        gt3GeetestUtils?.showSuccessDialog()
+                        utilsRef.value?.showSuccessDialog()
                         currentOnResult(
                             geetestResult.geetestChallenge,
                             geetestResult.geetestValidate,
                             geetestResult.geetestSeccode
                         )
                     }.onFailure {
-                        gt3GeetestUtils?.showFailedDialog()
+                        utilsRef.value?.showFailedDialog()
                         currentOnCancelled()
                     }
                 }
             }
         }
-        gt3GeetestUtils!!.init(gt3ConfigBean)
+        utilsRef.value!!.init(gt3ConfigBean)
 
         onDispose {
-            gt3GeetestUtils?.destory()
+            utilsRef.value?.destory()
         }
     }
 
     LaunchedEffect(show) {
         if (show) {
-            gt3GeetestUtils?.startCustomFlow()
+            utilsRef.value?.startCustomFlow()
             gt3ConfigBean.api1Json = org.json.JSONObject().apply {
                 put("success", 1)
                 put("gt", gt)
                 put("challenge", challenge)
             }
-            gt3GeetestUtils?.getGeetest()
+            utilsRef.value?.getGeetest()
         }
     }
+}
+
+private class GeetestUtilsRef {
+    var value: GT3GeetestUtils? = null
 }

@@ -220,7 +220,7 @@ private fun <T : PgcIndexParam> FilterChipRow(
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            itemsIndexed(options) { index, option ->
+            itemsIndexed(options, key = { _, option -> option.toString() }, contentType = { _, _ -> "chip" }) { index, option ->
                 val isSelected = option == selected
                 BvChip(
                     text = option.getDisplayName(context),

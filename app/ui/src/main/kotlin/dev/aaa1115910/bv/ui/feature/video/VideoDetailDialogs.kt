@@ -225,7 +225,11 @@ internal fun EpisodeSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(bottom = 8.dp),
                 ) {
-                    itemsIndexed(rows, key = { _, r -> r.key }) { _, r ->
+                    itemsIndexed(
+                        items = rows,
+                        key = { _, r -> r.key },
+                        contentType = { _, _ -> "row" },
+                    ) { _, r ->
                         BvChip(
                             text = r.title,
                             selected = r.key == row.key,
@@ -239,7 +243,11 @@ internal fun EpisodeSheet(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 12.dp),
             ) {
-                itemsIndexed(row.episodes, key = { index, ep -> "${ep.cid}-$index" }) { _, ep ->
+                itemsIndexed(
+                    items = row.episodes,
+                    key = { _, ep -> ep.cid },
+                    contentType = { _, _ -> "episode" },
+                ) { _, ep ->
                     val playing = ep.cid == currentCid
                     BvListItem(
                         title = ep.label,

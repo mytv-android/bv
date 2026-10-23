@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.getValue
@@ -86,6 +87,13 @@ internal fun BvPlayerHost(
     val lifecycleOwner = LocalLifecycleOwner.current
     val latestOnLoadNewVideo by rememberUpdatedState(onLoadNewVideo)
 
+    // Prefs 读取是 runBlocking 的 DataStore 访问：只在进入播放页时读一次，
+    // 避免播放状态每次变化都阻塞主线程
+    val incognitoMode = remember { Prefs.incognitoMode }
+    val playerLongPressAction = remember { Prefs.playerLongPressAction }
+    val playerLongPressSpeed = remember { Prefs.playerLongPressSpeed }
+    val skipPgcIntroOutro = remember { Prefs.skipPgcIntroOutro }
+
     // 旧播放页 onPause：暂停视频（弹幕引擎通过 isPlayingProvider 跟随，无需单独暂停）
     DisposableEffect(lifecycleOwner, videoPlayer) {
         val observer = LifecycleEventObserver { _, event ->
@@ -166,11 +174,11 @@ internal fun BvPlayerHost(
                     currentSubtitleBackgroundOpacity = playerVm.currentSubtitleBackgroundOpacity,
                     currentSubtitleBottomPadding = playerVm.currentSubtitleBottomPadding,
                     currentPlayMode = playerVm.currentPlayMode,
-                    incognitoMode = Prefs.incognitoMode,
-                    longPressAction = Prefs.playerLongPressAction,
-                    longPressSpeed = Prefs.playerLongPressSpeed,
+                    incognitoMode = incognitoMode,
+                    longPressAction = playerLongPressAction,
+                    longPressSpeed = playerLongPressSpeed,
                     clipInfoList = playerVm.clipInfoList,
-                    skipPgcIntroOutro = Prefs.skipPgcIntroOutro,
+                    skipPgcIntroOutro = skipPgcIntroOutro,
                 ),
                 LocalVideoPlayerDanmakuMasksData provides VideoPlayerDanmakuMasksData(
                     danmakuMasks = playerVm.danmakuMasks,

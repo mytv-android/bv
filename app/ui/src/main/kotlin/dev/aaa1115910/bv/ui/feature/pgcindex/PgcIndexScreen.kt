@@ -242,7 +242,7 @@ private fun PgcIndexGrid(
             horizontalArrangement = Arrangement.spacedBy(spacing),
             verticalArrangement = Arrangement.spacedBy(spacing),
         ) {
-            items(content.items.size, contentType = { "poster" }) { index ->
+            items(content.items.size, key = { content.items[it].seasonId }, contentType = { "poster" }) { index ->
                 val item = content.items[index]
                 PosterCard(
                     data = SeasonCardData.fromPgcItem(item),

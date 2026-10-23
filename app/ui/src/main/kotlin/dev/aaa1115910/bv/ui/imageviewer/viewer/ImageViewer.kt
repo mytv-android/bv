@@ -601,10 +601,10 @@ fun ImageViewer(
                 -> {
                 ImageComposeOrigin(
                     model = model,
-                    scale = state.scale.value,
-                    offsetX = state.offsetX.value,
-                    offsetY = state.offsetY.value,
-                    rotation = state.rotation.value,
+                    scale = { state.scale.value },
+                    offsetX = { state.offsetX.value },
+                    offsetY = { state.offsetY.value },
+                    rotation = { state.rotation.value },
                     gesture = gesture,
                     onSizeChange = sizeChange,
                     onMounted = onMounted,

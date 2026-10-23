@@ -88,7 +88,11 @@ internal fun DynamicPhone(state: DynamicPageState, actions: DynamicActions) {
                         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = bottom),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(state.items, contentType = { "dynamic" }) { item ->
+                        items(
+                            state.items,
+                            key = { item -> item.id?.takeIf { it.isNotBlank() } ?: item.commentId },
+                            contentType = { "dynamic" },
+                        ) { item ->
                             DynamicCard(
                                 item = item,
                                 onClick = { actions.open(item) },

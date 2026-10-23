@@ -605,7 +605,7 @@ private fun TvVideoRow(
                 ) {
                     items(
                         count = cards.size,
-                        key = { index -> "${cards[index].avid}-$index" },
+                        key = { index -> cards[index].avid },
                         contentType = { "video" },
                     ) { index ->
                         val card = cards[index]
@@ -728,7 +728,7 @@ private fun TvGridContent(
         ) {
             items(
                 count = cards.size,
-                key = { index -> "${cards[index].avid}-$index" },
+                key = { index -> cards[index].avid },
                 contentType = { "video" },
             ) { index ->
                 val card = cards[index]

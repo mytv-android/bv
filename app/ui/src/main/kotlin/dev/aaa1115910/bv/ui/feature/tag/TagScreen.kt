@@ -82,6 +82,7 @@ fun TagScreen(nav: NavController, route: TagRoute) {
             },
             emptyMessage = stringResource(R.string.tag_empty),
             firstRequester = firstRequester,
+            itemKey = { it.avid },
         ) { _, card, itemModifier ->
             VideoCard(data = card, onClick = { nav.openVideo(card) }, modifier = itemModifier)
         }

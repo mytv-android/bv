@@ -56,6 +56,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -399,7 +400,11 @@ private fun SideActionButton(
         Box(
             Modifier
                 .size(46.dp)
-                .clip(RoundedCornerShape(corner))
+                // 圆角动画在 Draw 阶段读取，避免每帧重组按钮内容
+                .graphicsLayer {
+                    shape = RoundedCornerShape(corner)
+                    clip = true
+                }
                 .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {

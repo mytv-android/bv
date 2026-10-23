@@ -124,7 +124,11 @@ internal fun DetailCommentList(
             if (showSortChips) {
                 item(key = "sort") { CommentSortChips(commentVm) }
             }
-            items(commentVm.comments) { comment ->
+            items(
+                items = commentVm.comments,
+                key = { it.rpid },
+                contentType = { "comment" },
+            ) { comment ->
                 CommentItem(
                     comment = comment,
                     onPictureClick = onShowPictures,
@@ -244,7 +248,11 @@ internal fun RepliesSheet(
                     }
                 }
             }
-            items(commentVm.replies) { reply ->
+            items(
+                items = commentVm.replies,
+                key = { it.rpid },
+                contentType = { "reply" },
+            ) { reply ->
                 CommentItem(
                     comment = reply,
                     onPictureClick = onShowPictures,

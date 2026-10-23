@@ -199,7 +199,11 @@ private fun PhoneIntro(
             item(key = "related") {
                 SectionHeader(stringResource(R.string.video_detail_related), gutter)
             }
-            itemsIndexed(ui.related, key = { index, video -> "related-$index-${video.avid}" }) { _, video ->
+            itemsIndexed(
+                items = ui.related,
+                key = { _, video -> video.avid },
+                contentType = { _, _ -> "related" },
+            ) { _, video ->
                 VideoRow(
                     data = video,
                     onClick = { callbacks.onRelatedClick(video) },

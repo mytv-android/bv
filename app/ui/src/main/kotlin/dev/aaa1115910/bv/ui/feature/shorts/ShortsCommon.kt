@@ -257,12 +257,11 @@ private fun CoinDialog(
 private fun FavoriteDialog(item: ShortsItem, vm: ShortsViewModel, onDismiss: () -> Unit) {
     val folders = vm.favoriteFolders
     val loading = vm.favoriteFoldersLoading
-    val selected = remember(item.aid) { mutableStateListOf<Long>() }
+    var selected by remember(item.aid) { mutableStateOf(emptySet<Long>()) }
     var initialized by remember(item.aid) { mutableStateOf(false) }
     LaunchedEffect(item.aid, loading, folders.size) {
         if (!initialized && !loading && vm.favoriteFoldersAid == item.aid && folders.isNotEmpty()) {
-            selected.clear()
-            selected.addAll(folders.filter { it.videoInThisFav }.map { it.id })
+            selected = folders.filter { it.videoInThisFav }.map { it.id }.toSet()
             initialized = true
         }
     }
@@ -294,12 +293,18 @@ private fun FavoriteDialog(item: ShortsItem, vm: ShortsViewModel, onDismiss: () 
                     Modifier.heightIn(max = 360.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    items(folders, key = { it.id }) { folder ->
+                    items(
+                        items = folders,
+                        key = { it.id },
+                        contentType = { "folder" },
+                    ) { folder ->
                         val checked = folder.id in selected
                         BvListItem(
                             title = folder.title,
                             subtitle = stringResource(R.string.shorts_favorite_count, folder.mediaCount),
-                            onClick = { if (checked) selected.remove(folder.id) else selected.add(folder.id) },
+                            onClick = {
+                                selected = if (checked) selected - folder.id else selected + folder.id
+                            },
                             contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
                             trailing = { Checkbox(checked = checked, onCheckedChange = null) },
                         )
@@ -444,7 +449,11 @@ internal fun ShortsCommentList(
                 }
             }
             if (ready || root != null) {
-                itemsIndexed(list) { index, comment ->
+                itemsIndexed(
+                    items = list,
+                    key = { _, comment -> comment.rpid },
+                    contentType = { _, _ -> "comment" },
+                ) { index, comment ->
                     val focusModifier = if (tv) {
                         Modifier
                             .then(if (index == 0 && firstItemRequester != null) Modifier.focusRequester(firstItemRequester) else Modifier)
@@ -589,10 +598,10 @@ internal fun ShortsProgress(
     overrideMs: Long? = null,
 ) {
     val slot = pool.slotFor(item.aid)
-    val duration = slot?.durationMs?.takeIf { it > 0 } ?: (item.duration * 1000L)
-    val position = overrideMs ?: slot?.positionMs ?: 0L
     var seeking by remember(item.aid) { mutableStateOf<Float?>(null) }
-    val fraction = seeking ?: if (duration > 0) position.toFloat() / duration else 0f
+    val duration: () -> Long = {
+        slot?.durationMs?.takeIf { it > 0 } ?: (item.duration * 1000L)
+    }
     val onSeek: ((Float) -> Unit)? = if (seekable) {
         { value: Float -> seeking = value }
     } else {
@@ -600,14 +609,21 @@ internal fun ShortsProgress(
     }
     val onSeekFinished: (() -> Unit)? = if (seekable) {
         {
-            seeking?.let { pool.seekTo(item.aid, (it * duration).toLong()) }
+            seeking?.let { pool.seekTo(item.aid, (it * duration()).toLong()) }
             seeking = null
         }
     } else {
         null
     }
     WavyProgress(
-        progress = fraction,
+        // 位置只在 Draw 阶段读取：播放器每 100ms 更新 positionMs 不会触发重组
+        progress = {
+            seeking ?: run {
+                val total = duration()
+                val position = overrideMs ?: slot?.positionMs ?: 0L
+                if (total > 0) position.toFloat() / total else 0f
+            }
+        },
         modifier = modifier,
         playing = slot?.isPlaying == true,
         onSeek = onSeek,

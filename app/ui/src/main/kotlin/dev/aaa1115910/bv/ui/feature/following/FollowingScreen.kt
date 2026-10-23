@@ -64,6 +64,7 @@ internal fun FollowingContent(
         modifier = modifier,
         emptyMessage = stringResource(R.string.following_empty),
         firstRequester = firstRequester,
+        itemKey = { it.mid },
     ) { _, up, itemModifier ->
         BvListItem(
             title = up.name,

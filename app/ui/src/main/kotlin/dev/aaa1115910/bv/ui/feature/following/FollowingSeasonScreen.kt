@@ -180,6 +180,7 @@ internal fun FollowingSeasonContent(
             onRetry = { vm.loadMore() },
             emptyMessage = stringResource(R.string.following_seasons_empty),
             firstRequester = firstRequester,
+            itemKey = { it.seasonId },
         ) { _, season, itemModifier ->
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 PosterCard(

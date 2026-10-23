@@ -2,7 +2,6 @@
 
 package dev.aaa1115910.bv.ui.designsystem.component
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -17,6 +16,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Path
@@ -59,50 +59,51 @@ fun BvSlider(
             )
         },
         track = { state ->
-            val range = state.valueRange
-            val fraction = if (range.endInclusive == range.start) 0f
-            else ((state.value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
-            Canvas(
+            Box(
                 Modifier
                     .fillMaxWidth()
                     .height(16.dp)
-            ) {
-                val gap = 6.dp.toPx()
-                val h = size.height
-                val x = size.width * fraction
-                val big = CornerRadius(8.dp.toPx())
-                val small = CornerRadius(3.dp.toPx())
-                val activeEnd = (x - gap).coerceAtLeast(0f)
-                if (activeEnd > 0f) {
-                    drawPath(
-                        Path().apply {
-                            addRoundRect(
-                                RoundRect(
-                                    left = 0f, top = 0f, right = activeEnd, bottom = h,
-                                    topLeftCornerRadius = big, bottomLeftCornerRadius = big,
-                                    topRightCornerRadius = small, bottomRightCornerRadius = small,
+                    // 进度在 Draw 阶段读取；Path 按尺寸缓存，拖动时只 rewind 不重新分配
+                    .drawWithCache {
+                        val gap = 6.dp.toPx()
+                        val big = CornerRadius(8.dp.toPx())
+                        val small = CornerRadius(3.dp.toPx())
+                        val activePath = Path()
+                        val inactivePath = Path()
+                        onDrawBehind {
+                            val range = state.valueRange
+                            val fraction = if (range.endInclusive == range.start) 0f
+                            else ((state.value - range.start) / (range.endInclusive - range.start))
+                                .coerceIn(0f, 1f)
+                            val h = size.height
+                            val x = size.width * fraction
+                            val activeEnd = (x - gap).coerceAtLeast(0f)
+                            if (activeEnd > 0f) {
+                                activePath.rewind()
+                                activePath.addRoundRect(
+                                    RoundRect(
+                                        left = 0f, top = 0f, right = activeEnd, bottom = h,
+                                        topLeftCornerRadius = big, bottomLeftCornerRadius = big,
+                                        topRightCornerRadius = small, bottomRightCornerRadius = small,
+                                    )
                                 )
-                            )
-                        },
-                        primary,
-                    )
-                }
-                val inactiveStart = (x + gap).coerceAtMost(size.width)
-                if (inactiveStart < size.width) {
-                    drawPath(
-                        Path().apply {
-                            addRoundRect(
-                                RoundRect(
-                                    left = inactiveStart, top = 0f, right = size.width, bottom = h,
-                                    topLeftCornerRadius = small, bottomLeftCornerRadius = small,
-                                    topRightCornerRadius = big, bottomRightCornerRadius = big,
+                                drawPath(activePath, primary)
+                            }
+                            val inactiveStart = (x + gap).coerceAtMost(size.width)
+                            if (inactiveStart < size.width) {
+                                inactivePath.rewind()
+                                inactivePath.addRoundRect(
+                                    RoundRect(
+                                        left = inactiveStart, top = 0f, right = size.width, bottom = h,
+                                        topLeftCornerRadius = small, bottomLeftCornerRadius = small,
+                                        topRightCornerRadius = big, bottomRightCornerRadius = big,
+                                    )
                                 )
-                            )
-                        },
-                        inactive,
-                    )
-                }
-            }
+                                drawPath(inactivePath, inactive)
+                            }
+                        }
+                    }
+            )
         },
     )
 }

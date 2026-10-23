@@ -223,7 +223,11 @@ internal fun VideoDetailTablet(
                         .weight(1f),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    itemsIndexed(ui.related, key = { index, video -> "related-$index-${video.avid}" }) { _, video ->
+                    itemsIndexed(
+                        items = ui.related,
+                        key = { _, video -> video.avid },
+                        contentType = { _, _ -> "related" },
+                    ) { _, video ->
                         VideoRow(data = video, onClick = { callbacks.onRelatedClick(video) })
                     }
                     item(key = "end") { Box(Modifier.height(8.dp)) }

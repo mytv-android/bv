@@ -90,6 +90,8 @@ internal enum class DynamicDateGroup(@param:StringRes val label: Int) {
 internal fun DynamicItem.effective(): DynamicItem =
     if (type == DynamicType.Forward) orig ?: this else this
 
+private val TimeOfDayRegex = Regex("^\\d{1,2}:\\d{2}$")
+
 /**
  * 按接口返回的发布时间文字分组（接口给的是「刚刚」「5分钟前」「3小时前」「昨天 21:30」「10月12日」等）。
  */
@@ -98,7 +100,7 @@ internal fun DynamicItem.dateGroup(): DynamicDateGroup {
     return when {
         time.startsWith("昨天") -> DynamicDateGroup.Yesterday
         time.isEmpty() || time.contains("刚刚") || time.contains("分钟前") || time.contains("小时前") ||
-            time.startsWith("今天") || Regex("^\\d{1,2}:\\d{2}$").matches(time) -> DynamicDateGroup.Today
+            time.startsWith("今天") || TimeOfDayRegex.matches(time) -> DynamicDateGroup.Today
 
         else -> DynamicDateGroup.Earlier
     }
@@ -337,7 +339,7 @@ internal fun DynamicUpRow(
                 isAll = true,
             )
         }
-        itemsIndexed(ups, contentType = { _, _ -> "up" }) { index, up ->
+        itemsIndexed(ups, key = { _, up -> up.mid }, contentType = { _, _ -> "up" }) { index, up ->
             UpAvatarItem(
                 name = up.name,
                 avatar = up.avatar,

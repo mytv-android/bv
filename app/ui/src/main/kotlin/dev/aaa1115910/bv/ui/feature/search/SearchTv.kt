@@ -383,7 +383,7 @@ private fun SearchTvInput(
                             contentPadding = PaddingValues(start = 4.dp, top = 12.dp, end = 48.dp, bottom = 12.dp),
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                         ) {
-                            items(cards.size, contentType = { "video" }) { index ->
+                            items(cards.size, key = { cards[it].avid }, contentType = { "video" }) { index ->
                                 val card = cards[index]
                                 VideoCard(
                                     data = card,

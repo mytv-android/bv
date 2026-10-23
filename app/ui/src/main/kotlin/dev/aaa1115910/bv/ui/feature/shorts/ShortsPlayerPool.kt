@@ -5,10 +5,8 @@ import android.view.TextureView
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -27,9 +25,12 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -215,9 +216,7 @@ internal class ShortsPlayerPool(
         )
     }
 
-    init {
-        scope.launch { tick() }
-    }
+    private var tickJob: Job? = null
 
     /**
      * @param maxQuality 每次加载时调用；返回非 null 表示按流量计费（移动网络），清晰度不超过该值
@@ -319,12 +318,18 @@ internal class ShortsPlayerPool(
     fun onVisible() {
         if (released) return
         visible = true
+        // 页面可见才启动 100ms 进度轮询；隐藏时不再空转
+        if (tickJob == null) {
+            tickJob = scope.launch { tick() }
+        }
         if (lastItems.isNotEmpty()) update(lastIndex, lastItems) else slots.forEach { applyRole(it) }
     }
 
     fun onHidden() {
         if (!visible) return
         visible = false
+        tickJob?.cancel()
+        tickJob = null
         currentSlot?.let { reportProgress(it) }
         slots.forEach { it.player?.mPlayer?.playWhenReady = false }
     }
@@ -343,6 +348,8 @@ internal class ShortsPlayerPool(
         if (released) return
         currentSlot?.let { reportProgress(it) }
         visible = false
+        tickJob?.cancel()
+        tickJob = null
         released = true
         slots.forEach { recycle(it, releasePlayer = true) }
     }
@@ -597,49 +604,73 @@ internal fun ShortsVideo(
         slot?.attach(textureView)
         onDispose { slot?.detach(textureView) }
     }
-    BoxWithConstraints(modifier.clipToBounds(), contentAlignment = Alignment.Center) {
-        val vw = slot?.videoWidth?.takeIf { it > 0 } ?: item.width
-        val vh = slot?.videoHeight?.takeIf { it > 0 } ?: item.height
-        val ratio = if (vw > 0 && vh > 0) vw.toFloat() / vh else if (item.isPortrait) 9f / 16f else 16f / 9f
-        val boxRatio = if (maxHeight > 0.dp) maxWidth / maxHeight else ratio
-        // 完整显示时宽于容器的视频按宽度铺满；裁剪时窄于容器的视频按宽度铺满
-        val fitWidth = (ratio > boxRatio) != crop
-        val w = if (fitWidth) maxWidth else maxHeight * ratio
-        val h = if (fitWidth) maxWidth / ratio else maxHeight
-        Box(Modifier.requiredSize(w, h)) {
-            AndroidView(factory = { textureView }, modifier = Modifier.fillMaxSize())
-            val coverAlpha by animateFloatAsState(
-                if (slot?.firstFrameRendered == true) 0f else 1f,
-                MaterialTheme.motionScheme.fastEffectsSpec(),
-                label = "shortsCover"
-            )
-            if (coverAlpha > 0.01f) {
-                AsyncImage(
-                    model = item.cover,
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { alpha = coverAlpha },
+    // 画面尺寸在 Layout 阶段算：省掉每个 pager 页一次 SubcomposeLayout
+    Layout(
+        modifier = modifier.clipToBounds(),
+        content = {
+            Box {
+                AndroidView(factory = { textureView }, modifier = Modifier.fillMaxSize())
+                val coverAlpha by animateFloatAsState(
+                    if (slot?.firstFrameRendered == true) 0f else 1f,
+                    MaterialTheme.motionScheme.fastEffectsSpec(),
+                    label = "shortsCover"
                 )
-            }
-        }
-        if (showStatus && slot != null && pool.currentAid == item.aid) {
-            when {
-                slot.state == SlotState.Error -> Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(stringResource(R.string.shorts_play_failed), style = BvType.Body, color = Color.White)
-                    BvButton(
-                        text = stringResource(R.string.ds_retry),
-                        onClick = { pool.retry(item.aid) },
-                        style = BvButtonStyle.Tonal,
+                if (coverAlpha > 0.01f) {
+                    AsyncImage(
+                        model = item.cover,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = coverAlpha },
                     )
                 }
-
-                !slot.firstFrameRendered || slot.buffering -> LoadingIndicator()
             }
+            if (showStatus && slot != null && pool.currentAid == item.aid) {
+                Box {
+                    when {
+                        slot.state == SlotState.Error -> Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text(stringResource(R.string.shorts_play_failed), style = BvType.Body, color = Color.White)
+                            BvButton(
+                                text = stringResource(R.string.ds_retry),
+                                onClick = { pool.retry(item.aid) },
+                                style = BvButtonStyle.Tonal,
+                            )
+                        }
+
+                        !slot.firstFrameRendered || slot.buffering -> LoadingIndicator()
+                    }
+                }
+            }
+        },
+    ) { measurables, constraints ->
+        val containerW = constraints.maxWidth
+        val containerH = constraints.maxHeight
+        val vw = slot?.videoWidth?.takeIf { it > 0 } ?: item.width
+        val vh = slot?.videoHeight?.takeIf { it > 0 } ?: item.height
+        val ratio = if (vw > 0 && vh > 0) {
+            vw.toFloat() / vh
+        } else {
+            if (item.isPortrait) 9f / 16f else 16f / 9f
+        }
+        val boxRatio = if (containerH > 0) containerW.toFloat() / containerH else ratio
+        // 完整显示时宽于容器的视频按宽度铺满；裁剪时窄于容器的视频按宽度铺满
+        val fitWidth = (ratio > boxRatio) != crop
+        val w = (if (fitWidth) containerW else containerH * ratio).roundToInt().coerceAtLeast(1)
+        val h = (if (fitWidth) containerW / ratio else containerH.toFloat()).roundToInt().coerceAtLeast(1)
+        val video = measurables[0].measure(Constraints.fixed(w, h))
+        val status = measurables.getOrNull(1)?.measure(
+            Constraints(maxWidth = containerW, maxHeight = containerH)
+        )
+        layout(containerW, containerH) {
+            video.place((containerW - w) / 2, (containerH - h) / 2)
+            status?.place(
+                (containerW - status.width) / 2,
+                (containerH - status.height) / 2,
+            )
         }
     }
 }

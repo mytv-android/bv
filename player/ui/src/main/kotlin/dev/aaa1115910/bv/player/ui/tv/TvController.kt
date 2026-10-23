@@ -569,9 +569,6 @@ internal fun TvController(
         animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
         label = "tvControlsEnd",
     )
-    val shownPosition = if (seeking) goTime else seekData.position
-    val safeDuration = seekData.duration.coerceAtLeast(1L)
-
     CompositionLocalProvider(LocalContentColor provides Color.White) {
         Box(
             modifier = modifier
@@ -647,6 +644,9 @@ internal fun TvController(
                 enter = fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()),
                 exit = fadeOut(MaterialTheme.motionScheme.defaultEffectsSpec()),
             ) {
+                // 进度只在控制层可见时读取，隐藏时不跟随 100ms 轮询重组
+                val shownPosition = if (seeking) goTime else seekData.position
+                val safeDuration = seekData.duration.coerceAtLeast(1L)
                 Box(modifier = Modifier.fillMaxSize()) {
                     CinemaScrim()
 

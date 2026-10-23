@@ -101,6 +101,7 @@ fun HistoryScreen(nav: NavController) {
                     onRetry = { vm.update() },
                     emptyMessage = stringResource(R.string.history_empty),
                     firstRequester = firstRequester,
+                    itemKey = { it.card.avid },
                 ) { _, item, modifier ->
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         VideoCard(

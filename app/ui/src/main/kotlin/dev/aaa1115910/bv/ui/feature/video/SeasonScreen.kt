@@ -155,13 +155,15 @@ fun SeasonScreen(nav: NavController, route: SeasonRoute) {
     }
 
     val progress = seasonVm.lastPlayProgress
-    val ui = season?.let { data ->
-        buildSeasonUi(
-            context = context,
-            data = data,
-            lastEpId = progress?.lastEpId,
-            lastTimeSec = progress?.lastTime ?: 0,
-        )
+    val ui = remember(season, progress, context) {
+        season?.let { data ->
+            buildSeasonUi(
+                context = context,
+                data = data,
+                lastEpId = progress?.lastEpId,
+                lastTimeSec = progress?.lastTime ?: 0,
+            )
+        }
     }
 
     val handlers = DetailHandlers(

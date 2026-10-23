@@ -136,7 +136,11 @@ internal fun MeTv(nav: NavController, state: MeState) {
                         contentPadding = PaddingValues(start = 24.dp, end = 48.dp, top = 12.dp, bottom = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
-                        items(continueItems) { entry ->
+                        items(
+                            items = continueItems,
+                            key = { it.card.avid },
+                            contentType = { "video" },
+                        ) { entry ->
                             VideoCard(
                                 data = entry.card,
                                 onClick = { nav.openHistory(entry) },

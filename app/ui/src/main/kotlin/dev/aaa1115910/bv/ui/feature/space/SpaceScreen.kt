@@ -180,6 +180,7 @@ fun SpaceScreen(nav: NavController, route: SpaceRoute) {
             },
             emptyMessage = stringResource(R.string.space_empty),
             firstRequester = firstRequester,
+            itemKey = { it.avid },
             header = {
                 item(key = "header", span = { GridItemSpan(maxLineSpan) }, contentType = "header") {
                     SpaceHeader(holder = profile, onToggleFollow = { profile.toggleFollow(context) })

@@ -13,6 +13,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,7 +29,7 @@ import androidx.compose.ui.unit.dp
  */
 @Composable
 fun WavyProgress(
-    progress: Float,
+    progress: () -> Float,
     modifier: Modifier = Modifier,
     playing: Boolean = true,
     color: Color = MaterialTheme.colorScheme.primary,
@@ -33,7 +37,8 @@ fun WavyProgress(
     onSeek: ((Float) -> Unit)? = null,
     onSeekFinished: (() -> Unit)? = null,
 ) {
-    val p = progress.coerceIn(0f, 1f)
+    // 透明 Slider 只需要拖动时的值；播放进度在 Draw 阶段读取，避免每 100ms 重组
+    var sliderValue by remember { mutableFloatStateOf(progress().coerceIn(0f, 1f)) }
     Box(modifier.fillMaxWidth().height(12.dp), contentAlignment = Alignment.Center) {
         Crossfade(
             targetState = playing,
@@ -42,7 +47,7 @@ fun WavyProgress(
         ) { wavy ->
             if (wavy) {
                 LinearWavyProgressIndicator(
-                    progress = { p },
+                    progress = { progress().coerceIn(0f, 1f) },
                     modifier = Modifier.fillMaxWidth().height(12.dp),
                     color = color,
                     trackColor = trackColor,
@@ -50,7 +55,7 @@ fun WavyProgress(
             } else {
                 Box(Modifier.fillMaxWidth().height(12.dp), contentAlignment = Alignment.Center) {
                     LinearProgressIndicator(
-                        progress = { p },
+                        progress = { progress().coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth().height(4.dp),
                         color = color,
                         trackColor = trackColor,
@@ -62,9 +67,15 @@ fun WavyProgress(
         }
         if (onSeek != null) {
             Slider(
-                value = p,
-                onValueChange = onSeek,
-                onValueChangeFinished = onSeekFinished,
+                value = sliderValue.coerceIn(0f, 1f),
+                onValueChange = {
+                    sliderValue = it
+                    onSeek(it)
+                },
+                onValueChangeFinished = {
+                    sliderValue = progress().coerceIn(0f, 1f)
+                    onSeekFinished?.invoke()
+                },
                 modifier = Modifier.fillMaxWidth(),
                 colors = SliderDefaults.colors(
                     thumbColor = Color.Transparent,
