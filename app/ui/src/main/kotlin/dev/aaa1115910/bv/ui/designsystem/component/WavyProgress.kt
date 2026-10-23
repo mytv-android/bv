@@ -38,7 +38,7 @@ fun WavyProgress(
     onSeekFinished: (() -> Unit)? = null,
 ) {
     // 透明 Slider 只需要拖动时的值；播放进度在 Draw 阶段读取，避免每 100ms 重组
-    var sliderValue by remember { mutableFloatStateOf(progress().coerceIn(0f, 1f)) }
+    var sliderValue by remember { mutableFloatStateOf(0f) }
     Box(modifier.fillMaxWidth().height(12.dp), contentAlignment = Alignment.Center) {
         Crossfade(
             targetState = playing,

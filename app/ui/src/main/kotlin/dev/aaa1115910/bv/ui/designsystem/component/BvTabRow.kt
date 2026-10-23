@@ -70,13 +70,13 @@ fun BvTabRow(
                 launch {
                     indicatorX.animateTo(
                         x + width * 0.2f,
-                        MaterialTheme.motionScheme.defaultSpatialSpec(),
+                        MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
                     )
                 }
                 launch {
                     indicatorW.animateTo(
                         width * 0.6f,
-                        MaterialTheme.motionScheme.defaultSpatialSpec(),
+                        MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
                     )
                 }
             }
