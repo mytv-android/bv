@@ -1463,7 +1463,7 @@ Box
 | 5 | 网络与代理 | 代理服务器、官方 CDN、测速 | Wifi | tertiaryContainer | 电视 `NetworkSetting` + API 类型(Web/App) + 测速入口 |
 | 6 | 账号与安全 | 多账号、用户锁、无痕模式 | Shield | secondaryContainer | 账号切换、用户锁、无痕模式 |
 | 7 | 存储 | 图片缓存、日志 | Storage | primaryContainer | 电视 `StorageSetting` + 日志入口 |
-| 8 | 关于 | 版本、更新、解码器信息 | Info | tertiaryContainer | 版本/更新/GitHub/alpha 更新/Firebase/FPS/设备信息/解码器信息/崩溃测试 |
+| 8 | 关于 | 版本、更新、解码器信息 | Info | tertiaryContainer | 版本/更新/项目地址/Telegram 群组/alpha 更新/Firebase/FPS/设备信息/解码器信息/崩溃测试；电视上点「项目地址 / Telegram 群组」弹链接二维码（复用 `m3qrcode`），手机 / 平板直接打开网页 |
 
 分类项 = BvListItem，图标容器裁剪为 `MaterialShapes.Cookie9Sided.toShape()`。
 
