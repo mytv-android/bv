@@ -19,6 +19,17 @@ import org.koin.core.annotation.Single
 import java.net.URI
 
 /**
+ * 杜比视界编码不是每个片源都提供，缺失时回退到同族的 H.265，
+ * 避免选了 DVH1 / HVC1 的片源在没有杜比视界时直接掉到 H.264。
+ */
+private val VideoCodec.fallbackCodecs: List<VideoCodec>
+    get() = when (this) {
+        VideoCodec.HVC1 -> listOf(VideoCodec.HEVC)
+        VideoCodec.DVH1 -> listOf(VideoCodec.HVC1, VideoCodec.HEVC)
+        else -> emptyList()
+    }
+
+/**
  * 根据 aid / cid（PGC 另需 epid）获取播放地址，并按用户设置选择清晰度、视频编码、音频和 CDN。
  *
  * 逻辑从 VideoPlayerV3ViewModel 中抽出，播放器和刷刷的播放器池共用这一份实现：
@@ -197,7 +208,8 @@ class PlayUrlResolver(
 
         val selected = when {
             codecList.contains(preferred) -> preferred
-            codecList.isNotEmpty() -> codecList.minBy { it.ordinal }
+            codecList.isNotEmpty() -> preferred.fallbackCodecs.firstOrNull { it in codecList }
+                ?: codecList.minBy { it.ordinal }
             // 编码表里没有该清晰度时，按实际视频流推断，避免直接失败
             else -> playData.dashVideos.firstOrNull { it.quality == quality.code }
                 ?.let { video ->

@@ -63,8 +63,8 @@ internal fun PlaySettings() {
     )
     SettingChoiceGroup(
         label = stringResource(R.string.settings_play_codec),
-        // 与旧电视相同：DVH1 / HVC1 不作为默认编码
-        options = VideoCodec.entries.filter { it != VideoCodec.DVH1 && it != VideoCodec.HVC1 },
+        // 播放器菜单里能选到的编码都可以设为默认，包括杜比视界（DVH1 / HVC1）
+        options = VideoCodec.entries,
         isSelected = { it == codec },
         optionLabel = { it.getDisplayName(context) },
         onSelect = {
