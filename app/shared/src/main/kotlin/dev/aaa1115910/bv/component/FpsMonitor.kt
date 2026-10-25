@@ -1,13 +1,13 @@
 package dev.aaa1115910.bv.component
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
@@ -23,11 +23,22 @@ fun FpsMonitor(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    var fpsCount by remember { mutableIntStateOf(0) }
+    Box(
+        modifier = modifier.fillMaxSize()
+    ) {
+        content()
+        FpsOverlay(modifier)
+    }
+}
+
+/** 独立的重组作用域：FPS 变化只重组这里的 Text，不重新进入 content()。 */
+@Composable
+private fun BoxScope.FpsOverlay(modifier: Modifier) {
     var fps by remember { mutableIntStateOf(0) }
-    var lastUpdate by remember { mutableLongStateOf(0L) }
 
     LaunchedEffect(Unit) {
+        var fpsCount = 0
+        var lastUpdate = 0L
         while (true) {
             withFrameMillis { ms ->
                 fpsCount++
@@ -40,17 +51,12 @@ fun FpsMonitor(
         }
     }
 
-    Box(
-        modifier = modifier.fillMaxSize()
-    ) {
-        content()
-        Text(
-            modifier = modifier
-                .size(60.dp)
-                .align(Alignment.TopStart),
-            text = "Fps: $fps",
-            color = Color.Red,
-            style = MaterialTheme.typography.bodyMedium
-        )
-    }
+    Text(
+        modifier = modifier
+            .size(60.dp)
+            .align(Alignment.TopStart),
+        text = "Fps: $fps",
+        color = Color.Red,
+        style = MaterialTheme.typography.bodyMedium
+    )
 }

@@ -108,6 +108,7 @@ import dev.aaa1115910.bv.ui.feature.me.formatCount
 import dev.aaa1115910.bv.ui.feature.player.findActivity
 import dev.aaa1115910.bv.ui.navigation.LivePlayerRoute
 import dev.aaa1115910.bv.util.Prefs
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import dev.aaa1115910.bv.util.requestFocus
 import dev.aaa1115910.bv.util.toast
 import dev.aaa1115910.bv.viewmodel.live.LivePlayerViewModel
@@ -152,16 +153,18 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
             )
         )
     }
+    val danmakuScale = remember { Prefs.defaultDanmakuScale }
+    val danmakuOpacity = remember { Prefs.defaultDanmakuOpacity }
     // 弹幕引擎 View：离开页面（离开组合）时 release；位置 / 播放状态 / 倍速跟随直播流播放器
-    val danmakuView = remember {
+    val danmakuView = remember(context, videoPlayer) {
         DanmakuView(context).apply {
             setPositionProvider { videoPlayer.currentPosition.coerceAtLeast(0L) }
             setIsPlayingProvider { videoPlayer.isPlaying }
             setPlaybackSpeedProvider { videoPlayer.speed }
             setConfig(
                 DanmakuConfig(
-                    textSizeScale = (Prefs.defaultDanmakuScale * 100).toInt(),
-                    opacity = Prefs.defaultDanmakuOpacity,
+                    textSizeScale = (danmakuScale * 100).toInt(),
+                    opacity = danmakuOpacity,
                 )
             )
         }
@@ -268,8 +271,8 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
         danmakuView.setConfig(
             DanmakuConfig(
                 enabled = danmakuEnabled,
-                textSizeScale = (Prefs.defaultDanmakuScale * 100).toInt(),
-                opacity = Prefs.defaultDanmakuOpacity,
+                textSizeScale = (danmakuScale * 100).toInt(),
+                opacity = danmakuOpacity,
             )
         )
     }
@@ -483,7 +486,7 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
     }
 
     // 播放 / 缓冲时保持屏幕常亮；出错后允许熄屏
-    DisposableEffect(view, isBuffering, isPlaybackError, vm.error) {
+    DisposableEffect(view, isPlaybackError, vm.error) {
         view.keepScreenOn = vm.error == null && !isPlaybackError
         onDispose { view.keepScreenOn = false }
     }
@@ -597,7 +600,9 @@ fun LivePlayerScreen(nav: NavController, route: LivePlayerRoute) {
             onDanmakuToggle = { danmakuEnabled = !danmakuEnabled },
             onDanmakuFilterLevelChange = { level ->
                 danmakuFilterLevel = level
-                Prefs.defaultLiveDanmakuFilterLevel = level
+                PreferenceWrites.enqueueLatest("live-danmaku-filter-level") {
+                    Prefs.defaultLiveDanmakuFilterLevel = level
+                }
             },
             onSwitchQuality = { qn ->
                 pendingQualityToast = true

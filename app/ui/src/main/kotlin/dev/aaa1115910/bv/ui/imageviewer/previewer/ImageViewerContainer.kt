@@ -15,9 +15,8 @@ import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import dev.aaa1115910.bv.ui.imageviewer.viewer.ImageViewerState
 import dev.aaa1115910.bv.ui.imageviewer.viewer.rememberViewerState
@@ -274,8 +273,8 @@ internal fun ImageViewerContainer(
         Box(
             modifier = modifier
                 .fillMaxSize()
-                .onGloballyPositioned {
-                    containerSize = it.size
+                .onSizeChanged {
+                    containerSize = it
                 }
                 .graphicsLayer {
                     scaleX = scale.value
@@ -288,7 +287,7 @@ internal fun ImageViewerContainer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .alpha(transformContentAlpha.value)
+                    .graphicsLayer { alpha = transformContentAlpha.value }
             ) {
                 TransformContentView(transformState)
             }
@@ -296,7 +295,7 @@ internal fun ImageViewerContainer(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .alpha(viewerContainerAlpha.value)
+                    .graphicsLayer { alpha = viewerContainerAlpha.value }
             ) {
                 viewer()
             }

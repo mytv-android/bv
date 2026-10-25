@@ -83,23 +83,25 @@ internal fun DetailPage(
 
     val onShare: () -> Unit = { shareVideo(context, shareTitle, shareUrl) }
     val sendDanmakuUnsupported = stringResource(R.string.video_detail_send_danmaku_unsupported)
-    val callbacks = DetailCallbacks(
-        onBack = handlers.onBack,
-        onUpClick = handlers.onUpClick,
-        onFollowClick = handlers.onFollowClick,
-        onPlay = handlers.onPlay,
-        onOpenEpisodes = { row -> dialogs.episodesRow = row.key },
-        onSeasonSelect = handlers.onSeasonSelect,
-        onRelatedClick = handlers.onRelatedClick,
-        onTagClick = handlers.onTagClick,
-        onShowPictures = { list, index -> scope.launch { pictures.show(list, index) } },
-        onOpenReplies = { comment ->
-            commentVm.prepareReplies(comment)
-            showReplies = true
-            scope.launch { commentVm.refreshReplies() }
-        },
-        onSendDanmaku = { Toast.makeText(context, sendDanmakuUnsupported, Toast.LENGTH_SHORT).show() },
-    )
+    val callbacks = remember(handlers, dialogs, commentVm, scope, pictures, context, sendDanmakuUnsupported) {
+        DetailCallbacks(
+            onBack = handlers.onBack,
+            onUpClick = handlers.onUpClick,
+            onFollowClick = handlers.onFollowClick,
+            onPlay = handlers.onPlay,
+            onOpenEpisodes = { row -> dialogs.episodesRow = row.key },
+            onSeasonSelect = handlers.onSeasonSelect,
+            onRelatedClick = handlers.onRelatedClick,
+            onTagClick = handlers.onTagClick,
+            onShowPictures = { list, index -> scope.launch { pictures.show(list, index) } },
+            onOpenReplies = { comment ->
+                commentVm.prepareReplies(comment)
+                showReplies = true
+                scope.launch { commentVm.refreshReplies() }
+            },
+            onSendDanmaku = { Toast.makeText(context, sendDanmakuUnsupported, Toast.LENGTH_SHORT).show() },
+        )
+    }
 
     CoverTheme(ui?.cover, forceDark = profile.isTv) {
         Box(Modifier.fillMaxSize()) {

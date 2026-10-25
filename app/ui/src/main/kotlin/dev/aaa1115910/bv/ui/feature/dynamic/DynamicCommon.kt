@@ -27,7 +27,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Size
@@ -370,16 +370,15 @@ private fun UpAvatarItem(
         Box(
             Modifier
                 .size(48.dp)
-                .drawBehind {
-                    // box-shadow: 0 0 0 2px primary —— 在头像形状外扩 2dp 画一圈
-                    if (selected) {
-                        val w = 2.dp.toPx()
-                        val outline = composeShape.createOutline(
-                            Size(size.width + w * 2, size.height + w * 2),
-                            layoutDirection,
-                            this,
-                        )
-                        translate(-w, -w) { drawOutline(outline, ring) }
+                .drawWithCache {
+                    val w = 2.dp.toPx()
+                    val outline = if (selected) composeShape.createOutline(
+                        Size(size.width + w * 2, size.height + w * 2),
+                        layoutDirection,
+                        this,
+                    ) else null
+                    onDrawBehind {
+                        if (outline != null) translate(-w, -w) { drawOutline(outline, ring) }
                     }
                 }
                 .bvFocus(corner = 24.dp)

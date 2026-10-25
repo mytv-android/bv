@@ -95,15 +95,17 @@ internal fun SettingsTablet(nav: NavController, initial: SettingsCategory) {
                 transitionSpec = { fadeIn(effects) togetherWith fadeOut(effects) },
                 label = "settingsPane",
             ) { category ->
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 30.dp, vertical = 26.dp),
-                    verticalArrangement = Arrangement.spacedBy(22.dp),
-                ) {
-                    Text(stringResource(category.title), style = BvType.PaneTitle, color = scheme.onSurface)
-                    SettingsCategoryContent(category = category, nav = nav, paneColor = scheme.surfaceContainerLow)
+                SettingsCategoryContent(category = category, nav = nav, paneColor = scheme.surfaceContainerLow) { content ->
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 30.dp, vertical = 26.dp),
+                        verticalArrangement = Arrangement.spacedBy(22.dp),
+                    ) {
+                        Text(stringResource(category.title), style = BvType.PaneTitle, color = scheme.onSurface)
+                        content()
+                    }
                 }
             }
         }

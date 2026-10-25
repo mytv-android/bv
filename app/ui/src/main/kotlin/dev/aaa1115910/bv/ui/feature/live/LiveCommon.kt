@@ -192,6 +192,7 @@ internal fun LiveChipRow(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(0.dp),
 ) {
+    val selectOnFocus = LocalDeviceProfile.current.isTv
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = selected.coerceAtMost((names.size - 1).coerceAtLeast(0)))
     // 外部切换分区时，把选中的标签滚到可见处
     LaunchedEffect(selected) {
@@ -216,7 +217,7 @@ internal fun LiveChipRow(
                 text = name,
                 selected = index == selected,
                 onClick = { onSelect(index) },
-                selectOnFocus = LocalDeviceProfile.current.isTv,
+                selectOnFocus = selectOnFocus,
             )
         }
     }

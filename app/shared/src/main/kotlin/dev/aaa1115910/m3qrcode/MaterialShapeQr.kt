@@ -11,16 +11,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.util.fastForEach
 import androidx.core.graphics.withTranslation
 import com.airbnb.lottie.LottieProperty
 import com.airbnb.lottie.compose.LottieAnimation
@@ -31,7 +31,6 @@ import com.airbnb.lottie.compose.rememberLottieComposition
 import com.airbnb.lottie.compose.rememberLottieDynamicProperties
 import com.airbnb.lottie.compose.rememberLottieDynamicProperty
 import dev.aaa1115910.bv.R
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlin.math.min
 
@@ -44,34 +43,38 @@ fun MaterialShapeQr(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
-    val state = rememberMaterialShapeQrState(
-        colorScheme = colorScheme ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    val fallbackColorScheme = remember(context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             androidx.compose.material3.dynamicLightColorScheme(context)
         } else {
             androidx.compose.material3.lightColorScheme()
         }
+    }
+    val state = rememberMaterialShapeQrState(
+        colorScheme = colorScheme ?: fallbackColorScheme
     )
     val composition by rememberLottieComposition(LottieCompositionSpec.RawRes(R.raw.lottie_qrcode_background))
-    val progress by animateLottieCompositionAsState(
+    val progress = animateLottieCompositionAsState(
         composition = composition,
         iterations = LottieConstants.IterateForever
     )
 
     val lottieDynamicProperties = rememberMaterialShapeQrLottieDynamicProperties(state.colorMap)
 
-    LaunchedEffect(content, ecLevel) {
+    // 生成与帧循环属于同一代内容，取消旧编码不会让新动画提前退出。
+    // 逐帧值只由绘制层读取；保留 Android 12+ 定位图案的持续旋转。
+    LaunchedEffect(state, content, ecLevel) {
         state.updateContent(content, ecLevel.level)
-    }
-
-    // 每 16ms 更新一次（近似 60fps），当还未生成 QR 时降低频率为 50ms
-    LaunchedEffect(Unit) {
+        if (state.qrcodeLineCount == 0) return@LaunchedEffect
         while (isActive) {
-            if (state.qrcodeLineCount == 0) {
-                delay(50)
-                continue
-            }
             withFrameMillis {
-                state.frameElapsed = System.currentTimeMillis() - state.qrStartTime
+                val elapsed = System.currentTimeMillis() - state.qrStartTime
+                state.frameElapsed = elapsed
+                state.dataFrameElapsed = elapsed.coerceAtMost(3000L)
+                state.drawAnimationBackground(elapsed)
+                if (elapsed >= 3000L) {
+                    state.hasFinalDataImage = true
+                }
             }
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S && state.hasFinalDataImage) {
                 break
@@ -85,15 +88,18 @@ fun MaterialShapeQr(
         contentAlignment = Alignment.Center
     ) {
         LottieAnimation(
-            modifier = Modifier.scale(state.lottieScale),
+            modifier = Modifier.graphicsLayer {
+                scaleX = state.lottieScale
+                scaleY = state.lottieScale
+            },
             composition = composition,
-            progress = { progress },
+            progress = { progress.value },
             dynamicProperties = lottieDynamicProperties
         )
         if (view.isInEditMode) {
             LottieAnimation(
                 composition = composition,
-                progress = { progress },
+                progress = { progress.value },
                 dynamicProperties = lottieDynamicProperties
             )
         }
@@ -101,29 +107,17 @@ fun MaterialShapeQr(
             modifier = Modifier
                 .fillMaxSize(0.8f)
         ) {
-
-            val nonFinderFrameElapsed by remember {
-                derivedStateOf {
-                    if (state.hasFinalDataImage) 3000L else state.frameElapsed
-                }
-            }
-
             NonFinderPatternsCanvas(
                 qrcodeLineCount = state.qrcodeLineCount,
                 qrcodeSize = state.qrcodeSize,
-                frameElapsed = nonFinderFrameElapsed,
+                frameElapsed = { state.dataFrameElapsed },
                 dataModuleShapeList = state.dataModuleShapeList,
                 backgroundModuleShapeList = state.backgroundModuleShapeList,
-                hasFinalDataImage = state.hasFinalDataImage,
-                onHasFinalDataImageChange = { state.hasFinalDataImage = it },
-                onDrawAnimationBackground = { elapsedMs ->
-                    state.drawAnimationBackground(elapsedMs)
-                }
             )
             FinderPatternsCanvas(
                 qrcodeLineCount = state.qrcodeLineCount,
                 qrcodeSize = state.qrcodeSize,
-                frameElapsed = state.frameElapsed,
+                frameElapsed = { state.frameElapsed },
                 finderPatternShapeList = state.finderPatternShapeList
             )
         }
@@ -135,12 +129,9 @@ fun NonFinderPatternsCanvas(
     modifier: Modifier = Modifier,
     qrcodeLineCount: Int,
     qrcodeSize: Int,
-    frameElapsed: Long,
+    frameElapsed: () -> Long,
     dataModuleShapeList: List<MaterialShapeRenderer>,
     backgroundModuleShapeList: List<MaterialShapeRenderer>,
-    hasFinalDataImage: Boolean = false,
-    onHasFinalDataImageChange: (Boolean) -> Unit,
-    onDrawAnimationBackground: (Long) -> Unit
 ) {
     Canvas(
         modifier = modifier.fillMaxSize()
@@ -159,20 +150,13 @@ fun NonFinderPatternsCanvas(
         val tx = (canvasWidth - scaledWidth) / 2f
         val ty = (canvasHeight - scaledHeight) / 2f
 
-        val elapsed = frameElapsed
-        if (elapsed > 3000L && !hasFinalDataImage) {
-            onHasFinalDataImageChange(true)
-        }
-        val drawElapsed = if (hasFinalDataImage) 3000L else elapsed
+        // 只读帧状态并夹到动画终点，不在 Draw 阶段写任何 Compose 状态。
+        val drawElapsed = frameElapsed().coerceAtMost(3000L)
 
         native.withTranslation(tx, ty) {
             scale(scale, scale)
             drawShapeListOnCanvas(dataModuleShapeList, this, drawElapsed)
             drawShapeListOnCanvas(backgroundModuleShapeList, this, drawElapsed)
-        }
-
-        if (!hasFinalDataImage) {
-            onDrawAnimationBackground(drawElapsed)
         }
     }
 }
@@ -182,7 +166,7 @@ fun FinderPatternsCanvas(
     modifier: Modifier = Modifier,
     qrcodeLineCount: Int,
     qrcodeSize: Int,
-    frameElapsed: Long,
+    frameElapsed: () -> Long,
     finderPatternShapeList: List<MaterialShapeRenderer>
 ) {
     Canvas(
@@ -202,7 +186,7 @@ fun FinderPatternsCanvas(
         val tx = (canvasWidth - scaledWidth) / 2f
         val ty = (canvasHeight - scaledHeight) / 2f
 
-        val elapsed = frameElapsed
+        val elapsed = frameElapsed()
 
         native.withTranslation(tx, ty) {
             scale(scale, scale)
@@ -232,5 +216,5 @@ private fun drawShapeListOnCanvas(
     canvas: Canvas,
     elapsedMs: Long
 ) {
-    list.forEach { it.draw(canvas, elapsedMs) }
+    list.fastForEach { it.draw(canvas, elapsedMs) }
 }

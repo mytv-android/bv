@@ -46,6 +46,7 @@ import dev.aaa1115910.bv.ui.designsystem.theme.LocalThemePrefs
 import dev.aaa1115910.bv.ui.feature.verify.GeetestTvVerifyDialog
 import dev.aaa1115910.bv.ui.feature.verify.GeetestVerifyDialogHost
 import dev.aaa1115910.bv.util.Prefs
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import dev.aaa1115910.bv.viewmodel.VideoPlayerV3ViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -269,59 +270,60 @@ internal fun BvPlayerHost(
                         playerVm.currentVideoAspectRatio = aspectRatio
                     },
                     onPlaySpeedChange = { speed ->
-                        Prefs.defaultPlaySpeed = speed
+                        PreferenceWrites.enqueue { Prefs.defaultPlaySpeed = speed }
                         playerVm.currentPlaySpeed = speed
                     },
                     onDanmakuEnabledChange = { enabled ->
                         playerVm.currentDanmakuEnabled = enabled
-                        Prefs.defaultDanmakuEnabled = enabled
+                        PreferenceWrites.enqueue { Prefs.defaultDanmakuEnabled = enabled }
                     },
                     onDanmakuSwitchChange = { enabledDanmakuTypes ->
-                        Prefs.defaultDanmakuTypes = enabledDanmakuTypes
+                        val savedTypes = enabledDanmakuTypes.toList()
+                        PreferenceWrites.enqueue { Prefs.defaultDanmakuTypes = savedTypes }
                         playerVm.currentDanmakuTypes.clear()
                         playerVm.currentDanmakuTypes.addAll(enabledDanmakuTypes)
                     },
                     onDanmakuSizeChange = { scale ->
-                        Prefs.defaultDanmakuScale = scale
+                        PreferenceWrites.enqueueLatest("danmaku-scale") { Prefs.defaultDanmakuScale = scale }
                         playerVm.currentDanmakuScale = scale
                     },
                     onDanmakuOpacityChange = { opacity ->
-                        Prefs.defaultDanmakuOpacity = opacity
+                        PreferenceWrites.enqueueLatest("danmaku-opacity") { Prefs.defaultDanmakuOpacity = opacity }
                         playerVm.currentDanmakuOpacity = opacity
                     },
                     onDanmakuAreaChange = { area ->
-                        Prefs.defaultDanmakuArea = area
+                        PreferenceWrites.enqueueLatest("danmaku-area") { Prefs.defaultDanmakuArea = area }
                         playerVm.currentDanmakuArea = area
                     },
                     onDanmakuMaskChange = { mask ->
-                        Prefs.defaultDanmakuMask = mask
+                        PreferenceWrites.enqueue { Prefs.defaultDanmakuMask = mask }
                         playerVm.currentDanmakuMask = mask
                     },
                     onDanmakuLaneDensityChange = { density ->
-                        Prefs.defaultDanmakuLaneDensity = density
+                        PreferenceWrites.enqueue { Prefs.defaultDanmakuLaneDensity = density }
                         playerVm.currentDanmakuLaneDensity = density
                     },
                     onDanmakuFilterLevelChange = { level ->
-                        Prefs.defaultDanmakuFilterLevel = level
+                        PreferenceWrites.enqueueLatest("danmaku-filter-level") { Prefs.defaultDanmakuFilterLevel = level }
                         playerVm.currentDanmakuFilterLevel = level
                     },
                     onSubtitleChange = { subtitle ->
                         playerVm.loadSubtitle(subtitle.id)
                     },
                     onSubtitleSizeChange = { size ->
-                        Prefs.defaultSubtitleFontSize = size
+                        PreferenceWrites.enqueueLatest("subtitle-size") { Prefs.defaultSubtitleFontSize = size }
                         playerVm.currentSubtitleFontSize = size
                     },
                     onSubtitleBackgroundOpacityChange = { opacity ->
-                        Prefs.defaultSubtitleBackgroundOpacity = opacity
+                        PreferenceWrites.enqueueLatest("subtitle-background") { Prefs.defaultSubtitleBackgroundOpacity = opacity }
                         playerVm.currentSubtitleBackgroundOpacity = opacity
                     },
                     onSubtitleBottomPadding = { padding ->
-                        Prefs.defaultSubtitleBottomPadding = padding
+                        PreferenceWrites.enqueueLatest("subtitle-bottom") { Prefs.defaultSubtitleBottomPadding = padding }
                         playerVm.currentSubtitleBottomPadding = padding
                     },
                     onPlayModeChange = { playMode ->
-                        Prefs.defaultPlayMode = playMode
+                        PreferenceWrites.enqueue { Prefs.defaultPlayMode = playMode }
                         playerVm.currentPlayMode = playMode
                     },
                     modifier = modifier,

@@ -10,7 +10,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,7 +53,7 @@ fun HistoryScreen(nav: NavController) {
     val userRepository: BvUserRepository = koinInject()
     val login = userRepository.isLogin
     val firstRequester = remember { FocusRequester() }
-    val items by remember(vm) { derivedStateOf { vm.histories.map { it.toContinueItem() } } }
+    val items = vm.histories.toList()
     val dpad = LocalDeviceProfile.current.input == BvInputMode.DPad
 
     var deleteMode by remember { mutableStateOf(false) }
@@ -101,8 +100,9 @@ fun HistoryScreen(nav: NavController) {
                     onRetry = { vm.update() },
                     emptyMessage = stringResource(R.string.history_empty),
                     firstRequester = firstRequester,
-                    itemKey = { it.card.avid },
-                ) { _, item, modifier ->
+                    itemKey = { "${it.historyBusiness}_${it.historyKid ?: it.avid}" },
+                ) { _, card, modifier ->
+                    val item = remember(card, card.timeString) { card.toContinueItem() }
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         VideoCard(
                             data = item.card,

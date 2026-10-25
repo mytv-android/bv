@@ -94,7 +94,9 @@ class SearchInputViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             runCatching {
                 if (keyword.isEmpty()) {
-                    matchedSearchHistories.clear()
+                    withContext(Dispatchers.Main) {
+                        matchedSearchHistories.clear()
+                    }
                 } else {
                     val matchedHistories = db.searchHistoryDao().findHistories(keyword, 20)
                     matchedSearchHistories.swapListWithMainContext(matchedHistories)

@@ -2,6 +2,27 @@ package dev.aaa1115910.bv.entity.carddata
 
 import dev.aaa1115910.bv.util.formatHourMinSec
 import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
+
+private class PublicationDateFormatter(val locale: Locale, val zone: TimeZone) {
+    val format = SimpleDateFormat("yyyy-MM-dd", locale).apply { timeZone = zone }
+}
+
+private val publicationFormatter = ThreadLocal<PublicationDateFormatter>()
+
+private fun publicationDate(seconds: Int): String {
+    val locale = Locale.getDefault()
+    val zone = TimeZone.getDefault()
+    val cached = publicationFormatter.get()
+    val formatter = if (cached != null && cached.locale == locale && cached.zone == zone) {
+        cached
+    } else {
+        PublicationDateFormatter(locale, zone).also(publicationFormatter::set)
+    }
+    return formatter.format.format(Date(seconds * 1000L))
+}
 
 data class VideoCardData(
     val avid: Long,
@@ -36,8 +57,7 @@ data class VideoCardData(
             timeString = if (it > 0) it.formatHourMinSec() else ""
         }
         pubTime?.let {
-            pubTimeString =
-                if (it > 0) SimpleDateFormat("yyyy-MM-dd").format(java.util.Date(it * 1000L)) else ""
+            pubTimeString = if (it > 0) publicationDate(it) else ""
         }
     }
 }

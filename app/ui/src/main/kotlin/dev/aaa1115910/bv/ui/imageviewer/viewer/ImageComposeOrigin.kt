@@ -9,11 +9,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,7 +29,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntSize
 import dev.aaa1115910.bv.ui.imageviewer.previewer.DEFAULT_CROSS_FADE_ANIMATE_SPEC
-import kotlinx.coroutines.launch
 
 class RawGesture(
     val onTap: (Offset) -> Unit = {},
@@ -61,42 +59,35 @@ fun ImageComposeOrigin(
     crossfadeAnimationSpec: AnimationSpec<Float> = DEFAULT_CROSS_FADE_ANIMATE_SPEC,
     boundClip: Boolean = true,
 ) {
-    val scope = rememberCoroutineScope()
     // 容器大小
     var bSize by remember { mutableStateOf(IntSize(0, 0)) }
-    // 容器比例
-    val bRatio by remember { derivedStateOf { bSize.width.toFloat() / bSize.height.toFloat() } }
-    // 图片原始大小
-    var oSize by remember { mutableStateOf(IntSize(0, 0)) }
-    // 图片原始比例
-    val oRatio by remember { derivedStateOf { oSize.width.toFloat() / oSize.height.toFloat() } }
-    // 是否宽度与容器大小一致
-    var widthFixed by remember { mutableStateOf(false) }
-    // 长宽是否均超出容器长宽
-    val superSize by remember {
-        derivedStateOf {
-            oSize.height > bSize.height && oSize.width > bSize.width
+    val density = LocalDensity.current
+    val imageSpecified = model !is Painter || model.intrinsicSize.isSpecified
+    val oSize = when (model) {
+        is Painter -> if (imageSpecified) IntSize(
+            model.intrinsicSize.width.toInt(), model.intrinsicSize.height.toInt(),
+        ) else IntSize.Zero
+        is ImageVector -> with(density) {
+            IntSize(model.defaultWidth.roundToPx(), model.defaultHeight.roundToPx())
         }
+        is ImageBitmap -> IntSize(model.width, model.height)
+        is ComposeModel -> model.intrinsicSize.takeUnless { it == IntSize.Zero } ?: bSize
+        else -> error("This model type is not supported!")
     }
-    // 显示大小
-    val uSize by remember {
-        derivedStateOf {
-            if (oRatio > bRatio) {
-                // 宽度一致
-                val uW = bSize.width
-                val uH = uW / oRatio
-                widthFixed = true
-                IntSize(uW, uH.toInt())
-            } else {
-                // 高度一致
-                val uH = bSize.height
-                val uW = uH * oRatio
-                widthFixed = false
-                IntSize(uW.toInt(), uH)
-            }
-        }
+    val bRatio = bSize.width.toFloat() / bSize.height
+    val oRatio = oSize.width.toFloat() / oSize.height
+    val widthFixed = oRatio > bRatio
+    val superSize = oSize.height > bSize.height && oSize.width > bSize.width
+    val uSize = when {
+        oSize.width <= 0 || oSize.height <= 0 -> IntSize.Zero
+        widthFixed -> IntSize(bSize.width, (bSize.width / oRatio).toInt())
+        else -> IntSize((bSize.height * oRatio).toInt(), bSize.height)
     }
+    val latestOnSizeChange by rememberUpdatedState(onSizeChange)
     LaunchedEffect(key1 = oSize, key2 = bSize, key3 = uSize) {
+        if (oSize.width <= 0 || oSize.height <= 0 || bSize.width <= 0 || bSize.height <= 0 ||
+            uSize.width <= 0 || uSize.height <= 0
+        ) return@LaunchedEffect
         val maxScale = when {
             superSize -> {
                 oSize.width.toFloat() / uSize.width.toFloat()
@@ -110,7 +101,7 @@ fun ImageComposeOrigin(
                 bSize.width.toFloat() / uSize.width.toFloat()
             }
         }
-        onSizeChange(
+        latestOnSizeChange(
             SizeChangeContent(
                 defaultSize = uSize,
                 containerSize = bSize,
@@ -119,73 +110,20 @@ fun ImageComposeOrigin(
         )
     }
 
-    // 图片是否加载成功
-    var imageSpecified by remember { mutableStateOf(false) }
-
     // 承载容器的透明度，主要用来控制图片加载成功后的渐变效果
     val viewerAlpha = remember { Animatable(0F) }
+    // 每个 model 只挂载回调一次；回调与动画窗格始终取最新值
+    var mountedModel by remember { mutableStateOf<Any?>(null) }
+    val latestOnMounted by rememberUpdatedState(onMounted)
+    val latestCrossfadeSpec by rememberUpdatedState(crossfadeAnimationSpec)
 
-    /**
-     * mounted回调
-     */
-    fun goMounted() {
-        scope.launch {
-            viewerAlpha.animateTo(1F, crossfadeAnimationSpec)
-            onMounted()
+    // 模型就绪后每个 model 只淡入/回调一次；动画在 effect 内执行，离开组合或模型变化时随 effect 取消。
+    LaunchedEffect(model, imageSpecified) {
+        if (imageSpecified && mountedModel != model) {
+            viewerAlpha.animateTo(1F, latestCrossfadeSpec)
+            mountedModel = model
+            latestOnMounted()
         }
-    }
-
-    when (model) {
-        is Painter -> {
-            var isMounted by remember { mutableStateOf(false) }
-            imageSpecified = model.intrinsicSize.isSpecified
-            LaunchedEffect(key1 = model.intrinsicSize, block = {
-                if (imageSpecified) {
-                    oSize = IntSize(
-                        model.intrinsicSize.width.toInt(),
-                        model.intrinsicSize.height.toInt()
-                    )
-                    if (!isMounted) {
-                        isMounted = true
-                        goMounted()
-                    }
-                }
-            })
-        }
-
-        is ImageVector -> {
-            imageSpecified = true
-            LocalDensity.current.run {
-                oSize = IntSize(
-                    model.defaultWidth.toPx().toInt(),
-                    model.defaultHeight.toPx().toInt(),
-                )
-                goMounted()
-            }
-        }
-
-        is ImageBitmap -> {
-            imageSpecified = true
-            oSize = IntSize(
-                model.width,
-                model.height
-            )
-            goMounted()
-        }
-
-        is ComposeModel -> {
-            imageSpecified = true
-            LaunchedEffect(key1 = model.intrinsicSize, block = {
-                oSize = if (model.intrinsicSize == IntSize.Zero) {
-                    bSize
-                } else {
-                    model.intrinsicSize
-                }
-            })
-            goMounted()
-        }
-
-        else -> throw Exception("This model type is not supported!")
     }
 
     Box(
@@ -199,10 +137,10 @@ fun ImageComposeOrigin(
             .onSizeChanged {
                 bSize = it
             }
-            .pointerInput(Unit) {
+            .pointerInput(gesture) {
                 detectTapGestures(onLongPress = gesture.onLongPress)
             }
-            .pointerInput(key1 = imageSpecified) {
+            .pointerInput(imageSpecified, gesture) {
                 if (imageSpecified) detectTransformGestures(
                     onTap = gesture.onTap,
                     onDoubleTap = gesture.onDoubleTap,

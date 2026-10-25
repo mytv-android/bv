@@ -96,15 +96,17 @@ internal fun SettingsPhoneDetail(nav: NavController, category: SettingsCategory)
             )
         },
     ) { innerPadding ->
-        Column(
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(innerPadding)
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(22.dp),
-        ) {
-            SettingsCategoryContent(category = category, nav = nav, paneColor = surface)
+        SettingsCategoryContent(category = category, nav = nav, paneColor = surface) { content ->
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(innerPadding)
+                    .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(22.dp),
+            ) {
+                content()
+            }
         }
     }
 }

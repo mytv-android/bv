@@ -22,7 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +43,10 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainWidth
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -66,6 +70,7 @@ import dev.aaa1115910.bv.ui.designsystem.focus.bvFocus
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.ui.designsystem.theme.LocalThemePrefs
 import dev.aaa1115910.bv.util.Prefs
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -136,13 +141,13 @@ internal fun AppearanceSettings(gapColor: Color) {
 
     // 1. 界面布局：自动 / 手机竖屏 / 平板横屏 / 电视横屏，选完立刻切换整个 App 的布局
     val layoutModeFlow = remember { Prefs.layoutModeFlow }
-    val layoutMode by layoutModeFlow.collectAsState(initial = LayoutMode.Auto)
+    val layoutMode by layoutModeFlow.collectAsStateWithLifecycle(initialValue = LayoutMode.Auto)
     val modes = LayoutMode.entries
     SettingGroup(stringResource(R.string.settings_appearance_layout)) {
         SegmentedRow(
             options = modes.map { stringResource(it.labelRes()) },
             selected = modes.indexOf(layoutMode),
-            onSelect = { index -> scope.launch { Prefs.layoutMode = modes[index] } },
+            onSelect = { index -> PreferenceWrites.enqueue { Prefs.layoutMode = modes[index] } },
             modifier = Modifier
                 .focusRestorer()
                 .focusGroup(),
@@ -300,15 +305,19 @@ private fun SeedSwatch(
     val reduceMotion = LocalThemePrefs.current.reduceMotion
     val target = if (selected) 1f else 0f
     val animated by animateFloatAsState(target, MaterialTheme.motionScheme.defaultSpatialSpec(), label = "seedSwatch")
-    val p = if (reduceMotion) target else animated
-    val ring = p.coerceIn(0f, 1f)
-    val dotSize = (32f + 4f * p).coerceIn(28f, 40f).dp
+    val progress = { if (reduceMotion) target else animated }
     val ringColor = MaterialTheme.colorScheme.onSurface
     val interaction = remember { MutableInteractionSource() }
     Box(
         Modifier
-            .size(dotSize)
-            .bvFocus(corner = dotSize / 2)
+            .layout { measurable, constraints ->
+                val dotSize = (32f + 4f * progress()).coerceIn(28f, 40f).dp.roundToPx()
+                val width = constraints.constrainWidth(dotSize)
+                val height = constraints.constrainHeight(dotSize)
+                val placeable = measurable.measure(Constraints.fixed(width, height))
+                layout(width, height) { placeable.place(0, 0) }
+            }
+            .bvFocus(corner = 999.dp)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -319,8 +328,9 @@ private fun SeedSwatch(
                 contentDescription = description
                 this.selected = selected
             }
-            .graphicsLayer { rotationZ = 45f * p }
+            .graphicsLayer { rotationZ = 45f * progress() }
             .drawBehind {
+                val ring = progress().coerceIn(0f, 1f)
                 val radius = size.minDimension * (0.5f - 0.2f * ring)
                 if (ring > 0f) {
                     val outer = 4.dp.toPx()
@@ -416,7 +426,7 @@ private fun TvScaleSetting() {
                 value = rounded
             }
         },
-        save = { Prefs.density = it },
+        save = { Prefs.density = ((it * 10).roundToInt() / 10f).coerceIn(0.5f, 5f) },
         valueRange = 0.5f..5f,
         steps = 44,
     )

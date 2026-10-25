@@ -14,7 +14,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -59,6 +58,10 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainHeight
+import kotlin.math.roundToInt
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -202,19 +205,22 @@ private fun PhonePage(
         } else {
             // 横屏视频：氛围光铺满 + 16:9 全宽，垂直居中再上移自身高度的 10%
             Ambient(item.cover)
-            BoxWithConstraints(Modifier.fillMaxSize()) {
-                val videoHeight = maxWidth * 9f / 16f
-                ShortsVideo(
-                    pool = pool,
-                    item = item,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .offset(y = -videoHeight * 0.1f)
-                        .fillMaxWidth()
-                        .height(videoHeight),
-                    crop = false,
-                )
-            }
+            ShortsVideo(
+                pool = pool,
+                item = item,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .layout { measurable, constraints ->
+                        val width = constraints.maxWidth
+                        val videoHeight = width * 9f / 16f
+                        val height = constraints.constrainHeight(videoHeight.roundToInt())
+                        val placeable = measurable.measure(Constraints.fixed(width, height))
+                        layout(width, height) {
+                            placeable.placeRelative(0, (-videoHeight * 0.1f).roundToInt())
+                        }
+                    },
+                crop = false,
+            )
         }
         CinemaScrim()
 

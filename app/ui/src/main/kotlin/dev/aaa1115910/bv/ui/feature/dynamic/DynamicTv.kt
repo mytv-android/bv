@@ -60,10 +60,8 @@ internal fun DynamicTv(state: DynamicPageState, actions: DynamicActions) {
 
     val items = state.items
     val groups = remember(items) {
-        val withCover = items.filter { it.coverUrl() != null }
-        DynamicDateGroup.entries.mapNotNull { group ->
-            withCover.filter { it.dateGroup() == group }.takeIf { it.isNotEmpty() }?.let { group to it }
-        }
+        val byDate = items.asSequence().filter { it.coverUrl() != null }.groupBy { it.dateGroup() }
+        DynamicDateGroup.entries.mapNotNull { group -> byDate[group]?.let { group to it } }
     }
 
     // 初始焦点：第一张卡；未登录时「登录」；一直没有内容时标签

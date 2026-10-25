@@ -37,7 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -47,6 +47,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -137,27 +140,28 @@ fun TvRail(
                     measurable.measure(Constraints(0, 0, 0, 0))
                     layout(0, 0) {}
                 } else {
-                    val placeable = measurable.measure(constraints)
+                    val widthPx = constraints.constrainWidth(width.roundToPx().coerceAtLeast(0))
+                    val placeable = measurable.measure(constraints.copy(minWidth = widthPx, maxWidth = widthPx))
                     layout(placeable.width, placeable.height) { placeable.place(0, 0) }
                 }
             }
-            .width(width)
             .fillMaxHeight()
             .graphicsLayer { alpha = railAlpha.value }
-            .drawBehind {
-                if (open) {
-                    // box-shadow: 24px 0 48px -24px rgb(0 0 0 / .7)
-                    drawRect(
-                        Brush.horizontalGradient(
-                            listOf(Color.Black.copy(alpha = .7f), Color.Transparent),
-                            startX = size.width,
-                            endX = size.width + 48.dp.toPx(),
-                        ),
+            .drawWithCache {
+                val shadowWidth = 48.dp.toPx()
+                val shadow = Brush.horizontalGradient(
+                    listOf(Color.Black.copy(alpha = .7f), Color.Transparent),
+                    startX = size.width,
+                    endX = size.width + shadowWidth,
+                )
+                onDrawBehind {
+                    if (open) drawRect(
+                        shadow,
                         topLeft = Offset(size.width, 0f),
-                        size = Size(48.dp.toPx(), size.height),
+                        size = Size(shadowWidth, size.height),
                     )
+                    drawRect(background)
                 }
-                drawRect(background)
             }
             .onFocusChanged {
                 val focused = it.hasFocus
@@ -170,7 +174,15 @@ fun TvRail(
             }
             .focusGroup()
             // 弹簧会过冲，内边距不能为负
-            .padding(vertical = 27.dp, horizontal = hPad.coerceAtLeast(0.dp)),
+            .layout { measurable, constraints ->
+                val horizontal = hPad.roundToPx().coerceAtLeast(0)
+                val vertical = 27.dp.roundToPx()
+                val placeable = measurable.measure(constraints.offset(-horizontal * 2, -vertical * 2))
+                layout(
+                    constraints.constrainWidth(placeable.width + horizontal * 2),
+                    constraints.constrainHeight(placeable.height + vertical * 2),
+                ) { placeable.placeRelative(horizontal, vertical) }
+            },
         horizontalAlignment = if (open) Alignment.Start else Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {

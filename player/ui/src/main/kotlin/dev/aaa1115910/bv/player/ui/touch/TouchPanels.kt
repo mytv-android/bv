@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -68,6 +67,8 @@ import dev.aaa1115910.bv.player.ui.formatDanmakuArea
 import dev.aaa1115910.bv.player.ui.formatPercent
 import dev.aaa1115910.bv.player.ui.formatSpeed
 import dev.aaa1115910.bv.player.ui.indexOfCid
+import dev.aaa1115910.bv.player.ui.lazyKey
+import dev.aaa1115910.bv.player.ui.lazyContentType
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -294,13 +295,13 @@ private fun EpisodesPanel(
         contentPadding = PaddingValues(22.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        item {
+        item(key = "title", contentType = "title") {
             PanelTitle(
                 modifier = Modifier.padding(bottom = 18.dp),
                 text = stringResource(R.string.player_ui_episodes),
             )
         }
-        items(items = list) { item ->
+        items(items = list, key = { it.lazyKey() }, contentType = { it.lazyContentType() }) { item ->
             if (item is VideoListUgcEpisodeTitle) {
                 Text(
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 6.dp),

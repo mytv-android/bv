@@ -121,7 +121,7 @@ internal fun HomeTv(nav: NavController, state: HomeState) {
     }
 
     val topThreshold = with(LocalDensity.current) { 8.dp.roundToPx() }
-    val atTop by remember {
+    val atTop by remember(topThreshold) {
         derivedStateOf {
             when (chip) {
                 ChipRecommend -> recommendList.isNearTop(topThreshold)
@@ -158,7 +158,9 @@ internal fun HomeTv(nav: NavController, state: HomeState) {
 
             ChipPopular -> TvGridContent(
                 gridState = popularGrid,
-                cards = rememberCards(state.popular.popularVideoList) { it.toCard() },
+                cards = state.popular.popularVideoList.toList(),
+                cardKey = { it.aid },
+                toCard = { it.toCard() },
                 loading = state.popular.loading,
                 onOpen = { nav.openVideo(it) },
                 onLoadMore = state::loadMorePopular,
@@ -190,7 +192,9 @@ internal fun HomeTv(nav: NavController, state: HomeState) {
                 } else {
                     TvGridContent(
                         gridState = followingGrid,
-                        cards = rememberCards(state.dynamic.dynamicVideoList) { it.toCard() },
+                        cards = state.dynamic.dynamicVideoList.toList(),
+                        cardKey = { it.aid },
+                        toCard = { it.toCard() },
                         loading = state.dynamic.loadingVideo,
                         onOpen = { nav.openVideo(it) },
                         onLoadMore = state::loadMoreDynamic,
@@ -405,7 +409,9 @@ private fun TvRecommendContent(
                     TvVideoRow(
                         title = stringResource(R.string.home_for_you),
                         hint = stringResource(R.string.home_more_rows_hint),
-                        cards = rememberCards(recommend, skip = featured.size) { it.toCard() },
+                        cards = recommend.toList().drop(featured.size),
+                        cardKey = { it.aid },
+                        toCard = { it.toCard() },
                         loading = state.recommend.loading,
                         onOpen = { nav.openVideo(it) },
                         onLoadMore = state::loadMoreRecommend,
@@ -416,7 +422,9 @@ private fun TvRecommendContent(
                 item(key = "popular", contentType = "row") {
                     TvVideoRow(
                         title = stringResource(R.string.home_tab_popular),
-                        cards = rememberCards(popular) { it.toCard() },
+                        cards = popular.toList(),
+                        cardKey = { it.aid },
+                        toCard = { it.toCard() },
                         loading = state.popular.loading,
                         onOpen = { nav.openVideo(it) },
                         onLoadMore = state::loadMorePopular,
@@ -549,9 +557,11 @@ private fun TvFeaturedText(item: UgcItem, state: HomeState) {
  * VideoCard(width 180, showMeta = false)。
  */
 @Composable
-private fun TvVideoRow(
+private fun <T> TvVideoRow(
     title: String,
-    cards: List<VideoCardData>,
+    cards: List<T>,
+    cardKey: (T) -> Long,
+    toCard: (T) -> VideoCardData,
     loading: Boolean,
     onOpen: (VideoCardData) -> Unit,
     onLoadMore: () -> Unit,
@@ -605,10 +615,11 @@ private fun TvVideoRow(
                 ) {
                     items(
                         count = cards.size,
-                        key = { index -> cards[index].avid },
+                        key = { index -> cardKey(cards[index]) },
                         contentType = { "video" },
                     ) { index ->
-                        val card = cards[index]
+                        val item = cards[index]
+                        val card = remember(item, toCard) { toCard(item) }
                         VideoCard(
                             data = card,
                             onClick = { onOpen(card) },
@@ -635,7 +646,9 @@ private fun TvRegionRow(
     val names = rememberRegionNames()
     TvVideoRow(
         title = names[HomeRegions.indexOf(type)],
-        cards = rememberCards(vm.ugcItems) { it.toCard() },
+        cards = vm.ugcItems.toList(),
+        cardKey = { it.aid },
+        toCard = { it.toCard() },
         loading = vm.updating,
         onOpen = { nav.openVideo(it) },
         onLoadMore = { state.loadMoreRegion(vm) },
@@ -684,9 +697,11 @@ private fun TvRegionContent(
 
 /** 「热门」「关注」：4 列网格（旧电视版同为 4 列），VideoCard(showMeta = true)。 */
 @Composable
-private fun TvGridContent(
+private fun <T> TvGridContent(
     gridState: LazyGridState,
-    cards: List<VideoCardData>,
+    cards: List<T>,
+    cardKey: (T) -> Long,
+    toCard: (T) -> VideoCardData,
     loading: Boolean,
     onOpen: (VideoCardData) -> Unit,
     onLoadMore: () -> Unit,
@@ -728,10 +743,11 @@ private fun TvGridContent(
         ) {
             items(
                 count = cards.size,
-                key = { index -> cards[index].avid },
+                key = { index -> cardKey(cards[index]) },
                 contentType = { "video" },
             ) { index ->
-                val card = cards[index]
+                val item = cards[index]
+                val card = remember(item, toCard) { toCard(item) }
                 VideoCard(data = card, onClick = { onOpen(card) })
             }
             if (loading) {

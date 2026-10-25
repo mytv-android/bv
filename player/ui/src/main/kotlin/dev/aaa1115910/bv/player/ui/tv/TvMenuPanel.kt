@@ -40,7 +40,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +72,8 @@ import dev.aaa1115910.bv.player.ui.formatDanmakuArea
 import dev.aaa1115910.bv.player.ui.formatPercent
 import dev.aaa1115910.bv.player.ui.formatSpeed
 import dev.aaa1115910.bv.player.ui.indexOfCid
+import dev.aaa1115910.bv.player.ui.lazyKey
+import dev.aaa1115910.bv.player.ui.lazyContentType
 import dev.aaa1115910.bv.util.requestFocus
 import kotlin.math.abs
 
@@ -165,9 +166,11 @@ private fun <T> LazyListScope.optionSection(
     label: @Composable (T) -> String,
     isSelected: (T) -> Boolean,
     onSelect: (T) -> Unit,
+    optionKey: (T) -> Any = { it.toString() },
 ) {
-    item(key = "$key-title") { Eyebrow(title(), if (first) 0.dp else 10.dp) }
-    itemsIndexed(options, key = { index, _ -> "$key-$index" }) { _, option ->
+    item(key = "$key-title", contentType = "heading") { Eyebrow(title(), if (first) 0.dp else 10.dp) }
+    // API responses can repeat an audio/codec value or subtitle id.
+    itemsIndexed(options, key = { index, option -> "$key-${optionKey(option)}-$index" }, contentType = { _, _ -> "option" }) { _, option ->
         OptionItem(text = label(option), selected = isSelected(option), onClick = { onSelect(option) })
     }
 }
@@ -390,6 +393,7 @@ private fun LazyListScope.subtitleOptions(menuState: PlayerMenuState) {
         label = { it.langDoc },
         isSelected = { it.id == menuState.subtitleId },
         onSelect = { menuState.selectSubtitle(it) },
+        optionKey = { it.id },
     )
     optionSection(
         key = "subtitleSize",
@@ -466,8 +470,8 @@ internal fun TvVideoListPanel(
             contentPadding = PaddingValues(vertical = 16.dp, horizontal = 10.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            item(key = "title") { Eyebrow(stringResource(R.string.player_ui_episodes), 0.dp) }
-            itemsIndexed(list) { index, item ->
+            item(key = "title", contentType = "heading") { Eyebrow(stringResource(R.string.player_ui_episodes), 0.dp) }
+            itemsIndexed(list, key = { _, item -> item.lazyKey() }, contentType = { _, item -> item.lazyContentType() }) { index, item ->
                 if (item is VideoListUgcEpisodeTitle) {
                     Eyebrow(item.displayTitle(context, inUgcSeason), 10.dp)
                 } else {

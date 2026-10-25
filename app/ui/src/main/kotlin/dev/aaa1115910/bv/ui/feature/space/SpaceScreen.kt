@@ -63,6 +63,7 @@ import org.koin.compose.koinInject
 internal class SpaceHeaderHolder(
     private val mid: Long,
     private val repo: VideoActionRepository,
+    private val auth: dev.aaa1115910.biliapi.repositories.AuthRepository,
 ) : ViewModel() {
     var name by mutableStateOf("")
         private set
@@ -84,7 +85,7 @@ internal class SpaceHeaderHolder(
         private set
 
     /** 自己的空间不显示关注按钮。 */
-    val canFollow: Boolean get() = repo.isLoggedIn && mid != Prefs.uid
+    val canFollow: Boolean get() = repo.isLoggedIn && mid != auth.mid
 
     init {
         viewModelScope.launch {
@@ -148,7 +149,8 @@ internal class SpaceHeaderHolder(
 fun SpaceScreen(nav: NavController, route: SpaceRoute) {
     val vm: UserSpaceViewModel = koinViewModel()
     val repo: VideoActionRepository = koinInject()
-    val profile: SpaceHeaderHolder = viewModel { SpaceHeaderHolder(route.mid, repo) }
+    val auth: dev.aaa1115910.biliapi.repositories.AuthRepository = koinInject()
+    val profile: SpaceHeaderHolder = viewModel { SpaceHeaderHolder(route.mid, repo, auth) }
     val context = LocalContext.current
     val pending = rememberPendingLoad()
     val firstRequester = remember { FocusRequester() }

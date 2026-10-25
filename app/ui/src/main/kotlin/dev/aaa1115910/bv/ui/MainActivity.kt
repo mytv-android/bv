@@ -16,27 +16,35 @@ import dev.aaa1115910.bv.util.Prefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 /** 唯一启动入口：同时声明 LAUNCHER 与 LEANBACK_LAUNCHER。 */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        installSplashScreen()
+        var preferencesReady = false
+        installSplashScreen().setKeepOnScreenCondition { !preferencesReady }
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         // 启动时后台检查缓存阈值（默认「不限制」，只有用户设置上限后才会清理）
         lifecycleScope.launch(Dispatchers.IO) {
             runCatching { CacheManager(applicationContext).checkCache() }
         }
-        val initialPrefs = runBlocking { Prefs.themePrefsFlow.first() }   // 只读一次，避免首帧主题闪烁
-        setContent {
-            BvRoot(initialPrefs) {
-                UserLockGate {
-                    val nav = rememberNavController()
-                    AppShell(nav)
-                    DeepLinkEffect(intent, nav)   // 处理 bugvideo://qrtoken
+        lifecycleScope.launch {
+            // 保留启动画面直到真实主题就绪，避免阻塞主线程或先显示错误的主题。
+            PreferenceWrites.awaitPending()
+            val (initialPrefs, showFps) = withContext(Dispatchers.IO) {
+                Prefs.themePrefsFlow.first() to Prefs.showFps
+            }
+            setContent {
+                BvRoot(initialPrefs, initialShowFps = showFps) {
+                    UserLockGate {
+                        val nav = rememberNavController()
+                        AppShell(nav)
+                        DeepLinkEffect(intent, nav)
+                    }
                 }
             }
+            preferencesReady = true
         }
     }
 }

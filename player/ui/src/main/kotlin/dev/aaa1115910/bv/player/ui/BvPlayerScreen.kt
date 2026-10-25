@@ -7,15 +7,11 @@
 
 package dev.aaa1115910.bv.player.ui
 
-import android.os.CountDownTimer
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -37,12 +33,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.layout
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.TextUnit
@@ -82,7 +78,6 @@ import dev.aaa1115910.bv.player.ui.design.rememberDpadMode
 import dev.aaa1115910.bv.player.ui.touch.TouchController
 import dev.aaa1115910.bv.player.ui.touch.VideoZoomState
 import dev.aaa1115910.bv.player.ui.tv.TvController
-import dev.aaa1115910.bv.util.countDownTimer
 import dev.aaa1115910.bv.util.fInfo
 import dev.aaa1115910.bv.util.formatHourMinSec
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -191,8 +186,8 @@ fun BvPlayerScreen(
     val latestOnLoadNextVideo by rememberUpdatedState(onLoadNextVideo)
     val latestOnClearBackToHistoryData by rememberUpdatedState(onClearBackToHistoryData)
 
-    // 直接调用 danmakuView 会始终为 null
-    var mDanmakuView: DanmakuView? by remember { mutableStateOf(null) }
+    // 长期监听器始终读取最新 View，不再通过协程复制成另一份状态。
+    val mDanmakuView by rememberUpdatedState(danmakuView)
 
     var isPlaying by rememberSaveable { mutableStateOf(false) }
     var isError by remember { mutableStateOf(false) }
@@ -213,15 +208,23 @@ fun BvPlayerScreen(
     )
 
     // 换集、切画幅比例、全屏状态变化后回到 1x
-    LaunchedEffect(configData.currentVideoCid, aspectRatioSetting, isFullScreen) {
+    KeyedSideEffect(configData.currentVideoCid, aspectRatioSetting, isFullScreen) {
         videoZoomState.reset()
     }
 
-    var hideBackToHistoryTimer: CountDownTimer? by remember { mutableStateOf(null) }
+    if (showBackToHistory) {
+        LaunchedEffect(Unit) {
+            delay(5000)
+            // Clear locally before a player callback can re-show the expired tip.
+            lastPlayed = 0L
+            showBackToHistory = false
+            latestOnClearBackToHistoryData()
+        }
+    }
 
     // 跳过 PGC 片头片尾：同一集每个区间只自动跳一次，换集或拿到新配置时重置
     var processedClipIndices by remember { mutableStateOf(emptySet<Int>()) }
-    LaunchedEffect(configData.currentVideoCid, configData.clipInfoList) {
+    KeyedSideEffect(configData.currentVideoCid, configData.clipInfoList) {
         processedClipIndices = emptySet()
     }
 
@@ -292,18 +295,13 @@ fun BvPlayerScreen(
 
     val updateBackToHistory: () -> Unit = {
         // 此处使用 videoPlayerHistoryData.lastPlayed 无法获取到新值
-        if (lastPlayed > 0 && hideBackToHistoryTimer == null) {
+        if (lastPlayed > 0 && !showBackToHistory) {
             logger.info { "show showBackToHistory: $lastPlayed" }
             showBackToHistory = true
-            hideBackToHistoryTimer = countDownTimer(5000, 1000, "hideBackToHistoryTimer") {
-                showBackToHistory = false
-                hideBackToHistoryTimer = null
-                latestOnClearBackToHistoryData()
-            }
         }
     }
 
-    val videoPlayerListener = remember {
+    val videoPlayerListener = remember(videoPlayer) {
         object : VideoPlayerListener {
             override fun onError(error: Exception) {
                 logger.info { "onError: $error" }
@@ -380,27 +378,25 @@ fun BvPlayerScreen(
     }
 
     // updateBackToHistory() 中使用 videoPlayerHistoryData.lastPlayed 无法获取到新值
-    LaunchedEffect(historyData.lastPlayed) {
+    KeyedSideEffect(historyData.lastPlayed) {
         lastPlayed = historyData.lastPlayed.toLong()
     }
 
-    LaunchedEffect(videoInfoData.width, videoInfoData.height) {
+    KeyedSideEffect(videoInfoData.width, videoInfoData.height) {
         val ratio = videoInfoData.width / videoInfoData.height.toFloat()
         defaultAspectRatio = ratio.takeIf { it > 0 && it.isFinite() } ?: (16 / 9f)
     }
 
-    LaunchedEffect(configData.currentVideoAspectRatio) {
+    KeyedSideEffect(configData.currentVideoAspectRatio) {
         aspectRatioSetting = configData.currentVideoAspectRatio
     }
 
-    LaunchedEffect(danmakuView) {
-        logger.debug { "update mDanmakuView" }
-        mDanmakuView = danmakuView
-        // View 实例可能晚于配置就绪（或换页面重建），挂上后立即同步一次
+    KeyedSideEffect(danmakuView) {
+        // View 实例可能晚于配置就绪（或换页面重建），挂上后立即同步一次。
         danmakuView?.setConfig(danmakuConfig)
     }
 
-    LaunchedEffect(loadStateData.loadState) {
+    KeyedSideEffect(loadStateData.loadState, loadStateData.errorMessage) {
         if (loadStateData.loadState == RequestState.Failed) {
             exception = Exception(loadStateData.errorMessage)
             isError = true
@@ -409,7 +405,7 @@ fun BvPlayerScreen(
 
     // 进度轮询 + 跳过 PGC 片头/片尾。
     // 轮询结果写进普通对象（不写 Compose State），界面进度由 PlayerSeekDataProvider 单独提供。
-    LaunchedEffect(Unit) {
+    LaunchedEffect(videoPlayer) {
         while (true) {
             val position = videoPlayer.currentPosition.coerceAtLeast(0L)
             progressSnapshot.position = position
@@ -439,19 +435,19 @@ fun BvPlayerScreen(
     }
 
     // 播放心跳：5 秒后开始，每 15 秒上报一次（播放中）；离开播放器时再上报一次
-    LaunchedEffect(Unit) {
+    LaunchedEffect(videoPlayer) {
         delay(5000)
         while (true) {
             if (videoPlayer.isPlaying) sendHeartbeat(true)
             delay(15000)
         }
     }
-    DisposableEffect(Unit) {
+    DisposableEffect(videoPlayer) {
         onDispose { sendHeartbeat(false) }
     }
 
     // 弹幕蒙版：蒙版帧的查找与 DstIn 混合由 DanmakuView 内部完成，这里只同步开关 / 数据 / 画面比例
-    LaunchedEffect(configData.currentDanmakuMask, mDanmakuView) {
+    KeyedSideEffect(configData.currentDanmakuMask, mDanmakuView) {
         mDanmakuView?.setMaskEnabled(configData.currentDanmakuMask)
     }
 
@@ -460,19 +456,23 @@ fun BvPlayerScreen(
             .collect { mDanmakuView?.setMaskSegments(it) }
     }
 
-    LaunchedEffect(aspectRatio, aspectRatioSetting, mDanmakuView) {
-        mDanmakuView?.setVideoAspectRatio(aspectRatio)
-        mDanmakuView?.setVideoAspectRatioType(aspectRatioSetting)
+    LaunchedEffect(mDanmakuView, aspectRatioSetting) {
+        val target = mDanmakuView ?: return@LaunchedEffect
+        target.setVideoAspectRatioType(aspectRatioSetting)
+        snapshotFlow { aspectRatio }.collect { target.setVideoAspectRatio(it) }
     }
 
-    DisposableEffect(Unit) {
-        onDispose { hideBackToHistoryTimer?.cancel() }
+    KeyedSideEffect(danmakuView, videoPlayer) {
+        danmakuView?.apply {
+            setPositionProvider { videoPlayer.currentPosition.coerceAtLeast(0L) }
+            setIsPlayingProvider { videoPlayer.isPlaying }
+            setPlaybackSpeedProvider { videoPlayer.speed }
+        }
     }
 
     // ---------------------------------------------------------------- 菜单状态
 
-    menuState.config = configData
-    menuState.handlers = PlayerMenuHandlers(
+    val menuHandlers = PlayerMenuHandlers(
         onResolutionChange = { resolution ->
             videoPlayer.pause()
             val current = videoPlayer.currentPosition
@@ -552,6 +552,10 @@ fun BvPlayerScreen(
         onSubtitleBottomPaddingChange = onSubtitleBottomPadding,
         onPlayModeChange = onPlayModeChange,
     )
+    SideEffect {
+        menuState.config = configData
+        menuState.handlers = menuHandlers
+    }
 
     // ---------------------------------------------------------------- 控制层
 
@@ -587,10 +591,9 @@ fun BvPlayerScreen(
             markManualSeekClip(time)
             videoPlayer.seekTo(time)
             mDanmakuView?.notifySeek(time)
-            onClearBackToHistoryData()
+            lastPlayed = 0L
             showBackToHistory = false
-            hideBackToHistoryTimer?.cancel()
-            hideBackToHistoryTimer = null
+            onClearBackToHistoryData()
         },
         playNewVideo = { item ->
             sendHeartbeat(true)
@@ -605,66 +608,42 @@ fun BvPlayerScreen(
 
     val videoSurface: @Composable BoxScope.() -> Unit = {
         if (isTv) {
-            LaunchedEffect(Unit) {
+            // 等 AndroidView 和监听器完成挂载后再设置自动播放。
+            LaunchedEffect(videoPlayer) {
                 videoPlayer.setOptions()
             }
         }
 
-        // BvVideoPlayer 必须保持唯一调用点：它 onDispose 时会释放播放内核，
-        // 若全屏切换让组合走到不同分支销毁重建，播放中的内核会被误释放（黑屏且不可恢复）
-        BoxWithConstraints(
+        // 保持唯一调用点，切换全屏时不能销毁并释放播放内核。
+        // 画幅动画和缩放只在测量阶段读取，平移只在放置阶段读取。
+        Box(
             modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            val baseSize = resolveVideoBaseSize(
-                maxWidth = maxWidth,
-                maxHeight = maxHeight,
-                aspectRatio = aspectRatio,
-                setting = aspectRatioSetting,
-            )
-            val density = LocalDensity.current
-            val baseWidthPx = with(density) { baseSize.width.toPx() }
-            val baseHeightPx = with(density) { baseSize.height.toPx() }
-            SideEffect {
-                videoZoomState.contentSize = IntSize(
-                    baseWidthPx.roundToInt(),
-                    baseHeightPx.roundToInt(),
-                )
-            }
-
-            // 等宽：宽度铺满、高度按比例；等高：高度铺满、宽度按比例；拉伸：直接铺满整个容器
-            val videoModifier = when (aspectRatioSetting) {
-                VideoAspectRatio.EqualWidth -> Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(aspectRatio)
-
-                VideoAspectRatio.EqualHeight -> Modifier
-                    .fillMaxHeight()
-                    .aspectRatio(aspectRatio, matchHeightConstraintsFirst = true)
-
-                VideoAspectRatio.Stretch -> Modifier.fillMaxSize()
-
-                else -> Modifier.aspectRatio(aspectRatio)
-            }
-
-            // 缩放值在 Layout 阶段读取：双指缩放只触发重测量，不重组
-            val zoomModifier = Modifier
-                .layout { measurable, _ ->
-                    val scale = videoZoomState.scale
-                    val width = (baseSize.width * scale).roundToPx().coerceAtLeast(1)
-                    val height = (baseSize.height * scale).roundToPx().coerceAtLeast(1)
-                    val placeable = measurable.measure(Constraints.fixed(width, height))
-                    layout(width, height) { placeable.place(0, 0) }
-                }
-                .offset {
-                    IntOffset(
-                        videoZoomState.offset.x.roundToInt(),
-                        videoZoomState.offset.y.roundToInt(),
-                    )
-                }
-
             BvVideoPlayer(
-                modifier = if (zoomEnabled) zoomModifier else videoModifier,
+                modifier = Modifier
+                    .layout { measurable, constraints ->
+                        val baseSize = resolveVideoBaseSize(
+                            maxWidth = constraints.maxWidth.toFloat(),
+                            maxHeight = constraints.maxHeight.toFloat(),
+                            aspectRatio = aspectRatio,
+                            setting = aspectRatioSetting,
+                        )
+                        // 普通字段，仅供手势回调使用，不向 Composition 回写快照状态。
+                        videoZoomState.contentSize = IntSize(
+                            baseSize.width.roundToInt(),
+                            baseSize.height.roundToInt(),
+                        )
+                        val scale = if (zoomEnabled) videoZoomState.scale else 1f
+                        val width = (baseSize.width * scale).roundToInt().coerceAtLeast(1)
+                        val height = (baseSize.height * scale).roundToInt().coerceAtLeast(1)
+                        val placeable = measurable.measure(Constraints.fixed(width, height))
+                        layout(width, height) { placeable.place(0, 0) }
+                    }
+                    .offset {
+                        val offset = if (zoomEnabled) videoZoomState.offset else Offset.Zero
+                        IntOffset(offset.x.roundToInt(), offset.y.roundToInt())
+                    },
                 videoPlayer = videoPlayer,
                 playerListener = videoPlayerListener,
             )
@@ -675,12 +654,7 @@ fun BvPlayerScreen(
             modifier = Modifier
                 .align(Alignment.Center)
                 .matchParentSize(),
-            danmakuView = mDanmakuView?.apply {
-                setPositionProvider { videoPlayer.currentPosition.coerceAtLeast(0L) }
-                setIsPlayingProvider { videoPlayer.isPlaying }
-                // 用播放器实际速率，而不是配置里的速率：两者会在长按加速等场景下不一致
-                setPlaybackSpeedProvider { videoPlayer.speed }
-            },
+            danmakuView = mDanmakuView,
         )
     }
 
@@ -785,22 +759,22 @@ internal class PlayerController(
     val setTemporarySpeed: (Float?) -> Unit,
 )
 
-/** 与 [videoSurface] 中非缩放分支的画幅规则保持一致，返回视频基础显示尺寸。 */
+/** 在测量阶段计算视频基础尺寸，等宽 / 等高模式允许画面超出容器。 */
 private fun resolveVideoBaseSize(
-    maxWidth: Dp,
-    maxHeight: Dp,
+    maxWidth: Float,
+    maxHeight: Float,
     aspectRatio: Float,
     setting: VideoAspectRatio,
-): DpSize {
+): Size {
     val ratio = aspectRatio.takeIf { it > 0f && it.isFinite() } ?: (16f / 9f)
     return when (setting) {
-        VideoAspectRatio.EqualWidth -> DpSize(maxWidth, maxWidth / ratio)
-        VideoAspectRatio.EqualHeight -> DpSize(maxHeight * ratio, maxHeight)
-        VideoAspectRatio.Stretch -> DpSize(maxWidth, maxHeight)
+        VideoAspectRatio.EqualWidth -> Size(maxWidth, maxWidth / ratio)
+        VideoAspectRatio.EqualHeight -> Size(maxHeight * ratio, maxHeight)
+        VideoAspectRatio.Stretch -> Size(maxWidth, maxHeight)
         else -> if (maxWidth / maxHeight > ratio) {
-            DpSize(maxHeight * ratio, maxHeight)
+            Size(maxHeight * ratio, maxHeight)
         } else {
-            DpSize(maxWidth, maxWidth / ratio)
+            Size(maxWidth, maxWidth / ratio)
         }
     }
 }

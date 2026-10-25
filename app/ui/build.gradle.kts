@@ -77,8 +77,10 @@ dependencies {
     implementation(project(":player:core"))
     implementation(project(":player:shared"))
     implementation(project(":player:ui"))
+    implementation(androidx.lifecycle.runtime.compose)
     implementation(androidx.media3.common)
     implementation(androidx.media3.exoplayer)
     implementation(libs.logging)
+    testImplementation(libs.kotlin.test)
     debugImplementation(androidx.compose.ui.tooling)
 }

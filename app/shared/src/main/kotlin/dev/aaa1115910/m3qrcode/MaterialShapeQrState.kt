@@ -11,17 +11,14 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.compose.material3.ColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.ColorUtils
@@ -29,6 +26,8 @@ import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.google.zxing.qrcode.encoder.Encoder
 import com.google.zxing.qrcode.encoder.QRCode
 import dev.aaa1115910.bv.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -61,19 +60,22 @@ internal data class MaterialShapeQrState(
     val finderPatternShapeList = mutableStateListOf<MaterialShapeRenderer>()
     val dataModuleShapeList = mutableStateListOf<MaterialShapeRenderer>()
     val backgroundModuleShapeList = mutableStateListOf<MaterialShapeRenderer>()
-    val hasCreated: SnapshotStateList<SnapshotStateList<Boolean>> = mutableStateListOf()
+    /** 纯生成期去重矩阵，不需要被 Snapshot 观察。 */
+    private var hasCreated: Array<BooleanArray> = emptyArray()
 
-    var finderPatternCenterShapeIndex by mutableIntStateOf(0)
+    var finderPatternCenterShapeIndex: Int = 0
 
-    var hasFinalDataImage by mutableStateOf(false)
-    var qrStartTime by mutableLongStateOf(0L)
-    var qrcode by mutableStateOf<QRCode?>(null)
+    /** 仅由帧循环和生成协程读写，不参与 Composition。 */
+    var hasFinalDataImage: Boolean = false
+    var qrStartTime: Long = 0L
+    var qrcode: QRCode? = null
     var qrcodeSize by mutableIntStateOf(0)
     var qrcodeLineCount by mutableIntStateOf(0)
-    var moduleSize by mutableIntStateOf(29)
+    var moduleSize: Int = 29
 
 
     var frameElapsed by mutableLongStateOf(0L)
+    var dataFrameElapsed by mutableLongStateOf(0L)
     var lottieScale by mutableFloatStateOf(0f)
 
 
@@ -98,22 +100,11 @@ internal data class MaterialShapeQrState(
     }
 
     fun drawAnimationBackground(elapsedMs: Long) {
-        // 当动画时间小于 1100ms 时，根据时间计算并设置背景动画的缩放
-        if (elapsedMs < 1100L) {
-            lottieScale = calculateAnimationBackgroundScale(elapsedMs)
-        }
-
-        // 在前 600ms 内根据计算的 alpha 值更新 Lottie 动画的背景颜色滤镜
-        if (elapsedMs <= 600L) {
-            val alphaFraction = calculateAnimationBackgroundAlpha(elapsedMs)
-            // 将浮点 alpha 转为 0..255 的整型并应用到 backgroundShapeColor
-            val alphaColor = ColorUtils.setAlphaComponent(
-                backgroundShapeColor,
-                (alphaFraction * 255).toInt()
-            )
-
-            colorMap[".bg"] = alphaColor
-        }
+        // 即使慢帧跳过动画终点，也必须落到最终比例和颜色。
+        lottieScale = calculateAnimationBackgroundScale(elapsedMs)
+        val alphaFraction = calculateAnimationBackgroundAlpha(elapsedMs)
+        val alphaColor = ColorUtils.setAlphaComponent(backgroundShapeColor, (alphaFraction * 255).toInt())
+        if (colorMap[".bg"] != alphaColor) colorMap[".bg"] = alphaColor
     }
 
     fun randomSquare(shapeSize: Int): Drawable {
@@ -197,14 +188,20 @@ internal data class MaterialShapeQrState(
         return (qrcode?.matrix?.get(x, y)?.toInt()?.and(15)) == 1
     }
 
-    fun updateContent(
+    suspend fun updateContent(
         content: String,
         errorCorrectionLevel: ErrorCorrectionLevel = ErrorCorrectionLevel.L
     ) {
-        val encode = Encoder.encode(content, errorCorrectionLevel, null)
+        val encode = withContext(Dispatchers.Default) {
+            Encoder.encode(content, errorCorrectionLevel, null)
+        }
         qrcode = encode
         qrStartTime = System.currentTimeMillis()
+        frameElapsed = 0L
+        dataFrameElapsed = 0L
+        lottieScale = 0f
         hasFinalDataImage = false
+        drawAnimationBackground(0L)
 
         // 获取矩阵宽度
         qrcodeLineCount = qrcode?.matrix?.width ?: 0
@@ -220,14 +217,7 @@ internal data class MaterialShapeQrState(
         // 计算最终位图尺寸
         qrcodeSize = moduleSize * qrcodeLineCount
 
-        hasCreated.clear()
-        for (i in 0 until qrcodeLineCount) {
-            val row = mutableStateListOf<Boolean>()
-            for (j in 0 until qrcodeLineCount) {
-                row.add(false)
-            }
-            hasCreated.add(row)
-        }
+        hasCreated = Array(qrcodeLineCount) { BooleanArray(qrcodeLineCount) }
 
         // 清空渲染器列表
         finderPatternShapeList.clear()
@@ -583,16 +573,9 @@ internal fun rememberMaterialShapeQrState(
     val backgroundDotColor2 = colorScheme.onSurface.copy(25 / 255f).toArgb()
     val backgroundDotColor3 = colorScheme.tertiaryContainer.copy(76 / 255f).toArgb()
 
-    val mainForegroundColorArray by remember {
-        derivedStateOf {
-            listOf(foregroundColorPrimary, foregroundColorSecondary)
-        }
-    }
-    val mainBackgroundColorArray by remember {
-        derivedStateOf {
-            listOf(backgroundDotColor1, backgroundDotColor2, backgroundDotColor3)
-        }
-    }
+    val mainForegroundColorArray = listOf(foregroundColorPrimary, foregroundColorSecondary)
+    val mainBackgroundColorArray =
+        listOf(backgroundDotColor1, backgroundDotColor2, backgroundDotColor3)
 
     val arrayOf1x1Shapes = remember { mutableStateListOf<Drawable>() }
     val arrayOf1x1SemiCircleShapes = remember { mutableStateListOf<Drawable>() }

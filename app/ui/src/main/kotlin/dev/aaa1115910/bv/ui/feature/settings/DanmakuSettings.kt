@@ -22,6 +22,7 @@ import dev.aaa1115910.bv.player.danmaku.DanmakuLaneDensity
 import dev.aaa1115910.bv.player.entity.DanmakuType
 import dev.aaa1115910.bv.ui.designsystem.component.BvChip
 import dev.aaa1115910.bv.util.Prefs
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import kotlin.math.roundToInt
 
 /**
@@ -49,134 +50,162 @@ private fun resolveDanmakuTypes(current: List<DanmakuType>, selected: List<Danma
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun DanmakuSettings() {
+internal fun DanmakuSettings(container: SettingsContainer) {
     val context = LocalContext.current
-    var enabled by remember { mutableStateOf(Prefs.defaultDanmakuEnabled) }
-    var types by remember { mutableStateOf(Prefs.defaultDanmakuTypes) }
-    var scale by remember { mutableFloatStateOf(Prefs.defaultDanmakuScale) }
-    var opacity by remember { mutableFloatStateOf(Prefs.defaultDanmakuOpacity) }
-    var area by remember { mutableFloatStateOf(Prefs.defaultDanmakuArea) }
-    var mask by remember { mutableStateOf(Prefs.defaultDanmakuMask) }
-    var laneDensity by remember { mutableStateOf(Prefs.defaultDanmakuLaneDensity) }
-    var rollingDurationFactor by remember { mutableFloatStateOf(Prefs.defaultDanmakuRollingDurationFactor) }
-    var filterLevel by remember { mutableIntStateOf(Prefs.defaultDanmakuFilterLevel) }
+    val initial = rememberPreferenceSnapshot {
+        DanmakuPreferences(
+            enabled = Prefs.defaultDanmakuEnabled,
+            types = Prefs.defaultDanmakuTypes,
+            scale = Prefs.defaultDanmakuScale,
+            opacity = Prefs.defaultDanmakuOpacity,
+            area = Prefs.defaultDanmakuArea,
+            mask = Prefs.defaultDanmakuMask,
+            laneDensity = Prefs.defaultDanmakuLaneDensity,
+            rollingDurationFactor = Prefs.defaultDanmakuRollingDurationFactor,
+            filterLevel = Prefs.defaultDanmakuFilterLevel,
+        )
+    } ?: return
+    var enabled by remember { mutableStateOf(initial.enabled) }
+    var types by remember { mutableStateOf(initial.types) }
+    var scale by remember { mutableFloatStateOf(initial.scale) }
+    var opacity by remember { mutableFloatStateOf(initial.opacity) }
+    var area by remember { mutableFloatStateOf(initial.area) }
+    var mask by remember { mutableStateOf(initial.mask) }
+    var laneDensity by remember { mutableStateOf(initial.laneDensity) }
+    var rollingDurationFactor by remember { mutableFloatStateOf(initial.rollingDurationFactor) }
+    var filterLevel by remember { mutableIntStateOf(initial.filterLevel) }
 
-    SettingSwitchRow(
-        title = stringResource(R.string.settings_danmaku_enabled),
-        subtitle = stringResource(R.string.settings_danmaku_enabled_desc),
-        checked = enabled,
-        onCheckedChange = {
-            enabled = it
-            Prefs.defaultDanmakuEnabled = it
-        },
-    )
+    container {
+        SettingSwitchRow(
+            title = stringResource(R.string.settings_danmaku_enabled),
+            subtitle = stringResource(R.string.settings_danmaku_enabled_desc),
+            checked = enabled,
+            onCheckedChange = {
+                enabled = it
+                PreferenceWrites.enqueue { Prefs.defaultDanmakuEnabled = it }
+            },
+        )
 
-    SettingGroup(stringResource(R.string.settings_danmaku_types)) {
-        FlowRow(
-            Modifier
-                .fillMaxWidth()
-                .focusRestorer()
-                .focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            DanmakuType.entries.forEach { type ->
-                val on = type in types
-                BvChip(
-                    text = type.getDisplayName(context),
-                    selected = on,
-                    onClick = {
-                        val selected = if (on) types - type else types + type
-                        types = resolveDanmakuTypes(types, selected)
-                        Prefs.defaultDanmakuTypes = types
-                    },
-                )
+        SettingGroup(stringResource(R.string.settings_danmaku_types)) {
+            FlowRow(
+                Modifier
+                    .fillMaxWidth()
+                    .focusRestorer()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DanmakuType.entries.forEach { type ->
+                    val on = type in types
+                    BvChip(
+                        text = type.getDisplayName(context),
+                        selected = on,
+                        onClick = {
+                            val selected = if (on) types - type else types + type
+                            types = resolveDanmakuTypes(types, selected)
+                            val savedTypes = types.toList()
+                            PreferenceWrites.enqueue { Prefs.defaultDanmakuTypes = savedTypes }
+                        },
+                    )
+                }
             }
         }
-    }
 
-    SettingGroup(stringResource(R.string.settings_danmaku_density)) {
-        FlowRow(
-            Modifier
-                .fillMaxWidth()
-                .focusRestorer()
-                .focusGroup(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            DanmakuLaneDensity.entries.forEach { density ->
-                BvChip(
-                    text = stringResource(
-                        when (density) {
-                            DanmakuLaneDensity.Sparse -> R.string.settings_danmaku_density_sparse
-                            DanmakuLaneDensity.Standard -> R.string.settings_danmaku_density_standard
-                            DanmakuLaneDensity.Dense -> R.string.settings_danmaku_density_dense
-                        }
-                    ),
-                    selected = laneDensity == density,
-                    onClick = {
-                        laneDensity = density
-                        Prefs.defaultDanmakuLaneDensity = density
-                    },
-                )
+        SettingGroup(stringResource(R.string.settings_danmaku_density)) {
+            FlowRow(
+                Modifier
+                    .fillMaxWidth()
+                    .focusRestorer()
+                    .focusGroup(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                DanmakuLaneDensity.entries.forEach { density ->
+                    BvChip(
+                        text = stringResource(
+                            when (density) {
+                                DanmakuLaneDensity.Sparse -> R.string.settings_danmaku_density_sparse
+                                DanmakuLaneDensity.Standard -> R.string.settings_danmaku_density_standard
+                                DanmakuLaneDensity.Dense -> R.string.settings_danmaku_density_dense
+                            }
+                        ),
+                        selected = laneDensity == density,
+                        onClick = {
+                            laneDensity = density
+                            PreferenceWrites.enqueue { Prefs.defaultDanmakuLaneDensity = density }
+                        },
+                    )
+                }
             }
         }
+
+        PrefSliderGroup(
+            label = stringResource(R.string.settings_danmaku_scale),
+            valueText = stringResource(R.string.settings_percent, (scale * 100).roundToInt()),
+            value = scale,
+            onValueChange = { scale = it },
+            save = { Prefs.defaultDanmakuScale = it },
+            valueRange = 0.5f..4f,
+            steps = 69,
+        )
+        PrefSliderGroup(
+            label = stringResource(R.string.settings_danmaku_speed),
+            valueText = "${(rollingDurationFactor * 10).roundToInt() / 10f}x",
+            value = rollingDurationFactor,
+            onValueChange = { rollingDurationFactor = it },
+            save = { Prefs.defaultDanmakuRollingDurationFactor = it },
+            valueRange = 0.2f..1.8f,
+            steps = 15,
+        )
+        PrefSliderGroup(
+            label = stringResource(R.string.settings_danmaku_opacity),
+            valueText = stringResource(R.string.settings_percent, (opacity * 100).roundToInt()),
+            value = opacity,
+            onValueChange = { opacity = it },
+            save = { Prefs.defaultDanmakuOpacity = it },
+            valueRange = 0f..1f,
+            steps = 19,
+        )
+        PrefSliderGroup(
+            label = stringResource(R.string.settings_danmaku_area),
+            valueText = stringResource(R.string.settings_percent, (area * 100).roundToInt()),
+            value = area,
+            onValueChange = { area = it },
+            save = { Prefs.defaultDanmakuArea = it },
+            valueRange = 0f..1f,
+            steps = 19,
+        )
+
+        SettingSwitchRow(
+            title = stringResource(R.string.settings_danmaku_mask),
+            subtitle = stringResource(R.string.settings_danmaku_mask_desc),
+            checked = mask,
+            onCheckedChange = {
+                mask = it
+                PreferenceWrites.enqueue { Prefs.defaultDanmakuMask = it }
+            },
+        )
+
+        PrefSliderGroup(
+            label = stringResource(R.string.settings_danmaku_filter_level),
+            valueText = stringResource(R.string.settings_danmaku_filter_level_value, filterLevel),
+            value = filterLevel.toFloat(),
+            onValueChange = { filterLevel = it.roundToInt() },
+            save = { Prefs.defaultDanmakuFilterLevel = it.roundToInt() },
+            valueRange = 0f..10f,
+            steps = 9,
+        )
     }
-
-    PrefSliderGroup(
-        label = stringResource(R.string.settings_danmaku_scale),
-        valueText = stringResource(R.string.settings_percent, (scale * 100).roundToInt()),
-        value = scale,
-        onValueChange = { scale = it },
-        save = { Prefs.defaultDanmakuScale = it },
-        valueRange = 0.5f..4f,
-        steps = 69,
-    )
-    PrefSliderGroup(
-        label = stringResource(R.string.settings_danmaku_speed),
-        valueText = "${(rollingDurationFactor * 10).roundToInt() / 10f}x",
-        value = rollingDurationFactor,
-        onValueChange = { rollingDurationFactor = it },
-        save = { Prefs.defaultDanmakuRollingDurationFactor = it },
-        valueRange = 0.2f..1.8f,
-        steps = 15,
-    )
-    PrefSliderGroup(
-        label = stringResource(R.string.settings_danmaku_opacity),
-        valueText = stringResource(R.string.settings_percent, (opacity * 100).roundToInt()),
-        value = opacity,
-        onValueChange = { opacity = it },
-        save = { Prefs.defaultDanmakuOpacity = it },
-        valueRange = 0f..1f,
-        steps = 19,
-    )
-    PrefSliderGroup(
-        label = stringResource(R.string.settings_danmaku_area),
-        valueText = stringResource(R.string.settings_percent, (area * 100).roundToInt()),
-        value = area,
-        onValueChange = { area = it },
-        save = { Prefs.defaultDanmakuArea = it },
-        valueRange = 0f..1f,
-        steps = 19,
-    )
-
-    SettingSwitchRow(
-        title = stringResource(R.string.settings_danmaku_mask),
-        subtitle = stringResource(R.string.settings_danmaku_mask_desc),
-        checked = mask,
-        onCheckedChange = {
-            mask = it
-            Prefs.defaultDanmakuMask = it
-        },
-    )
-
-    PrefSliderGroup(
-        label = stringResource(R.string.settings_danmaku_filter_level),
-        valueText = stringResource(R.string.settings_danmaku_filter_level_value, filterLevel),
-        value = filterLevel.toFloat(),
-        onValueChange = { filterLevel = it.roundToInt() },
-        save = { Prefs.defaultDanmakuFilterLevel = it.roundToInt() },
-        valueRange = 0f..10f,
-        steps = 9,
-    )
 }
+
+private data class DanmakuPreferences(
+    val enabled: Boolean,
+    val types: List<DanmakuType>,
+    val scale: Float,
+    val opacity: Float,
+    val area: Float,
+    val mask: Boolean,
+    val laneDensity: DanmakuLaneDensity,
+    val rollingDurationFactor: Float,
+    val filterLevel: Int,
+)

@@ -20,7 +20,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,6 +81,23 @@ const val MAX_SCALE_RATE = 3.2F
 
 // 最小手指手势间距
 const val MIN_GESTURE_FINGER_DISTANCE = 200
+
+/** 手势临时值容器：只在 pointer 回调中读写，不参与组合，无需 Snapshot state。 */
+private class ViewerGestureState {
+    var eventChangeCount = 0
+    var lastPan = Offset.Zero
+    var boundX = 0F
+    var boundY = 0F
+    var maxScale = 1F
+    var desX = 0F
+    var desY = 0F
+    var desScale = 1F
+    var fromScale = 1F
+    var boundScale = 1F
+    var desRotation = 0F
+    var rotate = 0F
+    var zoom = 1F
+}
 
 /**
  * viewer状态对象，用于记录compose组件状态
@@ -338,60 +354,36 @@ fun ImageViewer(
     val viewerGestureScope = remember { ViewerGestureScope() }
     detectGesture.invoke(viewerGestureScope)
     val scope = rememberCoroutineScope()
-    // 触摸时中心位置
+    // 触摸时中心位置（调试光标在 draw 阶段读取，保留 Snapshot state）
     var centroid by remember { mutableStateOf(Offset.Zero) }
     // 减速运动动画曲线
     val decay = remember {
         FloatExponentialDecaySpec(2f).generateDecayAnimationSpec<Float>()
     }
     var velocityTracker = remember { VelocityTracker() }
-    // 记录触摸事件中手指的个数
-    var eventChangeCount by remember { mutableStateOf(0) }
-    // 最后一次偏移运动
-    var lastPan by remember { mutableStateOf(Offset.Zero) }
-    // 手势实时的偏移范围
-    var boundX by remember { mutableStateOf(0F) }
-    var boundY by remember { mutableStateOf(0F) }
-    // 最大缩放率，双击的时候会放大到这个值
-    var maxScale by remember { mutableStateOf(1F) }
+    // 手势过程中的临时值只在 pointer 回调里读写，不参与组合
+    val gestureState = remember { ViewerGestureState() }
     // 最大显示缩放率，缩放率超过这个值后，手势结束了就会自动恢复到这个值
-    val maxDisplayScale by remember { derivedStateOf { maxScale * MAX_SCALE_RATE } }
-    // 目标偏移量
-    var desX by remember { mutableStateOf(0F) }
-    var desY by remember { mutableStateOf(0F) }
-    // 目标缩放率
-    var desScale by remember { mutableStateOf(1F) }
-    // 缩放率修改前的值
-    var fromScale by remember { mutableStateOf(1F) }
-    // 计算边界使用的缩放率
-    var boundScale by remember { mutableStateOf(1F) }
-    // 目标旋转角度
-    var desRotation by remember { mutableStateOf(0F) }
-    // 要增加的旋转角度
-    var rotate by remember { mutableStateOf(0F) }
-    // 要增加的放大倍率
-    var zoom by remember { mutableStateOf(1F) }
-    // 两个手指的距离
-    var fingerDistanceOffset by remember { mutableStateOf(Offset.Zero) }
+    fun maxDisplayScale(): Float = gestureState.maxScale * MAX_SCALE_RATE
 
     // 同步des的参数，在gallery的图片切换时，缩小后仍然接收手势指令，所以需要同步缩小后的参数
     fun asyncDesParams() {
-        desX = state.offsetX.value
-        desY = state.offsetY.value
-        desScale = state.scale.value
-        desRotation = state.rotation.value
+        gestureState.desX = state.offsetX.value
+        gestureState.desY = state.offsetY.value
+        gestureState.desScale = state.scale.value
+        gestureState.desRotation = state.rotation.value
     }
     LaunchedEffect(key1 = state.resetTimeStamp) {
         asyncDesParams()
     }
-    val gesture = remember {
+    val gesture = remember(state, scope, viewerGestureScope, gestureState, decay) {
         RawGesture(
-            onTap = viewerGestureScope.onTap,
-            onDoubleTap = viewerGestureScope.onDoubleTap,
-            onLongPress = viewerGestureScope.onLongPress,
+            onTap = { viewerGestureScope.onTap(it) },
+            onDoubleTap = { viewerGestureScope.onDoubleTap(it) },
+            onLongPress = { viewerGestureScope.onLongPress(it) },
             gestureStart = {
                 if (state.allowGestureInput) {
-                    eventChangeCount = 0
+                    gestureState.eventChangeCount = 0
                     velocityTracker = VelocityTracker()
                     scope.launch {
                         state.offsetX.stop()
@@ -415,11 +407,12 @@ fun ImageViewer(
                     }
                     // 如果缩放比小于1，要自动回到1
                     // 如果缩放比大于最大显示缩放比，就设置回去，并且避免加速度
+                    val maxDisplay = maxDisplayScale()
                     val scale = when {
                         state.scale.value < 1 -> 1F
-                        state.scale.value > maxDisplayScale -> {
+                        state.scale.value > maxDisplay -> {
                             velocity = null
-                            maxDisplayScale
+                            maxDisplay
                         }
 
                         else -> null
@@ -427,13 +420,13 @@ fun ImageViewer(
                     // 如果此时位移超出范围，就动画回范围内
                     // 如果没超出范围，就设置animate的范围，然后执行抛掷动画
                     scope.launch {
-                        if (inBound(state.offsetX.value, boundX) && velocity != null) {
-                            val vx = sameDirection(lastPan.x, velocity.x)
-                            state.offsetX.updateBounds(-boundX, boundX)
+                        if (inBound(state.offsetX.value, gestureState.boundX) && velocity != null) {
+                            val vx = sameDirection(gestureState.lastPan.x, velocity.x)
+                            state.offsetX.updateBounds(-gestureState.boundX, gestureState.boundX)
                             state.offsetX.animateDecay(vx, decay)
                         } else {
-                            val targetX = if (scale != maxDisplayScale) {
-                                limitToBound(state.offsetX.value, boundX)
+                            val targetX = if (scale != maxDisplayScale()) {
+                                limitToBound(state.offsetX.value, gestureState.boundX)
                             } else {
                                 panTransformAndScale(
                                     offset = state.offsetX.value,
@@ -448,13 +441,13 @@ fun ImageViewer(
                         }
                     }
                     scope.launch {
-                        if (inBound(state.offsetY.value, boundY) && velocity != null) {
-                            val vy = sameDirection(lastPan.y, velocity.y)
-                            state.offsetY.updateBounds(-boundY, boundY)
+                        if (inBound(state.offsetY.value, gestureState.boundY) && velocity != null) {
+                            val vy = sameDirection(gestureState.lastPan.y, velocity.y)
+                            state.offsetY.updateBounds(-gestureState.boundY, gestureState.boundY)
                             state.offsetY.animateDecay(vy, decay)
                         } else {
-                            val targetY = if (scale != maxDisplayScale) {
-                                limitToBound(state.offsetY.value, boundY)
+                            val targetY = if (scale != maxDisplayScale()) {
+                                limitToBound(state.offsetY.value, gestureState.boundY)
                             } else {
                                 panTransformAndScale(
                                     offset = state.offsetY.value,
@@ -482,80 +475,94 @@ fun ImageViewer(
             // 当禁止手势输入时
             if (!state.allowGestureInput) return@RawGesture true
             // 这里只记录最大手指数
-            if (event.changes.size > eventChangeCount) eventChangeCount = event.changes.size
+            if (event.changes.size > gestureState.eventChangeCount) {
+                gestureState.eventChangeCount = event.changes.size
+            }
             // 如果手指数从多个变成一个，就结束本次手势操作
-            if (eventChangeCount > event.changes.size) return@RawGesture false
+            if (gestureState.eventChangeCount > event.changes.size) return@RawGesture false
 
-            rotate = _rotate
-            zoom = _zoom
+            gestureState.rotate = _rotate
+            gestureState.zoom = _zoom
             // 如果是双指的情况下，手指距离小于一定值时，缩放和旋转的值会很离谱，所以在这种极端情况下就不要处理缩放和旋转了
             if (event.changes.size == 2) {
-                fingerDistanceOffset = event.changes[0].position - event.changes[1].position
+                val fingerDistanceOffset =
+                    event.changes[0].position - event.changes[1].position
                 if (
                     fingerDistanceOffset.x.absoluteValue < MIN_GESTURE_FINGER_DISTANCE
                     && fingerDistanceOffset.y.absoluteValue < MIN_GESTURE_FINGER_DISTANCE
                 ) {
-                    rotate = 0F
-                    zoom = 1F
+                    gestureState.rotate = 0F
+                    gestureState.zoom = 1F
                 }
             }
             // 上一次的偏移量
-            lastPan = pan
+            gestureState.lastPan = pan
             // 记录手势的中点
             centroid = center
             // 记录当前缩放比
-            fromScale = desScale
+            gestureState.fromScale = gestureState.desScale
             // 目标放大倍率
-            desScale *= zoom
+            gestureState.desScale *= gestureState.zoom
             // 检查最小放大倍率
-            if (desScale < MIN_SCALE) desScale = MIN_SCALE
+            if (gestureState.desScale < MIN_SCALE) gestureState.desScale = MIN_SCALE
 
             // 计算边界，如果目标缩放值超过最大显示缩放值，边界就要用最大缩放值来计算，否则手势结束时会导致无法归位
-            boundScale = if (desScale > maxDisplayScale) maxDisplayScale else desScale
-            boundX =
-                getBound(boundScale * state.defaultSize.width, state.containerSize.width.toFloat())
-            boundY =
+            val maxDisplay = maxDisplayScale()
+            gestureState.boundScale =
+                if (gestureState.desScale > maxDisplay) maxDisplay else gestureState.desScale
+            gestureState.boundX =
                 getBound(
-                    boundScale * state.defaultSize.height,
+                    gestureState.boundScale * state.defaultSize.width,
+                    state.containerSize.width.toFloat()
+                )
+            gestureState.boundY =
+                getBound(
+                    gestureState.boundScale * state.defaultSize.height,
                     state.containerSize.height.toFloat()
                 )
 
-            desX = panTransformAndScale(
-                offset = desX,
+            gestureState.desX = panTransformAndScale(
+                offset = gestureState.desX,
                 center = center.x,
                 bh = state.containerSize.width.toFloat(),
                 uh = state.defaultSize.width.toFloat(),
-                fromScale = fromScale,
-                toScale = desScale,
+                fromScale = gestureState.fromScale,
+                toScale = gestureState.desScale,
             ) + pan.x
             // 如果手指数1，就是拖拽，拖拽受范围限制
             // 如果手指数大于1，即有缩放事件，则支持中心点放大
-            if (eventChangeCount == 1) desX = limitToBound(desX, boundX)
-            desY = panTransformAndScale(
-                offset = desY,
+            if (gestureState.eventChangeCount == 1) {
+                gestureState.desX = limitToBound(gestureState.desX, gestureState.boundX)
+            }
+            gestureState.desY = panTransformAndScale(
+                offset = gestureState.desY,
                 center = center.y,
                 bh = state.containerSize.height.toFloat(),
                 uh = state.defaultSize.height.toFloat(),
-                fromScale = fromScale,
-                toScale = desScale,
+                fromScale = gestureState.fromScale,
+                toScale = gestureState.desScale,
             ) + pan.y
-            if (eventChangeCount == 1) desY = limitToBound(desY, boundY)
+            if (gestureState.eventChangeCount == 1) {
+                gestureState.desY = limitToBound(gestureState.desY, gestureState.boundY)
+            }
 
-            if (desScale < 1) desRotation += rotate
+            if (gestureState.desScale < 1) {
+                gestureState.desRotation += gestureState.rotate
+            }
             velocityTracker.addPosition(
                 event.changes[0].uptimeMillis,
-                Offset(desX, desY),
+                Offset(gestureState.desX, gestureState.desY),
             )
             if (!state.isRunning()) scope.launch {
-                state.scale.snapTo(desScale)
-                state.offsetX.snapTo(desX)
-                state.offsetY.snapTo(desY)
-                state.rotation.snapTo(desRotation)
+                state.scale.snapTo(gestureState.desScale)
+                state.offsetX.snapTo(gestureState.desX)
+                state.offsetY.snapTo(gestureState.desY)
+                state.rotation.snapTo(gestureState.desRotation)
             }
 
             // 这里判断是否已运动到边界，如果到了边界，就不消费事件，让上层界面获取到事件
-            val onLeft = desX >= boundX
-            val onRight = desX <= -boundX
+            val onLeft = gestureState.desX >= gestureState.boundX
+            val onRight = gestureState.desX <= -gestureState.boundX
             val reachSide = !(onLeft && pan.x > 0)
                     && !(onRight && pan.x < 0)
                     && !(onLeft && onRight)
@@ -572,7 +579,7 @@ fun ImageViewer(
         }
     }
     val sizeChange: suspend (SizeChangeContent) -> Unit = { content ->
-        maxScale = content.maxScale
+        gestureState.maxScale = content.maxScale
         state.defaultSize = content.defaultSize
         state.containerSize = content.containerSize
         state.maxScale = content.maxScale

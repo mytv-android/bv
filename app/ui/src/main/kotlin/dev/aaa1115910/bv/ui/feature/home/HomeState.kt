@@ -405,17 +405,9 @@ internal fun rememberHomeState(): HomeState {
     val videoAction: VideoActionRepository = koinInject()
     val auth: AuthRepository = koinInject()
     val context = LocalContext.current.applicationContext
-    return remember(recommend, popular, history, searchInput, user, dynamic) {
+    return remember(recommend, popular, history, searchInput, user, dynamic, context, toView, videoAction, auth) {
         HomeState(recommend, popular, history, searchInput, user, dynamic, context, toView, videoAction, auth)
     }
-}
-
-/** 列表 → 卡片数据，只在列表变化时重新转换。[skip] 跳过开头若干条。 */
-@Composable
-internal fun <T> rememberCards(list: List<T>, skip: Int = 0, mapper: (T) -> VideoCardData): List<VideoCardData> {
-    val latestMapper by rememberUpdatedState(mapper)
-    val cards by remember(list, skip) { derivedStateOf { list.drop(skip).map { latestMapper(it) } } }
-    return cards
 }
 
 /** 顶部搜索框占位词：第一个热搜词，取不到时用「搜索」。 */

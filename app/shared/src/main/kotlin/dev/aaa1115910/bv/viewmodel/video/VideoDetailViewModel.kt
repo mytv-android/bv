@@ -123,8 +123,7 @@ class VideoDetailViewModel(
                     isCurrent = node.isCurrent,
                 )
             }
-            videoInfoRepository.videoList.clear()
-            videoInfoRepository.videoList.addAll(interactiveVideoList)
+            videoInfoRepository.replaceVideoList(interactiveVideoList)
         } else if (videoDetail?.ugcSeason != null) {
             updateUgcSeasonSectionVideoList(0)
         } else {
@@ -137,8 +136,7 @@ class VideoDetailViewModel(
                         index = index,
                     )
                 }
-            videoInfoRepository.videoList.clear()
-            videoInfoRepository.videoList.addAll(partVideoList)
+            videoInfoRepository.replaceVideoList(partVideoList)
         }
     }
 
@@ -175,8 +173,7 @@ class VideoDetailViewModel(
                 }
             }
         }
-        videoInfoRepository.videoList.clear()
-        videoInfoRepository.videoList.addAll(partVideoList)
+        videoInfoRepository.replaceVideoList(partVideoList)
     }
 }
 

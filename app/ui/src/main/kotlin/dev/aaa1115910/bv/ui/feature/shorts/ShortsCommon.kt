@@ -100,6 +100,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 import kotlin.math.roundToInt
 import kotlin.random.Random
 
@@ -694,16 +695,21 @@ internal fun ShortsItem.tagsText(): String =
 /** 发布时间：今天 05:12 / 昨天 05:12 / 10-02 / 2023-10-02 */
 @Composable
 internal fun shortsPubdate(seconds: Long): String {
-    val date = Date(seconds * 1000)
-    val now = Calendar.getInstance()
-    val then = Calendar.getInstance().apply { time = date }
-    val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
-    val time = SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
+    val date = remember(seconds) { Date(seconds * 1000) }
+    val locale = Locale.getDefault()
+    val zone = TimeZone.getDefault()
+    val now = Calendar.getInstance(zone, locale)
+    val then = remember(date, locale, zone) { Calendar.getInstance(zone, locale).apply { time = date } }
+    val yesterday = (now.clone() as Calendar).apply { add(Calendar.DAY_OF_YEAR, -1) }
+    val timeFormatter = remember(locale, zone) { SimpleDateFormat("HH:mm", locale).apply { timeZone = zone } }
+    val dayFormatter = remember(locale, zone) { SimpleDateFormat("MM-dd", locale).apply { timeZone = zone } }
+    val yearFormatter = remember(locale, zone) { SimpleDateFormat("yyyy-MM-dd", locale).apply { timeZone = zone } }
+    val time = remember(date, timeFormatter) { timeFormatter.format(date) }
     return when {
         sameDay(now, then) -> stringResource(R.string.shorts_today, time)
         sameDay(yesterday, then) -> stringResource(R.string.shorts_yesterday, time)
-        now.get(Calendar.YEAR) == then.get(Calendar.YEAR) -> SimpleDateFormat("MM-dd", Locale.getDefault()).format(date)
-        else -> SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)
+        now.get(Calendar.YEAR) == then.get(Calendar.YEAR) -> dayFormatter.format(date)
+        else -> yearFormatter.format(date)
     }
 }
 

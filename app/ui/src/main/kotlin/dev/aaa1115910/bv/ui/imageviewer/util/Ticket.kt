@@ -31,10 +31,9 @@ class Ticket {
     }
 
     private fun clearTicket() {
-        ticketMap.forEach {
-            it.value.resume(Unit)
-            ticketMap.remove(it.key)
-        }
+        val waiting = ticketMap.values.toList()
+        ticketMap.clear()
+        waiting.forEach { it.resume(Unit) }
     }
 
     @Composable

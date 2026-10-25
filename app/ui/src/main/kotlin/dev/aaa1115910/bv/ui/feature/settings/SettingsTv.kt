@@ -54,6 +54,7 @@ internal fun SettingsTv(nav: NavController, initial: SettingsCategory) {
     val itemRequesters = remember { SettingsCategory.entries.associateWith { FocusRequester() } }
     val paneRequester = remember { FocusRequester() }
     var paneFocused by remember { mutableStateOf(false) }
+    var enterRequested by remember { mutableStateOf<SettingsCategory?>(null) }
 
     // 初始焦点：选中的分类（原型 data-start）
     LaunchedEffect(Unit) {
@@ -103,13 +104,21 @@ internal fun SettingsTv(nav: NavController, initial: SettingsCategory) {
                                 selected = category == selected,
                                 onClick = {
                                     selectedId = category.id
-                                    paneRequester.tryFocusEnter()
+                                    enterRequested = category
                                 },
-                                onFocused = { focused -> if (focused) selectedId = category.id },
+                                onFocused = { focused ->
+                                    if (focused) {
+                                        selectedId = category.id
+                                        if (enterRequested != category) enterRequested = null
+                                    }
+                                },
                                 modifier = Modifier
                                     .focusRequester(itemRequesters.getValue(category))
                                     .onBvKey { key ->
-                                        if (key == BvKey.Right) paneRequester.tryFocusEnter() else false
+                                        if (key == BvKey.Right) {
+                                            enterRequested = category
+                                            true
+                                        } else false
                                     },
                             )
                         }
@@ -124,19 +133,28 @@ internal fun SettingsTv(nav: NavController, initial: SettingsCategory) {
                 .background(scheme.surfaceContainer, RoundedCornerShape(28.dp)),
         ) {
             key(selected) {
-                TvColumnPivot {
-                    Column(
-                        Modifier
-                            .fillMaxSize()
-                            .onFocusChanged { paneFocused = it.hasFocus }
-                            .focusRequester(paneRequester)
-                            .focusGroup()
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 26.dp, vertical = 22.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp),
-                    ) {
-                        Text(stringResource(selected.title), style = BvType.PanelTitle, color = scheme.onSurface)
-                        SettingsCategoryContent(category = selected, nav = nav, paneColor = scheme.surfaceContainer)
+                SettingsCategoryContent(category = selected, nav = nav, paneColor = scheme.surfaceContainer) { content ->
+                    LaunchedEffect(enterRequested) {
+                        if (enterRequested == selected) {
+                            withFrameNanos { }
+                            paneRequester.tryFocusEnter()
+                            enterRequested = null
+                        }
+                    }
+                    TvColumnPivot {
+                        Column(
+                            Modifier
+                                .fillMaxSize()
+                                .onFocusChanged { paneFocused = it.hasFocus }
+                                .focusRequester(paneRequester)
+                                .focusGroup()
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 26.dp, vertical = 22.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            Text(stringResource(selected.title), style = BvType.PanelTitle, color = scheme.onSurface)
+                            content()
+                        }
                     }
                 }
             }

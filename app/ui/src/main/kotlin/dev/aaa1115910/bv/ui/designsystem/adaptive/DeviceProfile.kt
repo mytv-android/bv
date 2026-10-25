@@ -6,7 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -63,7 +63,7 @@ fun rememberDeviceProfile(): DeviceProfile {
     val keyboard = LocalInputModeManager.current.inputMode == InputMode.Keyboard
     // 设置 → 外观与主题 → 界面布局：改了立刻整个 App 换布局，不用重启
     val modeFlow = remember { Prefs.layoutModeFlow }
-    val mode by modeFlow.collectAsState(initial = LayoutMode.Auto)
+    val mode by modeFlow.collectAsStateWithLifecycle(initialValue = LayoutMode.Auto)
     val width = when {
         widthDp < 600 -> WidthClass.Compact
         widthDp < 840 -> WidthClass.Medium

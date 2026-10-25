@@ -12,7 +12,7 @@ import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -37,14 +37,14 @@ val LocalBvDark = staticCompositionLocalOf { false }
 
 /** 应用根：提供设备画像、主题偏好、电视密度，然后套全局主题。只在 MainActivity.setContent 里调用一次。 */
 @Composable
-fun BvRoot(initialPrefs: ThemePrefs, content: @Composable () -> Unit) {
-    val prefs by Prefs.themePrefsFlow.collectAsState(initial = initialPrefs)
+fun BvRoot(initialPrefs: ThemePrefs, initialShowFps: Boolean, content: @Composable () -> Unit) {
+    val prefs by Prefs.themePrefsFlow.collectAsStateWithLifecycle(initialValue = initialPrefs)
     val profile = rememberDeviceProfile()
     val context = LocalContext.current
     val base = LocalDensity.current
-    val tvDensity by Prefs.densityFlow.collectAsState(initial = context.resources.displayMetrics.widthPixels / 960f)
+    val tvDensity by Prefs.densityFlow.collectAsStateWithLifecycle(initialValue = context.resources.displayMetrics.widthPixels / 960f)
     val density = if (profile.isTv) Density(tvDensity, base.fontScale) else base
-    val showFps = remember { Prefs.showFps }
+    val showFps = initialShowFps
     CompositionLocalProvider(
         LocalDeviceProfile provides profile,
         LocalThemePrefs provides prefs,

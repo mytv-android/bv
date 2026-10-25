@@ -1,5 +1,9 @@
 package dev.aaa1115910.bv.repository
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.referentialEqualityPolicy
+import androidx.compose.runtime.setValue
 import dev.aaa1115910.bv.player.entity.VideoListItem
 import org.koin.core.annotation.Single
 
@@ -12,7 +16,13 @@ data class InteractivePlaybackContext(
 
 @Single
 class VideoInfoRepository {
-    val videoList = mutableListOf<VideoListItem>()
+    var videoList: List<VideoListItem> by mutableStateOf(emptyList(), referentialEqualityPolicy())
+        private set
+
+    /** Publish a complete snapshot; callers cannot mutate the currently displayed list in place. */
+    fun replaceVideoList(items: List<VideoListItem>) {
+        videoList = items.toList()
+    }
 
     var interactivePlaybackContext: InteractivePlaybackContext? = null
 

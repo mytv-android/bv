@@ -295,8 +295,7 @@ private fun applyVideoList(
 ) {
     // 互动视频：选集列表换成节点（初始节点 / 上次走到的路径）
     if (d.isInteractive && d.interactiveNodes.isNotEmpty()) {
-        videoInfoRepository.videoList.clear()
-        videoInfoRepository.videoList.addAll(
+        videoInfoRepository.replaceVideoList(
             d.interactiveNodes.mapIndexed { index, node ->
                 VideoListInteractiveNode(
                     aid = d.aid,
@@ -320,8 +319,7 @@ private fun applyVideoList(
         }.takeIf { it >= 0 } ?: 0
         detailVm.updateUgcSeasonSectionVideoList(index)
     } else {
-        videoInfoRepository.videoList.clear()
-        videoInfoRepository.videoList.addAll(
+        videoInfoRepository.replaceVideoList(
             d.pages.mapIndexed { index, page ->
                 VideoListPart(aid = d.aid, cid = page.cid, title = page.title, index = index)
             }

@@ -305,15 +305,16 @@ object Prefs {
         }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefPlayerTypeKey, value.ordinal) }
 
-    val densityFlow: Flow<Float> get() = dsm.getPreferenceFlow(PrefKeys.prefDensityRequest)
+    val densityFlow: Flow<Float> by lazy { dsm.getPreferenceFlow(PrefKeys.prefDensityRequest) }
     var density: Float
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefDensityRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefDensityKey, value) }
 
     /** 界面布局：默认 [LayoutMode.Auto] 按设备与宽度自动判断，其余三项强制指定布局 */
-    val layoutModeFlow: Flow<LayoutMode>
-        get() = dsm.getPreferenceFlow(PrefKeys.prefLayoutModeRequest)
+    val layoutModeFlow: Flow<LayoutMode> by lazy {
+        dsm.getPreferenceFlow(PrefKeys.prefLayoutModeRequest)
             .transform { ordinal -> emit(LayoutMode.entries.getOrElse(ordinal) { LayoutMode.Auto }) }
+    }
 
     var layoutMode: LayoutMode
         get() = runBlocking {
@@ -455,9 +456,10 @@ object Prefs {
         }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefThemeTypeKey, value.ordinal) }
 
-    val themeTypeFlow: Flow<ThemeType>
-        get() = dsm.getPreferenceFlow(PrefKeys.prefThemeTypeRequest)
+    val themeTypeFlow: Flow<ThemeType> by lazy {
+        dsm.getPreferenceFlow(PrefKeys.prefThemeTypeRequest)
             .transform { ordinal -> emit(ThemeType.entries[ordinal]) }
+    }
 
     var defaultPlayMode: PlayMode
         get() = runBlocking {
@@ -483,8 +485,8 @@ object Prefs {
             dsm.editPreference(PrefKeys.prefCacheAutoCleanKey, value)
         }
 
-    val themePrefsFlow: Flow<ThemePrefs>
-        get() = combine(
+    val themePrefsFlow: Flow<ThemePrefs> by lazy {
+        combine(
             dsm.getPreferenceFlow(PrefKeys.prefThemeSourceRequest),
             dsm.getPreferenceFlow(PrefKeys.prefSeedColorRequest),
             dsm.getPreferenceFlow(PrefKeys.prefPaletteStyleRequest),
@@ -502,6 +504,7 @@ object Prefs {
             .combine(dsm.getPreferenceFlow(PrefKeys.prefContentSeedRequest)) { p, c -> p.copy(contentSeed = if (c == 0) null else Color(c)) }
             .combine(dsm.getPreferenceFlow(PrefKeys.prefCoverThemeRequest)) { p, v -> p.copy(coverTheme = v) }
             .combine(dsm.getPreferenceFlow(PrefKeys.prefReduceMotionRequest)) { p, v -> p.copy(reduceMotion = v) }
+    }
 
     suspend fun setThemeSource(v: ThemeSource) = dsm.editPreference(PrefKeys.prefThemeSourceKey, v.ordinal)
     suspend fun setSeedColor(v: Color) = dsm.editPreference(PrefKeys.prefSeedColorKey, v.toArgb())

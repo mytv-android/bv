@@ -21,6 +21,17 @@ class MaterialShapeRenderer {
     var srcImgSvg: Drawable
     var startDelay: Long = 0
 
+    private val scratchRect = Rect()
+    private val scratchRectF = RectF()
+    private val renderDrawable: Drawable by lazy(LazyThreadSafetyMode.NONE) {
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            runCatching { srcImgSvg.constantState!!.newDrawable().mutate() }
+                .getOrDefault(srcImgSvg)
+        } else {
+            srcImgSvg
+        }
+    }
+
     companion object {
         private var springScaleCache: LinkedHashMap<Int, Float> = linkedMapOf()
         private var dampedString: DampedString = DampedString(60, 0.63f)
@@ -61,16 +72,23 @@ class MaterialShapeRenderer {
 
     private fun draw(canvas: Canvas, rectF: RectF, paint: Paint) {
         canvas.withRotation(initialRotation * 90.0f, rectF.centerX(), rectF.centerY()) {
-            val vectorDrawable = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-                runCatching { srcImgSvg.constantState!!.newDrawable().mutate() }
-                    .getOrDefault(srcImgSvg)
-            } else srcImgSvg
-            val rect = Rect()
-            rectF.round(rect)
-            vectorDrawable.bounds = rect
-            vectorDrawable.colorFilter = paint.colorFilter
-            vectorDrawable.draw(this)
+            rectF.round(scratchRect)
+            renderDrawable.bounds = scratchRect
+            renderDrawable.colorFilter = paint.colorFilter
+            renderDrawable.draw(this)
         }
+    }
+
+    private fun drawScaled(canvas: Canvas, scale: Float, paint: Paint) {
+        val halfWidth = destRect.width() / 2.0f * scale
+        val halfHeight = destRect.height() / 2.0f * scale
+        scratchRectF.set(
+            destRect.centerX() - halfWidth,
+            destRect.centerY() - halfHeight,
+            destRect.centerX() + halfWidth,
+            destRect.centerY() + halfHeight,
+        )
+        draw(canvas, scratchRectF, paint)
     }
 
     private fun drawForNone(canvas: Canvas, j: Long) {
@@ -86,16 +104,7 @@ class MaterialShapeRenderer {
         }
         if (f2 <= f) {
             val cos = (cos(((f2 - 1000.0f) / 1000.0f) * 3.1415927f) + 1.0f) / 2.0f
-            draw(
-                canvas,
-                RectF(
-                    destRect.centerX() - ((destRect.width() / 2.0f) * cos),
-                    destRect.centerY() - ((destRect.height() / 2.0f) * cos),
-                    destRect.centerX() + ((destRect.width() / 2.0f) * cos),
-                    destRect.centerY() + ((destRect.height() / 2.0f) * cos)
-                ),
-                paint
-            )
+            drawScaled(canvas, cos, paint)
         } else {
             drawForNone(canvas, j)
         }
@@ -107,15 +116,7 @@ class MaterialShapeRenderer {
         val f2 = j.toFloat()
         if (f2 <= f) {
             val interpolation = EmphasizedInterpolator.getInterpolation(f2 / f)
-            draw(
-                canvas,
-                RectF(
-                    destRect.centerX() - ((destRect.width() / 2.0f) * interpolation),
-                    destRect.centerY() - ((destRect.height() / 2.0f) * interpolation),
-                    destRect.centerX() + ((destRect.width() / 2.0f) * interpolation),
-                    destRect.centerY() + ((destRect.height() / 2.0f) * interpolation)
-                ), paint
-            )
+            drawScaled(canvas, interpolation, paint)
         } else {
             drawForNone(canvas, j)
         }
@@ -124,15 +125,7 @@ class MaterialShapeRenderer {
     private fun drawForSpringZoomIn(canvas: Canvas, j: Long) {
         if (j <= 1500) {
             val springScale = calculateSpringScale(j)
-            draw(
-                canvas,
-                RectF(
-                    destRect.centerX() - ((destRect.width() / 2.0f) * springScale),
-                    destRect.centerY() - ((destRect.height() / 2.0f) * springScale),
-                    destRect.centerX() + ((destRect.width() / 2.0f) * springScale),
-                    destRect.centerY() + ((destRect.height() / 2.0f) * springScale)
-                ), paint
-            )
+            drawScaled(canvas, springScale, paint)
         } else {
             drawForNone(canvas, j)
         }
@@ -146,18 +139,12 @@ class MaterialShapeRenderer {
             var f3 = ((f2 - f) * 360.0f) / 4410.0f
             if (f2 <= f) {
                 val interpolation = EmphasizedInterpolator.getInterpolation(f2 / f)
-                val rectF = RectF(
-                    destRect.centerX() - ((destRect.width() / 2.0f) * interpolation),
-                    destRect.centerY() - ((destRect.height() / 2.0f) * interpolation),
-                    destRect.centerX() + ((destRect.width() / 2.0f) * interpolation),
-                    destRect.centerY() + ((destRect.height() / 2.0f) * interpolation)
-                )
                 rotate(
                     (interpolation * 180.0f) + f3,
                     destRect.centerX(),
                     destRect.centerY()
                 )
-                draw(this, rectF, paint)
+                drawScaled(this, interpolation, paint)
             } else {
                 if (isMotionPaused) {
                     f3 = 0.0f

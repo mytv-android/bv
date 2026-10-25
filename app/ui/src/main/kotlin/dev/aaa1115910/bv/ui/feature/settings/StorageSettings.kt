@@ -20,6 +20,7 @@ import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.util.CacheManager
 import dev.aaa1115910.bv.util.LogCatcherUtil
 import dev.aaa1115910.bv.util.Prefs
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -55,13 +56,19 @@ private fun Long.toMb(): Long = this / 1024 / 1024
  * 逻辑照抄旧电视 StorageSetting；文件大小在 IO 线程计算，回到主线程再写状态。
  */
 @Composable
-internal fun StorageSettings(onLogs: () -> Unit) {
+internal fun StorageSettings(onLogs: () -> Unit, container: SettingsContainer) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var sizes by remember { mutableStateOf<Map<StorageTarget, Long>?>(null) }
     var pending by remember { mutableStateOf<StorageTarget?>(null) }
-    var threshold by remember { mutableStateOf(Prefs.cacheThreshold) }
-    var autoClean by remember { mutableStateOf(Prefs.cacheAutoClean) }
+    val initial = rememberPreferenceSnapshot {
+        StoragePreferences(
+            threshold = Prefs.cacheThreshold,
+            autoClean = Prefs.cacheAutoClean,
+        )
+    } ?: return
+    var threshold by remember { mutableStateOf(initial.threshold) }
+    var autoClean by remember { mutableStateOf(initial.autoClean) }
 
     val refresh: () -> Unit = {
         scope.launch {
@@ -76,6 +83,7 @@ internal fun StorageSettings(onLogs: () -> Unit) {
     // 阈值调低 / 重新开启自动清理时立即生效，并刷新各目录大小显示
     val cleanupNow: () -> Unit = {
         scope.launch {
+            PreferenceWrites.awaitPending()
             withContext(Dispatchers.IO) {
                 runCatching { CacheManager(context).checkCache() }
             }
@@ -83,86 +91,93 @@ internal fun StorageSettings(onLogs: () -> Unit) {
         }
     }
 
-    SettingChoiceGroup(
-        label = stringResource(R.string.settings_store_threshold),
-        options = CacheThresholdOptions,
-        isSelected = { it == threshold },
-        optionLabel = {
-            if (it == CacheManager.THRESHOLD_UNLIMITED) {
-                stringResource(R.string.settings_store_threshold_unlimited)
-            } else {
-                stringResource(R.string.settings_store_size, it)
-            }
-        },
-        onSelect = {
-            threshold = it
-            Prefs.cacheThreshold = it
-            cleanupNow()
-        },
-    )
-    SettingSwitchRow(
-        title = stringResource(R.string.settings_store_auto_clean),
-        subtitle = stringResource(R.string.settings_store_auto_clean_desc),
-        checked = autoClean,
-        onCheckedChange = {
-            autoClean = it
-            Prefs.cacheAutoClean = it
-            if (it) cleanupNow()
-        },
-    )
-
-    val calculating = stringResource(R.string.settings_store_calculating)
-    SettingRows(stringResource(R.string.settings_store_group_cache)) {
-        StorageTarget.entries.forEach { target ->
-            val size = sizes?.get(target)
-            SettingNavRow(
-                title = stringResource(target.title),
-                value = if (size == null) calculating else stringResource(R.string.settings_store_size, size.toMb()),
-                showChevron = false,
-                onClick = { pending = target },
-            )
-        }
-    }
-
-    SettingRows(stringResource(R.string.settings_store_group_logs)) {
-        SettingNavRow(
-            title = stringResource(R.string.settings_store_logs),
-            subtitle = stringResource(R.string.settings_store_logs_desc),
-            onClick = onLogs,
+    container {
+        SettingChoiceGroup(
+            label = stringResource(R.string.settings_store_threshold),
+            options = CacheThresholdOptions,
+            isSelected = { it == threshold },
+            optionLabel = {
+                if (it == CacheManager.THRESHOLD_UNLIMITED) {
+                    stringResource(R.string.settings_store_threshold_unlimited)
+                } else {
+                    stringResource(R.string.settings_store_size, it)
+                }
+            },
+            onSelect = {
+                threshold = it
+                PreferenceWrites.enqueue { Prefs.cacheThreshold = it }
+                cleanupNow()
+            },
         )
-    }
+        SettingSwitchRow(
+            title = stringResource(R.string.settings_store_auto_clean),
+            subtitle = stringResource(R.string.settings_store_auto_clean_desc),
+            checked = autoClean,
+            onCheckedChange = {
+                autoClean = it
+                PreferenceWrites.enqueue { Prefs.cacheAutoClean = it }
+                if (it) cleanupNow()
+            },
+        )
 
-    pending?.let { target ->
-        val size = sizes?.get(target) ?: 0L
-        val confirmRequester = remember { FocusRequester() }
-        LaunchedEffect(target) {
-            withFrameNanos { }
-            confirmRequester.tryFocusEnter()
+        val calculating = stringResource(R.string.settings_store_calculating)
+        SettingRows(stringResource(R.string.settings_store_group_cache)) {
+            StorageTarget.entries.forEach { target ->
+                val size = sizes?.get(target)
+                SettingNavRow(
+                    title = stringResource(target.title),
+                    value = if (size == null) calculating else stringResource(R.string.settings_store_size, size.toMb()),
+                    showChevron = false,
+                    onClick = { pending = target },
+                )
+            }
         }
-        SettingsDialog(onDismiss = { pending = null }) {
-            Text(
-                stringResource(R.string.settings_store_clear_title, stringResource(target.title)),
-                style = BvType.PanelTitle,
+
+        SettingRows(stringResource(R.string.settings_store_group_logs)) {
+            SettingNavRow(
+                title = stringResource(R.string.settings_store_logs),
+                subtitle = stringResource(R.string.settings_store_logs_desc),
+                onClick = onLogs,
             )
-            Text(
-                stringResource(R.string.settings_store_clear_body, size.toMb()),
-                style = BvType.Body,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            SettingsDialogActions(
-                confirm = stringResource(R.string.settings_confirm),
-                onConfirm = {
-                    pending = null
-                    scope.launch {
-                        storageLogger.info { "clear ${target.name}" }
-                        withContext(Dispatchers.IO) { runCatching { target.dir(context).deleteRecursively() } }
-                        refresh()
-                    }
-                },
-                dismiss = stringResource(R.string.settings_cancel),
-                onDismiss = { pending = null },
-                confirmRequester = confirmRequester,
-            )
+        }
+
+        pending?.let { target ->
+            val size = sizes?.get(target) ?: 0L
+            val confirmRequester = remember { FocusRequester() }
+            LaunchedEffect(target) {
+                withFrameNanos { }
+                confirmRequester.tryFocusEnter()
+            }
+            SettingsDialog(onDismiss = { pending = null }) {
+                Text(
+                    stringResource(R.string.settings_store_clear_title, stringResource(target.title)),
+                    style = BvType.PanelTitle,
+                )
+                Text(
+                    stringResource(R.string.settings_store_clear_body, size.toMb()),
+                    style = BvType.Body,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SettingsDialogActions(
+                    confirm = stringResource(R.string.settings_confirm),
+                    onConfirm = {
+                        pending = null
+                        scope.launch {
+                            storageLogger.info { "clear ${target.name}" }
+                            withContext(Dispatchers.IO) { runCatching { target.dir(context).deleteRecursively() } }
+                            refresh()
+                        }
+                    },
+                    dismiss = stringResource(R.string.settings_cancel),
+                    onDismiss = { pending = null },
+                    confirmRequester = confirmRequester,
+                )
+            }
         }
     }
 }
+
+private data class StoragePreferences(
+    val threshold: Int,
+    val autoClean: Boolean,
+)

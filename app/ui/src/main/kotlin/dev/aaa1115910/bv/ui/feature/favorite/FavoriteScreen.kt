@@ -143,7 +143,7 @@ internal fun FavoriteContent(
                 contentPadding = chipsPadding,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                items(folders) { folder ->
+                items(folders, key = { it.id }, contentType = { "folder" }) { folder ->
                     BvChip(
                         text = folder.title,
                         selected = current?.id == folder.id,

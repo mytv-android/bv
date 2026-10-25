@@ -246,8 +246,9 @@ private fun ColumnScope.HistoryPane(
     }
 
     val entries = data.entries
-    val today = remember(entries.size) { startOfTodaySeconds() }
-    // 直接观察 SnapshotStateList，省掉每次重组都 toList() 的拷贝和 O(N) equals
+    // 每次重组都按当前时间取「今天 0 点」，跨天后分组会立即更新；不能用列表长度做缓存 key。
+    val today = startOfTodaySeconds()
+    // 历史或筛选条件变化时重新分组；直接观察 SnapshotStateList，避免每次重组都主动拷贝。
     val groups by remember(today, filter) {
         derivedStateOf {
             val filtered = entries.filter { filter.accepts(it) }

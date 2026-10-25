@@ -60,6 +60,7 @@ import dev.aaa1115910.bv.player.entity.LocalVideoPlayerVideoShotData
 import dev.aaa1115910.bv.player.entity.VideoListItemData
 import dev.aaa1115910.bv.player.ui.BottomSubtitle
 import dev.aaa1115910.bv.player.ui.BufferingTip
+import dev.aaa1115910.bv.player.ui.KeyedSideEffect
 import dev.aaa1115910.bv.player.ui.PaidRequireTip
 import dev.aaa1115910.bv.player.ui.PlayErrorTip
 import dev.aaa1115910.bv.player.ui.PlayerController
@@ -140,20 +141,16 @@ internal fun TouchController(
         if (stateData.isPlaying) controller.pause() else controller.play()
     }
 
-    LaunchedEffect(isFullScreen) {
+    KeyedSideEffect(isFullScreen) {
         if (!isFullScreen) panel = TouchPanel.None
     }
 
     // 控制层：播放中 3 秒无操作淡出；拖动进度、打开面板时不淡出
-    LaunchedEffect(showControls, interactionTick, stateData.isPlaying, panel, progressDragFraction) {
-        if (showControls && stateData.isPlaying && panel == TouchPanel.None && progressDragFraction == null) {
+    if (showControls && stateData.isPlaying && panel == TouchPanel.None && progressDragFraction == null) {
+        LaunchedEffect(interactionTick) {
             delay(AutoHideMillis)
             showControls = false
         }
-    }
-
-    LaunchedEffect(is2xPlaying) {
-        if (is2xPlaying) showControls = false
     }
 
     BackHandler(enabled = panel != TouchPanel.None) { closePanel() }
@@ -175,6 +172,7 @@ internal fun TouchController(
     val onLongPress: () -> Unit = {
         Log.i(TAG, "Screen long press")
         is2xPlaying = true
+        showControls = false
         controller.setTemporarySpeed(2f)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             val vibrator = context.getSystemService(Vibrator::class.java)

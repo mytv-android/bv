@@ -11,6 +11,7 @@ import androidx.compose.material.icons.rounded.WatchLater
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -73,8 +74,26 @@ internal class MeState(
     val isLogin: Boolean get() = user.isLogin
     val info: MyInfoData? get() = user.responseData
 
-    /** 继续观看：历史前 20 条。 */
-    val continueItems: List<HistoryEntry> get() = if (isLogin) data.entries.take(20) else emptyList()
+    /**
+     * 历史快照：只在 entries 变化时 toList() 一次，今日数量与「继续观看」共用，
+     * 避免每个入口卡各自扫描 SnapshotStateList。
+     */
+    private val historySnapshotState = derivedStateOf {
+        if (isLogin) data.entries.toList() else emptyList()
+    }
+
+    /** 继续观看：历史前 20 条（基于同一份历史快照缓存）。 */
+    private val continueItemsState = derivedStateOf {
+        historySnapshotState.value.take(20)
+    }
+
+    private var todayCountSnapshot: List<HistoryEntry>? = null
+    private var todayCountDayStart: Long = Long.MIN_VALUE
+    private var todayCountValue: Int = 0
+
+    val historySnapshot: List<HistoryEntry> get() = historySnapshotState.value
+
+    val continueItems: List<HistoryEntry> get() = continueItemsState.value
 
     fun refresh() {
         accounts.updateData()
@@ -86,15 +105,22 @@ internal class MeState(
     }
 
     fun todayCount(): Int {
-        val today = startOfTodaySeconds()
-        return data.entries.count { it.viewAt >= today }
+        val dayStart = startOfTodaySeconds()
+        val snapshot = historySnapshotState.value
+        // 跨天后也要重新统计，因此以「今天 0 点时间戳」作为缓存 key，而不是列表长度。
+        if (snapshot !== todayCountSnapshot || dayStart != todayCountDayStart) {
+            todayCountSnapshot = snapshot
+            todayCountDayStart = dayStart
+            todayCountValue = snapshot.count { it.viewAt >= dayStart }
+        }
+        return todayCountValue
     }
 }
 
 /** 入口的副标题（未登录或还没取到数据时为空）。[tablet] 时「关注」用「N 位 UP 主」。 */
 @Composable
 internal fun MeState.subtitle(entry: MeEntry, tablet: Boolean = false): String = when (entry) {
-    MeEntry.History -> if (isLogin && (data.entries.isNotEmpty() || data.noMore)) {
+    MeEntry.History -> if (isLogin && (historySnapshot.isNotEmpty() || data.noMore)) {
         stringResource(R.string.me_history_sub, todayCount())
     } else ""
 

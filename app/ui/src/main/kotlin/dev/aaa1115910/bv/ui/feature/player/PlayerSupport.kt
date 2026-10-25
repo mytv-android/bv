@@ -24,12 +24,13 @@ private val logger = KotlinLogging.logger("PlayerSupport")
 
 /** 创建播放内核（照抄旧 VideoPlayerV3Activity / 手机 VideoPlayerActivity 的 initVideoPlayer）。 */
 internal fun createVideoPlayer(context: Context): AbstractVideoPlayer {
+    val apiType = Prefs.apiType
     val options = VideoPlayerOptions(
-        userAgent = when (Prefs.apiType) {
+        userAgent = when (apiType) {
             ApiType.Web -> context.getString(BvR.string.video_player_user_agent_http)
             ApiType.App -> context.getString(BvR.string.video_player_user_agent_client)
         },
-        referer = when (Prefs.apiType) {
+        referer = when (apiType) {
             ApiType.Web -> context.getString(BvR.string.video_player_referer)
             ApiType.App -> null
         },

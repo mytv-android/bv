@@ -51,6 +51,7 @@ import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.util.FirebaseUtil
 import dev.aaa1115910.bv.util.Prefs
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import dev.aaa1115910.m3qrcode.MaterialShapeQr
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.Dispatchers
@@ -93,20 +94,28 @@ private fun Double.toGb(): String = "${DecimalFormat("###.##").format(this / 102
  * 照抄旧电视 AboutSetting、InfoSetting、OtherSetting 与旧手机 AboutContent。
  */
 @Composable
-internal fun AboutSettings(onMediaCodec: () -> Unit) {
+internal fun AboutSettings(onMediaCodec: () -> Unit, container: SettingsContainer) {
     val context = LocalContext.current
     val view = LocalView.current
     val isTv = LocalDeviceProfile.current.isTv
     var showUpdate by remember { mutableStateOf(false) }
-    var updateAlpha by remember { mutableStateOf(Prefs.updateAlpha) }
-    var firebase by remember { mutableStateOf(Prefs.enableFirebaseCollection) }
-    var showFps by remember { mutableStateOf(Prefs.showFps) }
+    val initial = rememberPreferenceSnapshot {
+        AboutPreferences(
+            updateAlpha = Prefs.updateAlpha,
+            firebase = Prefs.enableFirebaseCollection,
+            showFps = Prefs.showFps,
+        )
+    } ?: return
+    var updateAlpha by remember { mutableStateOf(initial.updateAlpha) }
+    var firebase by remember { mutableStateOf(initial.firebase) }
+    var showFps by remember { mutableStateOf(initial.showFps) }
     var latest by remember { mutableStateOf<LatestVersion>(LatestVersion.Loading) }
     var linkQr by remember { mutableStateOf<LinkEntry?>(null) }
 
     // 最新版本（切换 Alpha 更新后重新获取）
     LaunchedEffect(updateAlpha) {
         latest = LatestVersion.Loading
+        PreferenceWrites.awaitPending()
         latest = withContext(Dispatchers.IO) {
             runCatching { GithubApi.getLatestBuild().name }
                 .onFailure { aboutLogger.warn(it) { "Failed to get latest version" } }
@@ -125,113 +134,115 @@ internal fun AboutSettings(onMediaCodec: () -> Unit) {
         if (isTv) linkQr = entry else openUrl(context, entry.url)
     }
 
-    SettingRows(stringResource(R.string.settings_about_group_version)) {
-        SettingNavRow(
-            title = stringResource(R.string.settings_about_version),
-            subtitle = "${BuildConfig.VERSION_NAME}.${BuildConfig.BUILD_TYPE}",
-            value = latestText,
-            onClick = { showUpdate = true },
-        )
-        SettingNavRow(
-            title = stringResource(R.string.settings_about_github),
-            subtitle = GITHUB_URL,
-            onClick = { onLinkClick(LinkEntry(R.string.settings_about_github, GITHUB_URL)) },
-        )
-        SettingNavRow(
-            title = stringResource(R.string.settings_about_telegram),
-            subtitle = TELEGRAM_URL,
-            onClick = { onLinkClick(LinkEntry(R.string.settings_about_telegram, TELEGRAM_URL)) },
-        )
-    }
-
-    SettingSwitchRow(
-        title = stringResource(R.string.settings_about_alpha),
-        subtitle = stringResource(R.string.settings_about_alpha_desc),
-        checked = updateAlpha,
-        onCheckedChange = {
-            updateAlpha = it
-            Prefs.updateAlpha = it
-        },
-    )
-    SettingSwitchRow(
-        title = stringResource(R.string.settings_about_firebase),
-        subtitle = stringResource(R.string.settings_about_firebase_desc),
-        checked = firebase,
-        onCheckedChange = {
-            firebase = it
-            Prefs.enableFirebaseCollection = it
-            FirebaseUtil.setCrashlyticsCollectionEnabled(it)
-        },
-    )
-    SettingSwitchRow(
-        title = stringResource(R.string.settings_about_fps),
-        subtitle = stringResource(R.string.settings_about_fps_desc),
-        checked = showFps,
-        onCheckedChange = {
-            showFps = it
-            Prefs.showFps = it
-        },
-    )
-
-    // 设备信息（旧电视 InfoSetting）
-    val unknown = stringResource(R.string.settings_device_unknown)
-    val memory = remember { memoryInfo(context) }
-    val storage = remember { storageInfo() }
-    val screen = remember(view) { screenInfo(view, context) }
-    SettingGroup(stringResource(R.string.settings_about_group_device)) {
-        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            DeviceInfoLine(stringResource(R.string.settings_device_manufacturer, Build.MANUFACTURER))
-            DeviceInfoLine(stringResource(R.string.settings_device_model, Build.MODEL, Build.PRODUCT))
-            DeviceInfoLine(stringResource(R.string.settings_device_system, Build.VERSION.RELEASE))
-            if (screen != null) {
-                DeviceInfoLine(stringResource(R.string.settings_device_screen, screen.first, screen.second, screen.third))
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                DeviceInfoLine(stringResource(R.string.settings_device_soc, Build.SOC_MANUFACTURER, Build.SOC_MODEL))
-            }
-            DeviceInfoLine(
-                stringResource(
-                    R.string.settings_device_memory,
-                    memory?.first ?: unknown,
-                    memory?.second ?: unknown,
-                )
-            )
-            DeviceInfoLine(
-                stringResource(
-                    R.string.settings_device_storage,
-                    storage?.first ?: unknown,
-                    storage?.second ?: unknown,
-                )
-            )
-        }
-    }
-
-    SettingRows(stringResource(R.string.settings_about_group_debug)) {
-        SettingNavRow(
-            title = stringResource(R.string.settings_about_codec),
-            subtitle = stringResource(R.string.settings_about_codec_desc),
-            onClick = onMediaCodec,
-        )
-        if (BuildConfig.DEBUG) {
+    container {
+        SettingRows(stringResource(R.string.settings_about_group_version)) {
             SettingNavRow(
-                title = stringResource(R.string.settings_about_crash),
-                subtitle = stringResource(R.string.settings_about_crash_desc),
-                onClick = { throw Exception("Boom!") },
-                showChevron = false,
+                title = stringResource(R.string.settings_about_version),
+                subtitle = "${BuildConfig.VERSION_NAME}.${BuildConfig.BUILD_TYPE}",
+                value = latestText,
+                onClick = { showUpdate = true },
+            )
+            SettingNavRow(
+                title = stringResource(R.string.settings_about_github),
+                subtitle = GITHUB_URL,
+                onClick = { onLinkClick(LinkEntry(R.string.settings_about_github, GITHUB_URL)) },
+            )
+            SettingNavRow(
+                title = stringResource(R.string.settings_about_telegram),
+                subtitle = TELEGRAM_URL,
+                onClick = { onLinkClick(LinkEntry(R.string.settings_about_telegram, TELEGRAM_URL)) },
             )
         }
-    }
 
-    if (showUpdate) {
-        SettingsUpdateDialog(onDismiss = { showUpdate = false })
-    }
-
-    linkQr?.let { entry ->
-        LinkQrCodeDialog(
-            title = stringResource(entry.title),
-            link = entry.url,
-            onDismiss = { linkQr = null },
+        SettingSwitchRow(
+            title = stringResource(R.string.settings_about_alpha),
+            subtitle = stringResource(R.string.settings_about_alpha_desc),
+            checked = updateAlpha,
+            onCheckedChange = {
+                updateAlpha = it
+                PreferenceWrites.enqueue { Prefs.updateAlpha = it }
+            },
         )
+        SettingSwitchRow(
+            title = stringResource(R.string.settings_about_firebase),
+            subtitle = stringResource(R.string.settings_about_firebase_desc),
+            checked = firebase,
+            onCheckedChange = {
+                firebase = it
+                PreferenceWrites.enqueue { Prefs.enableFirebaseCollection = it }
+                FirebaseUtil.setCrashlyticsCollectionEnabled(it)
+            },
+        )
+        SettingSwitchRow(
+            title = stringResource(R.string.settings_about_fps),
+            subtitle = stringResource(R.string.settings_about_fps_desc),
+            checked = showFps,
+            onCheckedChange = {
+                showFps = it
+                PreferenceWrites.enqueue { Prefs.showFps = it }
+            },
+        )
+
+        // 设备信息（旧电视 InfoSetting）
+        val unknown = stringResource(R.string.settings_device_unknown)
+        val memory = remember { memoryInfo(context) }
+        val storage = remember { storageInfo() }
+        val screen = remember(view) { screenInfo(view, context) }
+        SettingGroup(stringResource(R.string.settings_about_group_device)) {
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                DeviceInfoLine(stringResource(R.string.settings_device_manufacturer, Build.MANUFACTURER))
+                DeviceInfoLine(stringResource(R.string.settings_device_model, Build.MODEL, Build.PRODUCT))
+                DeviceInfoLine(stringResource(R.string.settings_device_system, Build.VERSION.RELEASE))
+                if (screen != null) {
+                    DeviceInfoLine(stringResource(R.string.settings_device_screen, screen.first, screen.second, screen.third))
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    DeviceInfoLine(stringResource(R.string.settings_device_soc, Build.SOC_MANUFACTURER, Build.SOC_MODEL))
+                }
+                DeviceInfoLine(
+                    stringResource(
+                        R.string.settings_device_memory,
+                        memory?.first ?: unknown,
+                        memory?.second ?: unknown,
+                    )
+                )
+                DeviceInfoLine(
+                    stringResource(
+                        R.string.settings_device_storage,
+                        storage?.first ?: unknown,
+                        storage?.second ?: unknown,
+                    )
+                )
+            }
+        }
+
+        SettingRows(stringResource(R.string.settings_about_group_debug)) {
+            SettingNavRow(
+                title = stringResource(R.string.settings_about_codec),
+                subtitle = stringResource(R.string.settings_about_codec_desc),
+                onClick = onMediaCodec,
+            )
+            if (BuildConfig.DEBUG) {
+                SettingNavRow(
+                    title = stringResource(R.string.settings_about_crash),
+                    subtitle = stringResource(R.string.settings_about_crash_desc),
+                    onClick = { throw Exception("Boom!") },
+                    showChevron = false,
+                )
+            }
+        }
+
+        if (showUpdate) {
+            SettingsUpdateDialog(onDismiss = { showUpdate = false })
+        }
+
+        linkQr?.let { entry ->
+            LinkQrCodeDialog(
+                title = stringResource(entry.title),
+                link = entry.url,
+                onDismiss = { linkQr = null },
+            )
+        }
     }
 }
 
@@ -342,3 +353,9 @@ private fun screenInfo(view: View, context: Context): Triple<Int, Int, Float>? =
     val mode = display.mode
     Triple(mode.physicalWidth, mode.physicalHeight, mode.refreshRate)
 }.getOrNull()
+
+private data class AboutPreferences(
+    val updateAlpha: Boolean,
+    val firebase: Boolean,
+    val showFps: Boolean,
+)

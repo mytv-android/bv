@@ -10,7 +10,6 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -82,7 +81,7 @@ internal fun ToViewContent(
 ) {
     val profile = LocalDeviceProfile.current
     val pending = rememberPendingLoad()
-    val items by remember(vm) { derivedStateOf { vm.histories.map { it.toContinueItem() } } }
+    val items = vm.histories.toList()
     val hintPadding = when (profile.layout) {
         DeviceLayout.Phone -> 16.dp
         DeviceLayout.Tablet -> 24.dp
@@ -132,8 +131,9 @@ internal fun ToViewContent(
             },
             emptyMessage = stringResource(R.string.toview_empty),
             firstRequester = firstRequester,
-            itemKey = { it.card.avid },
-        ) { _, item, itemModifier ->
+            itemKey = { it.avid },
+        ) { _, card, itemModifier ->
+            val item = remember(card, card.timeString) { card.toContinueItem() }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 VideoCard(
                     data = item.card,

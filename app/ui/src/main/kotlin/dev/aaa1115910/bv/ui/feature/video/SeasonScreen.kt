@@ -22,7 +22,6 @@ import dev.aaa1115910.biliapi.entity.video.season.Episode
 import dev.aaa1115910.biliapi.entity.video.season.SeasonDetail
 import dev.aaa1115910.biliapi.repositories.VideoDetailRepository
 import dev.aaa1115910.bv.appui.R
-import dev.aaa1115910.bv.player.entity.VideoListItemData
 import dev.aaa1115910.bv.player.entity.VideoListPgcEpisode
 import dev.aaa1115910.bv.repository.VideoInfoRepository
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
@@ -166,41 +165,43 @@ fun SeasonScreen(nav: NavController, route: SeasonRoute) {
         }
     }
 
-    val handlers = DetailHandlers(
-        onBack = {
-            if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) nav.popBackStack()
-        },
-        onUpClick = {},
-        onFollowClick = {
-            scope.launch {
-                if (seasonVm.isFollowing) seasonVm.unFollowSeason() else seasonVm.followSeason()
-            }
-        },
-        onPlay = { row, episode ->
-            val data = season
-            if (data != null) {
-                val list = rowEpisodes(data, row.key)
-                val target = list.firstOrNull { it.cid == episode.cid && it.id == episode.epid }
-                    ?: list.firstOrNull { it.cid == episode.cid }
-                if (target != null) {
-                    val startMs = if (target.id == progress?.lastEpId) {
-                        ((progress?.lastTime ?: 0) * 1000L).coerceAtLeast(0L)
-                    } else 0L
-                    playEpisode(data, list, target, startMs)
+    val handlers = remember(season, progress, seasonVm, scope, lifecycleOwner, nav, playEpisode) {
+        DetailHandlers(
+            onBack = {
+                if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) nav.popBackStack()
+            },
+            onUpClick = {},
+            onFollowClick = {
+                scope.launch {
+                    if (seasonVm.isFollowing) seasonVm.unFollowSeason() else seasonVm.followSeason()
                 }
-            }
-        },
-        onSeasonSelect = { seasonId ->
-            if ((seasonVm.seasonData?.seasonId ?: 0) != seasonId) {
-                // 不清空当前数据：手机 / 平板的内嵌播放器继续播放，新季度加载完成后切换
-                seasonVm.seasonId = seasonId
-                seasonVm.epId = null
-                scope.launch { seasonVm.updateSeasonData() }
-            }
-        },
-        onRelatedClick = { video -> nav.openVideo(video) },
-        onTagClick = { tag -> nav.navigate(TagRoute(tag.id)) },
-    )
+            },
+            onPlay = { row, episode ->
+                val data = season
+                if (data != null) {
+                    val list = rowEpisodes(data, row.key)
+                    val target = list.firstOrNull { it.cid == episode.cid && it.id == episode.epid }
+                        ?: list.firstOrNull { it.cid == episode.cid }
+                    if (target != null) {
+                        val startMs = if (target.id == progress?.lastEpId) {
+                            ((progress?.lastTime ?: 0) * 1000L).coerceAtLeast(0L)
+                        } else 0L
+                        playEpisode(data, list, target, startMs)
+                    }
+                }
+            },
+            onSeasonSelect = { seasonId ->
+                if ((seasonVm.seasonData?.seasonId ?: 0) != seasonId) {
+                    // 不清空当前数据：手机 / 平板的内嵌播放器继续播放，新季度加载完成后切换
+                    seasonVm.seasonId = seasonId
+                    seasonVm.epId = null
+                    scope.launch { seasonVm.updateSeasonData() }
+                }
+            },
+            onRelatedClick = { video -> nav.openVideo(video) },
+            onTagClick = { tag -> nav.navigate(TagRoute(tag.id)) },
+        )
+    }
 
     // 电视「▶ 继续 第 N 话 · {mm:ss}」/「▶ 播放」
     val lastEpisode = findEpisode(season, progress?.lastEpId)?.second
@@ -341,8 +342,7 @@ private fun applySeasonVideoList(
             index = index,
         )
     }
-    videoInfoRepository.videoList.clear()
-    videoInfoRepository.videoList.addAll(list)
+    videoInfoRepository.replaceVideoList(list)
 }
 
 private fun buildSeasonUi(

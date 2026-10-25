@@ -16,11 +16,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +41,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
@@ -92,6 +92,20 @@ internal fun VideoListItem.displayTitle(context: Context, inUgcSeason: Boolean):
     else -> ""
 }
 
+/** Saveable identities distinguish section headers and interactive nodes sharing a video. */
+internal fun VideoListItem.lazyKey(): String = when (this) {
+    is VideoListInteractiveNode -> "node:$aid:$nodeId:$edgeId:$startPos"
+    is VideoListPgcEpisode -> "episode:$seasonId:$epid:$cid"
+    is VideoListUgcEpisode -> "ugc:$aid:$cid"
+    is VideoListPart -> "part:$aid:$cid"
+    is VideoListUgcEpisodeTitle -> "section:$index:$title"
+    is VideoListItemData -> "video:$aid:$cid"
+    else -> error("Unsupported video list item: ${this::class}")
+}
+
+internal fun VideoListItem.lazyContentType(): String =
+    if (this is VideoListUgcEpisodeTitle) "heading" else "episode"
+
 internal fun List<VideoListItem>.indexOfCid(cid: Long): Int =
     indexOfFirst { it is VideoListItemData && it.cid == cid }
 
@@ -132,11 +146,13 @@ internal fun rememberPartLabel(): String? {
     val config = LocalVideoPlayerConfigData.current
     val info = LocalVideoPlayerVideoInfoData.current
     val list = config.availableVideoList
-    if (list.count { it is VideoListItemData } <= 1) return null
-    return when (val current = list.getOrNull(list.indexOfCid(config.currentVideoCid))) {
-        is VideoListPart -> context.getString(R.string.player_ui_part_label, current.index + 1, info.partTitle)
-        is VideoListUgcEpisode -> context.getString(R.string.player_ui_episode_label, current.index + 1, info.partTitle)
-        else -> info.partTitle.takeIf { it.isNotBlank() }
+    return remember(list, config.currentVideoCid, info.partTitle, context) {
+        if (list.count { it is VideoListItemData } <= 1) return@remember null
+        when (val current = list.getOrNull(list.indexOfCid(config.currentVideoCid))) {
+            is VideoListPart -> context.getString(R.string.player_ui_part_label, current.index + 1, info.partTitle)
+            is VideoListUgcEpisode -> context.getString(R.string.player_ui_episode_label, current.index + 1, info.partTitle)
+            else -> info.partTitle.takeIf { it.isNotBlank() }
+        }
     }
 }
 
@@ -155,7 +171,8 @@ internal fun BottomSubtitle(modifier: Modifier = Modifier) {
     val currentText by remember(seekData, subtitleData) {
         derivedStateOf {
             runCatching {
-                subtitleData.find { it.isShowing(seekData.position) }?.content ?: ""
+                val position = seekData.position
+                subtitleData.find { it.isShowing(position) }?.content ?: ""
             }.getOrDefault("")
         }
     }
@@ -262,18 +279,23 @@ internal fun SeekPreviewRow(
         enter = fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()),
         exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
     ) {
-        BoxWithConstraints(
+        Layout(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = bottomGap)
-        ) {
-            val maxOffset = (maxWidth - SeekPreviewWidth).coerceAtLeast(0.dp)
-            val x = (maxWidth * fraction.coerceIn(0f, 1f) - SeekPreviewWidth / 2).coerceIn(0.dp, maxOffset)
-            SeekPreviewThumbnail(
-                modifier = Modifier.offset(x = x),
-                videoShot = videoShot,
-                position = position,
-            )
+                .padding(bottom = bottomGap),
+            content = {
+                SeekPreviewThumbnail(videoShot = videoShot, position = position)
+            },
+        ) { measurables, constraints ->
+            val thumbnail = measurables.single().measure(constraints.copy(minWidth = 0, minHeight = 0))
+            val width = constraints.maxWidth
+            val height = constraints.constrainHeight(thumbnail.height)
+            layout(width, height) {
+                val maxOffset = (width - thumbnail.width).coerceAtLeast(0)
+                val x = (width * fraction.coerceIn(0f, 1f) - thumbnail.width / 2f)
+                    .roundToInt().coerceIn(0, maxOffset)
+                thumbnail.placeRelative(x, 0)
+            }
         }
     }
 }

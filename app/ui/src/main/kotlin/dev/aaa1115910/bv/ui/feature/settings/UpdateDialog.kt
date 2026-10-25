@@ -38,6 +38,7 @@ import dev.aaa1115910.bv.BuildConfig
 import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.network.GithubApi
 import dev.aaa1115910.bv.network.entity.Release
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.util.CacheManager
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -146,6 +147,7 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
+                    PreferenceWrites.awaitPending()
                     val latest = GithubApi.getLatestBuild()
                     val revision = latest.revision
                         ?: throw IllegalStateException("无法从发布信息中解析版本号")

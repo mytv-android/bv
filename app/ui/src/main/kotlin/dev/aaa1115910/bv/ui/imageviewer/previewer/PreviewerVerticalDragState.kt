@@ -118,9 +118,9 @@ open class PreviewerVerticalDragState(
     internal suspend fun verticalDrag(pointerInputScope: PointerInputScope) {
         pointerInputScope.apply {
             // 记录开始时的位置
-            var vStartOffset by mutableStateOf<Offset?>(null)
+            var vStartOffset: Offset? = null
             // 标记是否为下拉关闭
-            var vOrientationDown by mutableStateOf<Boolean?>(null)
+            var vOrientationDown: Boolean? = null
             // 如果getKay不为空才开始检测手势
             if (verticalDragType != VerticalDragType.None) detectVerticalDragGestures(
                 onDragStart = OnDragStart@{

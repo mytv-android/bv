@@ -98,10 +98,26 @@ private fun ipAddress(context: Context): String = runCatching {
     ip
 }.getOrDefault("")
 
-/** 手动 + 崩溃日志，按修改时间倒序。 */
-private fun loadLogFiles(): List<File> = runCatching {
+private data class LogEntry(
+    val file: File,
+    val sizeKb: Long,
+    val modifiedAt: Long,
+    val manual: Boolean,
+)
+
+/** 文件元数据在 IO 线程读取，列表重组和焦点移动不再访问文件系统。 */
+private fun loadLogFiles(): List<LogEntry> = runCatching {
     LogCatcherUtil.updateLogFiles()
-    (LogCatcherUtil.manualFiles + LogCatcherUtil.crashFiles).sortedByDescending { it.lastModified() }
+    (LogCatcherUtil.manualFiles + LogCatcherUtil.crashFiles)
+        .map {
+            LogEntry(
+                file = it,
+                sizeKb = it.length() / 1024,
+                modifiedAt = it.lastModified(),
+                manual = it.name.startsWith("logs_manual"),
+            )
+        }
+        .sortedByDescending { it.modifiedAt }
 }.getOrDefault(emptyList())
 
 /**
@@ -116,7 +132,7 @@ fun LogsScreen(nav: NavController) {
     val layout = LocalDeviceProfile.current.layout
     val wide = layout != DeviceLayout.Phone
     val tv = layout == DeviceLayout.Tv
-    val logs = remember { mutableStateListOf<File>() }
+    val logs = remember { mutableStateListOf<LogEntry>() }
     var host by remember { mutableStateOf("") }
     var port by remember { mutableIntStateOf(0) }
     var selected by remember { mutableStateOf<File?>(null) }
@@ -244,7 +260,7 @@ fun LogsScreen(nav: NavController) {
 
 @Composable
 private fun LogList(
-    logs: List<File>,
+    logs: List<LogEntry>,
     selected: File?,
     insets: PaddingValues,
     spacing: androidx.compose.ui.unit.Dp,
@@ -264,7 +280,7 @@ private fun LogList(
             contentPadding = insets,
             verticalArrangement = Arrangement.spacedBy(spacing),
         ) {
-            item(key = "save") {
+            item(key = "save", contentType = "save") {
                 BvListItem(
                     title = stringResource(R.string.tools_logs_save),
                     modifier = Modifier.focusRequester(firstRequester),
@@ -277,7 +293,7 @@ private fun LogList(
                 )
             }
             if (logs.isEmpty()) {
-                item(key = "empty") {
+                item(key = "empty", contentType = "empty") {
                     Text(
                         stringResource(R.string.tools_logs_empty),
                         modifier = Modifier
@@ -289,21 +305,25 @@ private fun LogList(
                     )
                 }
             }
-            items(logs, key = { it.absolutePath }) { file ->
-                val manual = file.name.startsWith("logs_manual")
+            items(
+                items = logs,
+                key = { it.file.absolutePath },
+                contentType = { "log" },
+            ) { entry ->
+                val manual = entry.manual
                 BvListItem(
-                    title = file.name,
+                    title = entry.file.name,
                     subtitle = stringResource(
                         R.string.tools_logs_item,
                         stringResource(if (manual) R.string.tools_logs_manual else R.string.tools_logs_crash),
-                        file.length() / 1024,
+                        entry.sizeKb,
                     ),
                     icon = if (manual) Icons.Rounded.Description else Icons.Rounded.BugReport,
                     iconContainerColor = if (manual) scheme.secondaryContainer else scheme.tertiaryContainer,
                     iconContentColor = if (manual) scheme.onSecondaryContainer else scheme.onTertiaryContainer,
-                    selected = file == selected,
-                    onClick = { onFile(file) },
-                    onFocused = { if (it) onFileFocused(file) },
+                    selected = entry.file == selected,
+                    onClick = { onFile(entry.file) },
+                    onFocused = { if (it) onFileFocused(entry.file) },
                 )
             }
         }

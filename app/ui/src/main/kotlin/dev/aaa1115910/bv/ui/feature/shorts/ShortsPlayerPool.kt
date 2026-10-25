@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -615,7 +616,8 @@ internal fun ShortsVideo(
                     MaterialTheme.motionScheme.fastEffectsSpec(),
                     label = "shortsCover"
                 )
-                if (coverAlpha > 0.01f) {
+                val showCover by remember { derivedStateOf { coverAlpha > 0.01f } }
+                if (showCover) {
                     AsyncImage(
                         model = item.cover,
                         contentDescription = null,

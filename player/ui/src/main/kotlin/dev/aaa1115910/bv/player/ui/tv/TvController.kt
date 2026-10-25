@@ -68,6 +68,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -75,6 +76,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.aaa1115910.bv.player.entity.LocalVideoPlayerConfigData
@@ -90,6 +94,7 @@ import dev.aaa1115910.bv.player.entity.PlayerLongPressAction
 import dev.aaa1115910.bv.player.shared.BuildConfig
 import dev.aaa1115910.bv.player.ui.BottomSubtitle
 import dev.aaa1115910.bv.player.ui.BufferingTip
+import dev.aaa1115910.bv.player.ui.KeyedSideEffect
 import dev.aaa1115910.bv.player.ui.PaidRequireTip
 import dev.aaa1115910.bv.player.ui.PlayErrorTip
 import dev.aaa1115910.bv.player.ui.PlayerController
@@ -255,8 +260,8 @@ internal fun TvController(
         interactionTick++
     }
 
-    LaunchedEffect(controlsVisible, interactionTick, panelOpen, seeking) {
-        if (controlsVisible && !panelOpen && !seeking) {
+    if (controlsVisible && !panelOpen && !seeking) {
+        LaunchedEffect(interactionTick) {
             delay(AutoHideMillis)
             hideControls()
         }
@@ -534,10 +539,10 @@ internal fun TvController(
     }
 
     // 暂停 / 换集时恢复原倍速（长按期间若视频暂停或切集，不留下加速状态）
-    LaunchedEffect(stateData.isPlaying) {
+    KeyedSideEffect(stateData.isPlaying) {
         if (!stateData.isPlaying) restoreLongPressSpeed()
     }
-    LaunchedEffect(configData.currentVideoCid) {
+    KeyedSideEffect(configData.currentVideoCid) {
         restoreLongPressSpeed()
     }
     DisposableEffect(Unit) {
@@ -654,7 +659,7 @@ internal fun TvController(
                     Column(
                         modifier = Modifier
                             .align(Alignment.TopStart)
-                            .padding(start = 48.dp, top = 27.dp, end = controlsEnd)
+                            .controlsPadding(start = 48.dp, top = 27.dp, end = { controlsEnd })
                     ) {
                         Text(
                             text = titleLine,
@@ -677,7 +682,7 @@ internal fun TvController(
                     Column(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
-                            .padding(start = 48.dp, end = controlsEnd, bottom = 27.dp)
+                            .controlsPadding(start = 48.dp, end = { controlsEnd }, bottom = 27.dp)
                             .fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
@@ -799,6 +804,28 @@ internal fun TvController(
                 RemoteControlHintOverlay(onDismiss = onRemoteControlHintDismiss)
             }
         }
+    }
+}
+
+/** 动画边距在测量阶段读取，避免侧栏展开时逐帧重组控制层。 */
+private fun Modifier.controlsPadding(
+    start: Dp,
+    end: () -> Dp,
+    top: Dp = 0.dp,
+    bottom: Dp = 0.dp,
+): Modifier = layout { measurable, constraints ->
+    val startPx = start.roundToPx()
+    val endPx = end().roundToPx().coerceAtLeast(0)
+    val topPx = top.roundToPx()
+    val bottomPx = bottom.roundToPx()
+    val horizontal = startPx + endPx
+    val vertical = topPx + bottomPx
+    val placeable = measurable.measure(constraints.offset(-horizontal, -vertical))
+    layout(
+        constraints.constrainWidth(placeable.width + horizontal),
+        constraints.constrainHeight(placeable.height + vertical),
+    ) {
+        placeable.placeRelative(startPx, topPx)
     }
 }
 

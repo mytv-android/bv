@@ -23,11 +23,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
@@ -44,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.navigation.NavController
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import dev.aaa1115910.bv.ui.designsystem.component.BvButton
 import dev.aaa1115910.bv.ui.designsystem.component.BvButtonStyle
 import dev.aaa1115910.bv.ui.designsystem.component.BvChip
@@ -58,7 +61,8 @@ import dev.aaa1115910.bv.ui.navigation.LogsRoute
 import dev.aaa1115910.bv.ui.navigation.MediaCodecRoute
 import dev.aaa1115910.bv.ui.navigation.SpeedTestRoute
 import dev.aaa1115910.bv.ui.navigation.UserLockRoute
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 
 /** 请求焦点（组节点会把焦点交给第一个子项）；失败时不抛异常。 */
 internal fun FocusRequester.tryFocusEnter(): Boolean =
@@ -102,21 +106,31 @@ internal fun SettingsCategoryItem(
  * 分类详情内容（三端相同，由外层 Column 决定间距：手机 / 平板 22，电视 16）。
  * paneColor 是内容所在面板的背景色（种子色选中圈的 2dp 间隙用它画）。
  */
+internal typealias SettingsContainer = @Composable (@Composable () -> Unit) -> Unit
+
 @Composable
-internal fun SettingsCategoryContent(category: SettingsCategory, nav: NavController, paneColor: Color) {
+internal fun SettingsCategoryContent(
+    category: SettingsCategory,
+    nav: NavController,
+    paneColor: Color,
+    container: SettingsContainer,
+) {
+    // Mount the scroll container only after preferences are ready. A loading-only
+    // measure would clamp a restored ScrollState to zero before controls arrive.
     when (category) {
-        SettingsCategory.Appearance -> AppearanceSettings(gapColor = paneColor)
-        SettingsCategory.Play -> PlaySettings()
-        SettingsCategory.Danmaku -> DanmakuSettings()
-        SettingsCategory.Subtitle -> SubtitleSettings()
-        SettingsCategory.Network -> NetworkSettings(onSpeedTest = { nav.navigate(SpeedTestRoute) })
+        SettingsCategory.Appearance -> container { AppearanceSettings(gapColor = paneColor) }
+        SettingsCategory.Play -> PlaySettings(container)
+        SettingsCategory.Danmaku -> DanmakuSettings(container)
+        SettingsCategory.Subtitle -> SubtitleSettings(container)
+        SettingsCategory.Network -> NetworkSettings(onSpeedTest = { nav.navigate(SpeedTestRoute) }, container = container)
         SettingsCategory.Account -> AccountSettings(
             onAccounts = { nav.navigate(AccountsRoute) },
             onUserLock = { nav.navigate(UserLockRoute) },
+            container = container,
         )
 
-        SettingsCategory.Storage -> StorageSettings(onLogs = { nav.navigate(LogsRoute) })
-        SettingsCategory.About -> AboutSettings(onMediaCodec = { nav.navigate(MediaCodecRoute) })
+        SettingsCategory.Storage -> StorageSettings(onLogs = { nav.navigate(LogsRoute) }, container = container)
+        SettingsCategory.About -> AboutSettings(onMediaCodec = { nav.navigate(MediaCodecRoute) }, container = container)
     }
 }
 
@@ -278,6 +292,11 @@ internal fun SettingSliderGroup(
  * 写入 Prefs 的滑块组：拖动时只改本地值，松手（或方向键调节停下 400ms 后）再写入，
  * 避免每一帧都写 DataStore。
  */
+private class SavedSliderValue(var value: Float) {
+    var current = value
+}
+
+@OptIn(FlowPreview::class)
 @Composable
 internal fun PrefSliderGroup(
     label: String,
@@ -288,22 +307,33 @@ internal fun PrefSliderGroup(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int = 0,
 ) {
-    var saved by remember { mutableFloatStateOf(value) }
+    val currentValue by rememberUpdatedState(value)
+    val currentSave by rememberUpdatedState(save)
+    val saved = remember { SavedSliderValue(value) }
+    SideEffect { saved.current = value }
     val commit: () -> Unit = {
-        if (value != saved) {
-            saved = value
-            save(value)
+        val next = saved.current
+        if (next != saved.value) {
+            saved.value = next
+            val saveValue = currentSave
+            PreferenceWrites.enqueue { saveValue(next) }
         }
     }
-    LaunchedEffect(value) {
-        delay(400)
-        commit()
+    val currentCommit by rememberUpdatedState(commit)
+    LaunchedEffect(Unit) {
+        snapshotFlow { currentValue }.debounce(400).collect { currentCommit() }
+    }
+    DisposableEffect(Unit) {
+        onDispose { currentCommit() }
     }
     SettingSliderGroup(
         label = label,
         valueText = valueText,
         value = value,
-        onValueChange = onValueChange,
+        onValueChange = {
+            saved.current = it
+            onValueChange(it)
+        },
         valueRange = valueRange,
         steps = steps,
         onValueChangeFinished = commit,

@@ -27,8 +27,8 @@ import androidx.compose.runtime.saveable.mapSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -235,7 +235,7 @@ fun ImagePreviewer(
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .alpha(uiAlpha.value)
+                            .graphicsLayer { alpha = uiAlpha.value }
                     ) {
                         content()
                     }
@@ -259,7 +259,7 @@ fun ImagePreviewer(
                                     }
                                 }
                                 ImageViewerContainer(
-                                    modifier = Modifier.alpha(viewerAlpha.value),
+                                    modifier = Modifier.graphicsLayer { alpha = viewerAlpha.value },
                                     containerState = viewerContainerState,
                                     placeholder = layerScope.placeholder,
                                     viewer = viewer,

@@ -290,7 +290,7 @@ internal fun rememberFollowState(apiType: ApiType): FollowState {
     val repo: VideoActionRepository = koinInject()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    return remember(repo) { FollowState(repo, scope, context, apiType) }
+    return remember(repo, scope, context, apiType) { FollowState(repo, scope, context, apiType) }
 }
 
 // ---------- 结果 → 卡片数据 ----------

@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +41,18 @@ private const val SPEED_TEST_UA =
 @Composable
 fun SpeedTestScreen(nav: NavController) {
     var loading by remember { mutableStateOf(true) }
+    var cookies by remember { mutableStateOf<Map<String, String>?>(null) }
+    LaunchedEffect(Unit) {
+        cookies = withContext(Dispatchers.IO) {
+            mapOf(
+                "DedeUserID" to Prefs.uid.toString(),
+                "DedeUserID__ckMd5" to Prefs.uidCkMd5,
+                "SESSDATA" to Prefs.sessData,
+                "bili_jct" to Prefs.biliJct,
+                "sid" to Prefs.sid,
+            )
+        }
+    }
     ToolPage(title = stringResource(R.string.tools_speed_title), onBack = { nav.popBackStack() }) { insets ->
         BoxWithConstraints(
             Modifier
@@ -47,17 +62,12 @@ fun SpeedTestScreen(nav: NavController) {
                 .background(MaterialTheme.colorScheme.surfaceContainerLow),
         ) {
             val widthPx = with(LocalDensity.current) { maxWidth.toPx().toInt() }
-            AndroidView(
+            val loadedCookies = cookies
+            if (loadedCookies != null) AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { ctx ->
                     CookieManager.getInstance().apply {
-                        mapOf(
-                            "DedeUserID" to Prefs.uid,
-                            "DedeUserID__ckMd5" to Prefs.uidCkMd5,
-                            "SESSDATA" to Prefs.sessData,
-                            "bili_jct" to Prefs.biliJct,
-                            "sid" to Prefs.sid,
-                        ).forEach { (name, value) -> setCookie(".bilibili.com", "$name=$value") }
+                        loadedCookies.forEach { (name, value) -> setCookie(".bilibili.com", "$name=$value") }
                     }
                     WebView(ctx).apply {
                         webViewClient = object : WebViewClientCompat() {

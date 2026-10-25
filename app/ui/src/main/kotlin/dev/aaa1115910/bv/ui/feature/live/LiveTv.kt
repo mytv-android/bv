@@ -80,7 +80,7 @@ internal fun LiveTv(nav: NavController, vm: LiveHomeViewModel, login: Boolean) {
     }
 
     val topThreshold = with(LocalDensity.current) { 8.dp.roundToPx() }
-    val atTop by remember {
+    val atTop by remember(topThreshold) {
         derivedStateOf {
             when (chip) {
                 LiveTabRecommend -> recommendGrid.isNearTop(topThreshold)
@@ -266,7 +266,7 @@ private fun TvGridContent(
         ) {
             liveCards(items, onOpen)
             if (loading) {
-                item(span = { GridItemSpan(maxLineSpan) }, contentType = "loading") { LoadMoreIndicator() }
+                item(key = "loading", span = { GridItemSpan(maxLineSpan) }, contentType = "loading") { LoadMoreIndicator() }
             }
         }
     }
@@ -347,7 +347,7 @@ private fun TvAreaContent(
                     ) {
                         liveCards(vm.areaRooms, openRoom)
                         if (vm.areaRoomsLoading) {
-                            item(span = { GridItemSpan(maxLineSpan) }, contentType = "loading") { LoadMoreIndicator() }
+                            item(key = "loading", span = { GridItemSpan(maxLineSpan) }, contentType = "loading") { LoadMoreIndicator() }
                         }
                     }
                 }

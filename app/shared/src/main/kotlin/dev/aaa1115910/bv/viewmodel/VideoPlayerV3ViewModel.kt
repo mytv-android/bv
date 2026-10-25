@@ -437,8 +437,7 @@ class VideoPlayerV3ViewModel(
 
                 withContext(Dispatchers.Main) {
                     interactiveOptionsFromQuestions = fromQuestionChoices
-                    videoInfoRepository.videoList.clear()
-                    videoInfoRepository.videoList.addAll(interactiveVideoList)
+                    videoInfoRepository.replaceVideoList(interactiveVideoList)
                     currentInteractiveNodeId = nodes.firstOrNull { it.isCurrent }?.nodeId
                         ?: currentInteractiveNodeId
                     currentInteractiveEdgeId = responseEdgeId

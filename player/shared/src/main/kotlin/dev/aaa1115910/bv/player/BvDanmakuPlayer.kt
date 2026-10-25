@@ -1,6 +1,5 @@
 package dev.aaa1115910.bv.player
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -18,10 +17,8 @@ fun BvDanmakuPlayer(
     modifier: Modifier = Modifier,
 ) {
     if (danmakuView == null) return
-    Box(modifier = modifier.fillMaxSize()) {
-        AndroidView(
-            modifier = Modifier.fillMaxSize(),
-            factory = { danmakuView }
-        )
-    }
+    AndroidView(
+        modifier = modifier.fillMaxSize(),
+        factory = { danmakuView },
+    )
 }

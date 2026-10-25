@@ -34,6 +34,7 @@ import dev.aaa1115910.bv.BVApp
 import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.ui.designsystem.theme.BvType
 import dev.aaa1115910.bv.util.Prefs
+import dev.aaa1115910.bv.ui.PreferenceWrites
 import org.koin.compose.koinInject
 
 private enum class ProxyField { Http, Grpc }
@@ -43,109 +44,126 @@ private enum class ProxyField { Http, Grpc }
  * 逻辑照抄旧电视 NetworkSetting 与 ApiSetting。
  */
 @Composable
-internal fun NetworkSettings(onSpeedTest: () -> Unit) {
+internal fun NetworkSettings(onSpeedTest: () -> Unit, container: SettingsContainer) {
     val channelRepository: ChannelRepository = koinInject()
-    var enableProxy by remember { mutableStateOf(Prefs.enableProxy) }
-    var proxyHttpServer by remember { mutableStateOf(Prefs.proxyHttpServer) }
-    var proxyGrpcServer by remember { mutableStateOf(Prefs.proxyGRPCServer) }
-    var preferOfficialCdn by remember { mutableStateOf(Prefs.preferOfficialCdn) }
-    var apiType by remember { mutableStateOf(Prefs.apiType) }
+    val initial = rememberPreferenceSnapshot {
+        NetworkPreferences(
+            enableProxy = Prefs.enableProxy,
+            proxyHttpServer = Prefs.proxyHttpServer,
+            proxyGrpcServer = Prefs.proxyGRPCServer,
+            preferOfficialCdn = Prefs.preferOfficialCdn,
+            apiType = Prefs.apiType,
+        )
+    } ?: return
+    var enableProxy by remember { mutableStateOf(initial.enableProxy) }
+    var proxyHttpServer by remember { mutableStateOf(initial.proxyHttpServer) }
+    var proxyGrpcServer by remember { mutableStateOf(initial.proxyGrpcServer) }
+    var preferOfficialCdn by remember { mutableStateOf(initial.preferOfficialCdn) }
+    var apiType by remember { mutableStateOf(initial.apiType) }
     var editing by remember { mutableStateOf<ProxyField?>(null) }
     val emptyText = stringResource(R.string.settings_net_proxy_empty)
 
-    Column(Modifier.fillMaxWidth()) {
-        SettingSwitchRow(
-            title = stringResource(R.string.settings_net_proxy),
-            subtitle = stringResource(R.string.settings_net_proxy_desc),
-            checked = enableProxy,
-            onCheckedChange = { enable ->
-                enableProxy = enable
-                Prefs.enableProxy = enable
-                if (enable) BVApp.instance?.initProxy()
-            },
-        )
-        AnimatedVisibility(visible = enableProxy) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp),
-            ) {
-                SettingNavRow(
-                    title = stringResource(R.string.settings_net_proxy_http),
-                    subtitle = proxyHttpServer.ifBlank { emptyText },
-                    onClick = { editing = ProxyField.Http },
-                )
-                SettingNavRow(
-                    title = stringResource(R.string.settings_net_proxy_grpc),
-                    subtitle = proxyGrpcServer.ifBlank { emptyText },
-                    onClick = { editing = ProxyField.Grpc },
-                )
-            }
-        }
-    }
-
-    SettingSwitchRow(
-        title = stringResource(R.string.settings_net_cdn),
-        subtitle = stringResource(R.string.settings_net_cdn_desc),
-        checked = preferOfficialCdn,
-        onCheckedChange = {
-            preferOfficialCdn = it
-            Prefs.preferOfficialCdn = it
-        },
-    )
-
-    SettingChoiceGroup(
-        label = stringResource(R.string.settings_net_api),
-        options = ApiType.entries.toList(),
-        isSelected = { it == apiType },
-        optionLabel = { it.name },
-        onSelect = {
-            apiType = it
-            Prefs.apiType = it
-        },
-    )
-
-    SettingRows(stringResource(R.string.settings_net_tools)) {
-        SettingNavRow(
-            title = stringResource(R.string.settings_net_speed_test),
-            subtitle = stringResource(R.string.settings_net_speed_test_desc),
-            onClick = onSpeedTest,
-        )
-    }
-
-    when (editing) {
-        ProxyField.Http -> ProxyServerDialog(
-            title = stringResource(R.string.settings_net_proxy_http),
-            server = proxyHttpServer,
-            onDismiss = { editing = null },
-            onConfirm = { server ->
-                editing = null
-                proxyHttpServer = server
-                Prefs.proxyHttpServer = server
-                runCatching { BiliHttpProxyApi.createClient(server) }
-            },
-        )
-
-        ProxyField.Grpc -> ProxyServerDialog(
-            title = stringResource(R.string.settings_net_proxy_grpc),
-            server = proxyGrpcServer,
-            onDismiss = { editing = null },
-            onConfirm = { server ->
-                editing = null
-                proxyGrpcServer = server
-                Prefs.proxyGRPCServer = server
-                runCatching {
-                    channelRepository.initProxyChannel(
-                        accessKey = Prefs.accessToken,
-                        buvid = Prefs.buvid,
-                        proxyServer = server,
+    container {
+        Column(Modifier.fillMaxWidth()) {
+            SettingSwitchRow(
+                title = stringResource(R.string.settings_net_proxy),
+                subtitle = stringResource(R.string.settings_net_proxy_desc),
+                checked = enableProxy,
+                onCheckedChange = { enable ->
+                    enableProxy = enable
+                    PreferenceWrites.enqueue {
+                        Prefs.enableProxy = enable
+                        if (enable) BVApp.instance?.initProxy()
+                    }
+                },
+            )
+            AnimatedVisibility(visible = enableProxy) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    SettingNavRow(
+                        title = stringResource(R.string.settings_net_proxy_http),
+                        subtitle = proxyHttpServer.ifBlank { emptyText },
+                        onClick = { editing = ProxyField.Http },
+                    )
+                    SettingNavRow(
+                        title = stringResource(R.string.settings_net_proxy_grpc),
+                        subtitle = proxyGrpcServer.ifBlank { emptyText },
+                        onClick = { editing = ProxyField.Grpc },
                     )
                 }
+            }
+        }
+
+        SettingSwitchRow(
+            title = stringResource(R.string.settings_net_cdn),
+            subtitle = stringResource(R.string.settings_net_cdn_desc),
+            checked = preferOfficialCdn,
+            onCheckedChange = {
+                preferOfficialCdn = it
+                PreferenceWrites.enqueue { Prefs.preferOfficialCdn = it }
             },
         )
 
-        null -> Unit
+        SettingChoiceGroup(
+            label = stringResource(R.string.settings_net_api),
+            options = ApiType.entries.toList(),
+            isSelected = { it == apiType },
+            optionLabel = { it.name },
+            onSelect = {
+                apiType = it
+                PreferenceWrites.enqueue { Prefs.apiType = it }
+            },
+        )
+
+        SettingRows(stringResource(R.string.settings_net_tools)) {
+            SettingNavRow(
+                title = stringResource(R.string.settings_net_speed_test),
+                subtitle = stringResource(R.string.settings_net_speed_test_desc),
+                onClick = onSpeedTest,
+            )
+        }
+
+        when (editing) {
+            ProxyField.Http -> ProxyServerDialog(
+                title = stringResource(R.string.settings_net_proxy_http),
+                server = proxyHttpServer,
+                onDismiss = { editing = null },
+                onConfirm = { server ->
+                    editing = null
+                    proxyHttpServer = server
+                    PreferenceWrites.enqueue {
+                        Prefs.proxyHttpServer = server
+                        runCatching { BiliHttpProxyApi.createClient(server) }
+                    }
+                },
+            )
+
+            ProxyField.Grpc -> ProxyServerDialog(
+                title = stringResource(R.string.settings_net_proxy_grpc),
+                server = proxyGrpcServer,
+                onDismiss = { editing = null },
+                onConfirm = { server ->
+                    editing = null
+                    proxyGrpcServer = server
+                    PreferenceWrites.enqueue {
+                        Prefs.proxyGRPCServer = server
+                        runCatching {
+                            channelRepository.initProxyChannel(
+                                accessKey = Prefs.accessToken,
+                                buvid = Prefs.buvid,
+                                proxyServer = server,
+                            )
+                        }
+                    }
+                },
+            )
+
+            null -> Unit
+        }
     }
 }
 
@@ -206,3 +224,11 @@ private fun ProxyServerDialog(
         )
     }
 }
+
+private data class NetworkPreferences(
+    val enableProxy: Boolean,
+    val proxyHttpServer: String,
+    val proxyGrpcServer: String,
+    val preferOfficialCdn: Boolean,
+    val apiType: ApiType,
+)
