@@ -610,65 +610,61 @@ fun BvPlayerScreen(
             }
         }
 
-        // 等宽：宽度铺满、高度按比例；等高：高度铺满、宽度按比例；拉伸：直接铺满整个容器
-        val videoModifier = when (aspectRatioSetting) {
-            VideoAspectRatio.EqualWidth -> Modifier
-                .fillMaxWidth()
-                .aspectRatio(aspectRatio)
-
-            VideoAspectRatio.EqualHeight -> Modifier
-                .fillMaxHeight()
-                .aspectRatio(aspectRatio, matchHeightConstraintsFirst = true)
-
-            VideoAspectRatio.Stretch -> Modifier.fillMaxSize()
-
-            else -> Modifier.aspectRatio(aspectRatio)
-        }
-
-        if (zoomEnabled) {
-            BoxWithConstraints(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                val baseSize = resolveVideoBaseSize(
-                    maxWidth = maxWidth,
-                    maxHeight = maxHeight,
-                    aspectRatio = aspectRatio,
-                    setting = aspectRatioSetting,
+        // BvVideoPlayer 必须保持唯一调用点：它 onDispose 时会释放播放内核，
+        // 若全屏切换让组合走到不同分支销毁重建，播放中的内核会被误释放（黑屏且不可恢复）
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            val baseSize = resolveVideoBaseSize(
+                maxWidth = maxWidth,
+                maxHeight = maxHeight,
+                aspectRatio = aspectRatio,
+                setting = aspectRatioSetting,
+            )
+            val density = LocalDensity.current
+            val baseWidthPx = with(density) { baseSize.width.toPx() }
+            val baseHeightPx = with(density) { baseSize.height.toPx() }
+            SideEffect {
+                videoZoomState.contentSize = IntSize(
+                    baseWidthPx.roundToInt(),
+                    baseHeightPx.roundToInt(),
                 )
-                val density = LocalDensity.current
-                val baseWidthPx = with(density) { baseSize.width.toPx() }
-                val baseHeightPx = with(density) { baseSize.height.toPx() }
-                SideEffect {
-                    videoZoomState.contentSize = IntSize(
-                        baseWidthPx.roundToInt(),
-                        baseHeightPx.roundToInt(),
+            }
+
+            // 等宽：宽度铺满、高度按比例；等高：高度铺满、宽度按比例；拉伸：直接铺满整个容器
+            val videoModifier = when (aspectRatioSetting) {
+                VideoAspectRatio.EqualWidth -> Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(aspectRatio)
+
+                VideoAspectRatio.EqualHeight -> Modifier
+                    .fillMaxHeight()
+                    .aspectRatio(aspectRatio, matchHeightConstraintsFirst = true)
+
+                VideoAspectRatio.Stretch -> Modifier.fillMaxSize()
+
+                else -> Modifier.aspectRatio(aspectRatio)
+            }
+
+            // 缩放值在 Layout 阶段读取：双指缩放只触发重测量，不重组
+            val zoomModifier = Modifier
+                .layout { measurable, _ ->
+                    val scale = videoZoomState.scale
+                    val width = (baseSize.width * scale).roundToPx().coerceAtLeast(1)
+                    val height = (baseSize.height * scale).roundToPx().coerceAtLeast(1)
+                    val placeable = measurable.measure(Constraints.fixed(width, height))
+                    layout(width, height) { placeable.place(0, 0) }
+                }
+                .offset {
+                    IntOffset(
+                        videoZoomState.offset.x.roundToInt(),
+                        videoZoomState.offset.y.roundToInt(),
                     )
                 }
 
-                BvVideoPlayer(
-                    modifier = Modifier
-                        // 缩放值在 Layout 阶段读取：双指缩放只触发重测量，不重组
-                        .layout { measurable, _ ->
-                            val scale = videoZoomState.scale
-                            val width = (baseSize.width * scale).roundToPx().coerceAtLeast(1)
-                            val height = (baseSize.height * scale).roundToPx().coerceAtLeast(1)
-                            val placeable = measurable.measure(Constraints.fixed(width, height))
-                            layout(width, height) { placeable.place(0, 0) }
-                        }
-                        .offset {
-                            IntOffset(
-                                videoZoomState.offset.x.roundToInt(),
-                                videoZoomState.offset.y.roundToInt(),
-                            )
-                        },
-                    videoPlayer = videoPlayer,
-                    playerListener = videoPlayerListener,
-                )
-            }
-        } else {
             BvVideoPlayer(
-                modifier = videoModifier.align(Alignment.Center),
+                modifier = if (zoomEnabled) zoomModifier else videoModifier,
                 videoPlayer = videoPlayer,
                 playerListener = videoPlayerListener,
             )

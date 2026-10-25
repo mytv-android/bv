@@ -312,10 +312,12 @@ private suspend fun PointerInputScope.detectPinchGestures(
         do {
             val event = awaitPointerEvent()
             if (event.changes.size >= 2) {
-                // 第二指落下立即消费，取消 tap / 长按 / seek / 亮度 / 音量
-                event.changes.forEach { it.consume() }
+                // 先计算再消费：calculate* 只统计未消费的指针，消费后再算会恒等于无手势
                 val zoomChange = event.calculateZoom()
                 val panChange = event.calculatePan()
+                val centroid = event.calculateCentroid(useCurrent = true)
+                // 第二指落下立即消费，取消 tap / 长按 / seek / 亮度 / 音量
+                event.changes.forEach { it.consume() }
                 pendingPan += panChange
                 pendingZoom *= zoomChange
                 if (!pastSlop) {
@@ -330,7 +332,7 @@ private suspend fun PointerInputScope.detectPinchGestures(
                     }
                     onGesture(
                         state,
-                        event.calculateCentroid(useCurrent = true),
+                        centroid,
                         if (isFirst) pendingPan else panChange,
                         if (isFirst) pendingZoom else zoomChange,
                     )
