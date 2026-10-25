@@ -7,6 +7,7 @@
 
 package dev.aaa1115910.bv.player.ui.tv
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
@@ -258,6 +259,11 @@ internal fun TvController(
             rootFocusRequester.requestFocus(scope)
         }
         interactionTick++
+    }
+
+    // 系统返回不一定经过遥控按键事件；复用关闭面板逻辑，避免直接退出播放页。
+    BackHandler(enabled = panelOpen && !showRemoteControlHint) {
+        closePanels()
     }
 
     if (controlsVisible && !panelOpen && !seeking) {
