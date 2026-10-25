@@ -27,6 +27,11 @@
     <string name="settings_cat_about_desc">版本、更新、解码器信息</string>
 
     <!-- 外观与主题 -->
+    <string name="settings_appearance_layout">界面布局</string>
+    <string name="settings_appearance_layout_auto">自动</string>
+    <string name="settings_appearance_layout_phone">手机竖屏</string>
+    <string name="settings_appearance_layout_tablet">平板横屏</string>
+    <string name="settings_appearance_layout_tv">电视横屏</string>
     <string name="settings_appearance_source">主题来源</string>
     <string name="settings_source_wallpaper">系统壁纸</string>
     <string name="settings_source_custom">自选种子色</string>

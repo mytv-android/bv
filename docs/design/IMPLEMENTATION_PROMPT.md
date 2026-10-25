@@ -1468,14 +1468,15 @@ Box
 分类项 = BvListItem，图标容器裁剪为 `MaterialShapes.Cookie9Sided.toShape()`。
 
 **「外观与主题」详情（三端相同内容，Column(spacedBy 22；电视 16)）：**
-1. 「主题来源」SegmentedRow：系统壁纸 / 自选种子色 / 跟随内容（Android 12 以下隐藏「系统壁纸」）
-2. 「种子色」Row(spacedBy 10)：6 个预设色圆点 32dp（`BvSeeds.presets`）；当前选中的那个 36dp、圆角 30%、旋转 45°、外加 2dp 背景色间隙 + 2dp onSurface 外圈（`defaultSpatialSpec` 动画）；最后一个「+」tonal 图标按钮打开自定义取色对话框（色相滑块 0–360 + 预览，HSV 饱和度 0.7 明度 0.95）
-3. 「配色风格」FlowRow BvChip：TonalSpot Vibrant(默认选中) Expressive Fidelity Content Monochrome
-4. 「对比度」Row(SpaceBetween)(标签 + 当前值「标准/中/高」) + Slider(3 档：0 / 0.5 / 1.0)
-5. 「深色模式」SegmentedRow：跟随系统 / 浅色 / 深色 / 影院纯黑（电视上整项隐藏，电视永远深色）
-6. Row(SpaceBetween)：Column(「详情页使用封面颜色」14sp Bold + Meta「详情、播放器、刷刷随视频变色」) + Switch
-7. Row(SpaceBetween)：Column(「减少动效」+ Meta「关闭形状变形和弹簧回弹」) + Switch
-8. （仅电视）「界面缩放（电视）」Row(标签 + 「960dp 基准 · {百分比}」) + Slider（写 `Prefs.density`，沿用旧电视 UI 设置的范围）
+1. 「界面布局」SegmentedRow：自动 / 手机竖屏 / 平板横屏 / 电视横屏（写 `Prefs.layoutMode`，默认「自动」）。默认按设备与窗口宽度自动判断；强制某一形态时整个 App（含设置页自身）立即换成对应布局——手机竖屏 = 手机布局、平板横屏 = 平板布局、电视横屏 = 电视布局并按电视对待（方向键输入、远距、电视密度）；强制手机 / 平板时输入方式仍跟随真实设备
+2. 「主题来源」SegmentedRow：系统壁纸 / 自选种子色 / 跟随内容（Android 12 以下隐藏「系统壁纸」）
+3. 「种子色」Row(spacedBy 10)：6 个预设色圆点 32dp（`BvSeeds.presets`）；当前选中的那个 36dp、圆角 30%、旋转 45°、外加 2dp 背景色间隙 + 2dp onSurface 外圈（`defaultSpatialSpec` 动画）；最后一个「+」tonal 图标按钮打开自定义取色对话框（色相滑块 0–360 + 预览，HSV 饱和度 0.7 明度 0.95）
+4. 「配色风格」FlowRow BvChip：TonalSpot Vibrant(默认选中) Expressive Fidelity Content Monochrome
+5. 「对比度」Row(SpaceBetween)(标签 + 当前值「标准/中/高」) + Slider(3 档：0 / 0.5 / 1.0)
+6. 「深色模式」SegmentedRow：跟随系统 / 浅色 / 深色 / 影院纯黑（电视上整项隐藏，电视永远深色）
+7. Row(SpaceBetween)：Column(「详情页使用封面颜色」14sp Bold + Meta「详情、播放器、刷刷随视频变色」) + Switch
+8. Row(SpaceBetween)：Column(「减少动效」+ Meta「关闭形状变形和弹簧回弹」) + Switch
+9. （仅电视）「界面缩放（电视）」Row(标签 + 「960dp 基准 · {百分比}」) + Slider（写 `Prefs.density`，沿用旧电视 UI 设置的范围）
 每一项修改立即调用 `Prefs.setXxx`，整个 App 颜色带动画实时变化。
 
 **手机：** 列表页：标题「设置」BvType.PageTitle(padding top=statusBar+6, start 20, bottom 12) + Column(padding 水平 8, spacedBy 2) 8 个分类；点分类 → `SettingsRoute(category)` 进入详情页（LargeFlexibleTopAppBar 标题为分类名 + 上面的内容，水平内边距 16）。

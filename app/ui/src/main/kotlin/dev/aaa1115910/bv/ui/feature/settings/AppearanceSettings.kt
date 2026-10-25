@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +55,7 @@ import com.materialkolor.PaletteStyle
 import dev.aaa1115910.bv.appui.R
 import dev.aaa1115910.bv.entity.BvSeeds
 import dev.aaa1115910.bv.entity.DarkMode
+import dev.aaa1115910.bv.entity.LayoutMode
 import dev.aaa1115910.bv.entity.ThemeSource
 import dev.aaa1115910.bv.ui.designsystem.adaptive.BvInputMode
 import dev.aaa1115910.bv.ui.designsystem.adaptive.LocalDeviceProfile
@@ -94,6 +96,14 @@ private fun DarkMode.labelRes(): Int = when (this) {
 }
 
 @StringRes
+private fun LayoutMode.labelRes(): Int = when (this) {
+    LayoutMode.Auto -> R.string.settings_appearance_layout_auto
+    LayoutMode.Phone -> R.string.settings_appearance_layout_phone
+    LayoutMode.Tablet -> R.string.settings_appearance_layout_tablet
+    LayoutMode.Tv -> R.string.settings_appearance_layout_tv
+}
+
+@StringRes
 private fun PaletteStyle.labelRes(): Int = when (this) {
     PaletteStyle.TonalSpot -> R.string.settings_style_tonal_spot
     PaletteStyle.Vibrant -> R.string.settings_style_vibrant
@@ -113,7 +123,7 @@ private fun contrastLabel(value: Float): Int = when {
 
 /**
  * 「外观与主题」（第 9.9 节，原型 appearance()；三端相同内容）：
- * 主题来源、种子色、配色风格、对比度、深色模式（电视隐藏）、封面颜色、减少动效、界面缩放（仅电视）。
+ * 界面布局、主题来源、种子色、配色风格、对比度、深色模式（电视隐藏）、封面颜色、减少动效、界面缩放（仅电视）。
  * 读 [LocalThemePrefs]，每一项修改立即调用 Prefs.setXxx，整个 App 实时换色。
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -124,6 +134,21 @@ internal fun AppearanceSettings(gapColor: Color) {
     val scope = rememberCoroutineScope()
     var showCustomSeed by remember { mutableStateOf(false) }
 
+    // 1. 界面布局：自动 / 手机竖屏 / 平板横屏 / 电视横屏，选完立刻切换整个 App 的布局
+    val layoutModeFlow = remember { Prefs.layoutModeFlow }
+    val layoutMode by layoutModeFlow.collectAsState(initial = LayoutMode.Auto)
+    val modes = LayoutMode.entries
+    SettingGroup(stringResource(R.string.settings_appearance_layout)) {
+        SegmentedRow(
+            options = modes.map { stringResource(it.labelRes()) },
+            selected = modes.indexOf(layoutMode),
+            onSelect = { index -> scope.launch { Prefs.layoutMode = modes[index] } },
+            modifier = Modifier
+                .focusRestorer()
+                .focusGroup(),
+        )
+    }
+
     val pickSeed: (Color) -> Unit = { color ->
         scope.launch {
             Prefs.setSeedColor(color)
@@ -132,7 +157,7 @@ internal fun AppearanceSettings(gapColor: Color) {
         }
     }
 
-    // 1. 主题来源（Android 12 以下没有壁纸取色，隐藏「系统壁纸」）
+    // 2. 主题来源（Android 12 以下没有壁纸取色，隐藏「系统壁纸」）
     val sources = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) ThemeSource.entries.toList()
         else listOf(ThemeSource.Custom, ThemeSource.Content)
@@ -148,7 +173,7 @@ internal fun AppearanceSettings(gapColor: Color) {
         )
     }
 
-    // 2. 种子色：6 个预设圆点 + 自定义（+）
+    // 3. 种子色：6 个预设圆点 + 自定义（+）
     val seedArgb = prefs.seed.toArgb()
     val isPreset = BvSeeds.presets.any { it.toArgb() == seedArgb }
     SettingGroup(stringResource(R.string.settings_appearance_seed)) {
@@ -188,7 +213,7 @@ internal fun AppearanceSettings(gapColor: Color) {
         }
     }
 
-    // 3. 配色风格
+    // 4. 配色风格
     SettingChoiceGroup(
         label = stringResource(R.string.settings_appearance_style),
         options = PaletteStyles,
@@ -197,7 +222,7 @@ internal fun AppearanceSettings(gapColor: Color) {
         onSelect = { style -> scope.launch { Prefs.setPaletteStyle(style) } },
     )
 
-    // 4. 对比度：3 档 0 / 0.5 / 1.0
+    // 5. 对比度：3 档 0 / 0.5 / 1.0
     var contrast by remember(prefs.contrast) { mutableFloatStateOf(prefs.contrast.toFloat()) }
     SettingSliderGroup(
         label = stringResource(R.string.settings_appearance_contrast),
@@ -214,7 +239,7 @@ internal fun AppearanceSettings(gapColor: Color) {
         steps = 1,
     )
 
-    // 5. 深色模式（电视永远深色，整项隐藏）
+    // 6. 深色模式（电视永远深色，整项隐藏）
     if (!profile.isTv) {
         val modes = DarkMode.entries
         SettingGroup(stringResource(R.string.settings_appearance_dark)) {
@@ -229,7 +254,7 @@ internal fun AppearanceSettings(gapColor: Color) {
         }
     }
 
-    // 6. 详情页使用封面颜色
+    // 7. 详情页使用封面颜色
     SettingSwitchRow(
         title = stringResource(R.string.settings_appearance_cover),
         subtitle = stringResource(R.string.settings_appearance_cover_desc),
@@ -237,7 +262,7 @@ internal fun AppearanceSettings(gapColor: Color) {
         onCheckedChange = { v -> scope.launch { Prefs.setCoverTheme(v) } },
     )
 
-    // 7. 减少动效
+    // 8. 减少动效
     SettingSwitchRow(
         title = stringResource(R.string.settings_appearance_reduce_motion),
         subtitle = stringResource(R.string.settings_appearance_reduce_motion_desc),
@@ -245,7 +270,7 @@ internal fun AppearanceSettings(gapColor: Color) {
         onCheckedChange = { v -> scope.launch { Prefs.setReduceMotion(v) } },
     )
 
-    // 8. 界面缩放（仅电视）
+    // 9. 界面缩放（仅电视）
     if (profile.isTv) TvScaleSetting()
 
     if (showCustomSeed) {

@@ -20,6 +20,7 @@ import dev.aaa1115910.biliapi.http.util.generateBuvid
 import dev.aaa1115910.bv.BVApp
 import dev.aaa1115910.bv.BuildConfig
 import dev.aaa1115910.bv.entity.DarkMode
+import dev.aaa1115910.bv.entity.LayoutMode
 import dev.aaa1115910.bv.entity.PlayerType
 import dev.aaa1115910.bv.entity.ThemePrefs
 import dev.aaa1115910.bv.entity.ThemeSource
@@ -309,6 +310,19 @@ object Prefs {
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefDensityRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefDensityKey, value) }
 
+    /** 界面布局：默认 [LayoutMode.Auto] 按设备与宽度自动判断，其余三项强制指定布局 */
+    val layoutModeFlow: Flow<LayoutMode>
+        get() = dsm.getPreferenceFlow(PrefKeys.prefLayoutModeRequest)
+            .transform { ordinal -> emit(LayoutMode.entries.getOrElse(ordinal) { LayoutMode.Auto }) }
+
+    var layoutMode: LayoutMode
+        get() = runBlocking {
+            LayoutMode.entries.getOrElse(
+                dsm.getPreferenceFlow(PrefKeys.prefLayoutModeRequest).first()
+            ) { LayoutMode.Auto }
+        }
+        set(value) = runBlocking { dsm.editPreference(PrefKeys.prefLayoutModeKey, value.ordinal) }
+
     var updateAlpha: Boolean
         get() = runBlocking { dsm.getPreferenceFlow(PrefKeys.prefAlphaRequest).first() }
         set(value) = runBlocking { dsm.editPreference(PrefKeys.prefAlphaKey, value) }
@@ -533,6 +547,7 @@ object PrefKeys {
     val prefWebExtraCookiesKey = stringPreferencesKey("web_extra_cookies")
     val prefPlayerTypeKey = intPreferencesKey("pt")
     val prefDensityKey = floatPreferencesKey("density")
+    val prefLayoutModeKey = intPreferencesKey("bv_layout_mode")
     val prefAlphaKey = booleanPreferencesKey("alpha")
     val prefAccessTokenKey = stringPreferencesKey("access_token")
     val prefRefreshTokenKey = stringPreferencesKey("refresh_token")
@@ -605,6 +620,8 @@ object PrefKeys {
             runCatching { BVApp.context.resources.displayMetrics.widthPixels / 960f }
                 .getOrDefault(2f)
         )
+    val prefLayoutModeRequest =
+        PreferenceRequest(prefLayoutModeKey, LayoutMode.Auto.ordinal)
 
     @Suppress("KotlinConstantConditions")
     val prefAlphaRequest = PreferenceRequest(prefAlphaKey, BuildConfig.BUILD_TYPE == "alpha")
