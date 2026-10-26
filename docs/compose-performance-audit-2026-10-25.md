@@ -1,6 +1,9 @@
 # Compose 性能审计与修复记录
 
 日期：2026-10-25  
+系统返回修复验收更新：2026-10-26
+设置页返回修复更新：2026-10-26
+
 基准提交：`c1552eb4`  
 工作分支：`develop`
 
@@ -8,7 +11,11 @@
 
 已检查应用界面、共享 Compose 组件、播放器界面与图片预览相关代码，并落实可局部修改的性能修复。保留已有功能、普通播放器的 SurfaceView/HDR 路径，以及基准提交中的全屏切换与双指手势修复。
 
-用户已提交并推送 `851b2ce3a41356db1abd3a0f25502005995452ff`。[Alpha Build](https://github.com/mytv-android/bv/actions/runs/40191021655) 已成功，Alpha 与 Debug APK 均已构建并发布。已安装匹配提交的非调试 Alpha，完成下表中的虚拟机功能冒烟检查。核心检查通过，但电视菜单的系统返回行为未通过，不能称为全部回归通过。没有运行本地 Gradle，也没有测量性能提升。
+性能修复提交 `851b2ce3a41356db1abd3a0f25502005995452ff` 的 [Alpha Build](https://github.com/mytv-android/bv/actions/runs/40191021655) 已成功。下表保留 Alpha 1044 的原始冒烟结果，包括当时发现的电视菜单系统返回问题。
+
+该问题随后由 `b765ed9b3efe856ddbdeebb300a55f3d092eef3a` 修复。对应 [Alpha Build](https://github.com/mytv-android/bv/actions/runs/40208182299) 已成功，非调试 Alpha 1045 已在专用 Android TV API 33 实例完成实际回归：播放中、暂停中、触摸选项后以及选集面板的系统返回均只关闭面板，不退出或重建播放器；遥控菜单键与按钮栏焦点导航保持正常。
+
+这证明本次电视菜单返回修复通过已覆盖场景，不代表所有功能、设备或性能指标均通过。没有运行本地 Gradle，也没有测量性能提升。
 
 | 检查 | 结果 |
 | --- | --- |
@@ -175,10 +182,33 @@ Alpha 1044 中已确认的未通过项：
 - 用户确认修复后，在 TvController 增加常驻的 `BackHandler(enabled = panelOpen && !showRemoteControlHint)`，复用既有 `closePanels()`。
 - 系统返回只在菜单或选集面板打开时消费，沿用原有焦点恢复；遥控提示显示时不抢占返回。原有按下/抬起按键处理和无面板退出逻辑不变。
 - 源码静态核对通过：Kotlin PSI 解析无语法错误，现有 Activity Compose 依赖含所需 BackHandler API。移除新增导入和拦截块后，文件与 HEAD 完全一致，确认原有遥控处理及焦点恢复未改。`git diff --check` 通过。
-- 这是尚未提交的源码修复，不在上述 Alpha 1044 中。修复后的构建与设备回归尚未完成；核对最新 CI 仍是 `851b2ce3`，不能用旧产物的验证结果证明新修复通过。需要先提交、推送此修复，取得匹配的新 CI APK。没有运行本地 Gradle 或启动新设备测试。
+- 用户已提交并推送修复：`b765ed9b3efe856ddbdeebb300a55f3d092eef3a`。对应 [Alpha Build](https://github.com/mytv-android/bv/actions/runs/40208182299) 已成功，Alpha、Debug 构建和产物发布均完成。已核对工作流 head SHA 与修复提交一致。
+- 已下载并核验非调试 Alpha：`1.0.0.r1045.b765ed9b.alpha`，版本号 1045，签名与此前安装包一致。SHA-256：`86405b0a4dde6771df6a2339bc53fdf14cfbcfaec45ba5d19640192ec0795220`。没有运行本地 Gradle。
+- 专用 Android TV API 33 实例已从 Alpha 1044 保留数据升级至 Alpha 1045，安装返回 Success，冷启动返回 Status ok。首页加载正常，启动进程日志未发现致命异常。
+- 播放中与暂停中画面菜单均通过系统返回、遥控菜单键关闭检查：菜单消失，播放器标题、时间和播放状态对应的控件仍在，进程与 SurfaceView 保留；日志出现原 closePanels 事件，检查区间无播放器 Init/Release 或播放/暂停状态切换。
+- 暂停时通过方向键打开选集面板，系统返回只关闭面板；视频进度和暂停画面保留，焦点回到播放器根节点。
+- 触摸重新选择当前默认画幅后，系统返回仍只关闭菜单，恢复播放器根焦点，进程和视频保留。
+- 从按钮栏打开画面菜单后返回，焦点恢复到按钮栏；随后向右可聚焦“选集”，没有误触发视频快进。已用截图、XML 焦点边界和日志交叉核验。
 - 已准备 [设备回归脚本](../.bvtest/verify_tv_menu_system_back.py)。要求明确的设备、AVD 和新版本号，在已起播的 TV 页面分别检查播放中与暂停状态；断言系统返回和菜单键均关闭菜单、调用原 closePanels、保持进程与 SurfaceView、不出现播放器 Init/Release 或播放状态改变。脚本拒绝把 Alpha 1044 当作修复验证。
 - 脚本自身的 Python 语法、命令入口和模拟数据检查已通过：播放中、暂停中正常关闭样例可通过，模拟旧版返回后释放播放器的样例会被拒绝。这只验证检查脚本，不是 Android 应用运行测试。
-- 回归还需覆盖：触摸改变菜单焦点后返回仍只关菜单；选集面板同样关闭；焦点回到打开面板前的入口；遥控提示层不被抢占；菜单键与方向键保持正常。
+- 此次设备回归已覆盖播放中与暂停中的系统返回和遥控菜单键、触摸当前选项后返回、选集面板返回，以及按钮栏打开菜单后的焦点恢复和方向键导航。检查区间没有播放器退出、重建或意外播放状态切换。
+- 完成面板检查后恢复播放，日志确认新的 onPlay。随后主动暂停，在没有面板时正常退出到视频详情并返回首页；唯一 Release 出现在这次主动退出后，而不是菜单返回期间。
+- 最终进程日志未发现致命异常、保存失败或重复 Lazy 键异常，系统崩溃缓冲区没有 BV 记录。自动布局、字幕原值与默认画幅保留。专用实例正常关闭，进程和设备序列号均已消失，AVD 数据保留，其他设备与共享 ADB 未改动。
+- 验证边界：保留的数据已关闭首启遥控提示，本次未清空数据强制重现提示层；未覆盖实体遥控器差异、旧版 Android、HDR 或性能基准。Alpha 工作流只装配应用，不代表新增单元测试已执行。
+- 额外观察：收尾进入字幕设置后，从字号滑块发送两次系统 Back，界面和焦点仍停在滑块，未满足脚本的返回首页断言。该设置页行为不属于本次播放器菜单返回修复，当时没有修改或记为通过；正常播放器退出、菜单关闭与焦点恢复证据独立成立。该问题后续已单独复现并修复，见下节。
+
+本次返回修复的本机验收证据位于 Git 忽略目录 `.bvtest/verification-b765ed9b/`：
+
+- [匹配构建与 APK 核验](../.bvtest/verification-b765ed9b/verified-artifact.json)
+- [菜单返回与焦点回归汇总](../.bvtest/verification-b765ed9b/core-return-verification.json)
+- [播放中菜单返回截图](../.bvtest/verification-b765ed9b/playing-system-back-evidence.jpg)
+- [暂停与选集返回截图](../.bvtest/verification-b765ed9b/paused-and-episodes-evidence.jpg)
+- [按钮栏焦点恢复截图](../.bvtest/verification-b765ed9b/button-focus-evidence.jpg)
+- [最终日志](../.bvtest/verification-b765ed9b/final-log-results.json)
+- [设置保留与额外观察](../.bvtest/verification-b765ed9b/final-runtime-and-settings.json)
+- [环境清理记录](../.bvtest/verification-b765ed9b/environment-cleanup.json)
+
+此轮仅更新验收报告，没有追加源码修改、提交或推送。原有 `libs` 无关改动保留。
 
 本次尚未覆盖的范围：
 
@@ -191,3 +221,38 @@ Alpha 1044 中已确认的未通过项：
 - 真实发布配置下的冷启动、滚动、播放控制动画帧耗时与分配量对比。
 
 `.claude/`、`artwork/` 与 `libs` 的无关工作区内容未纳入本次变更。基准中的 TouchGestures 修复未再次修改。
+
+## 后续设置页返回修复
+
+针对上节「额外观察」中的设置页返回问题，已在同一 Alpha 1045 / 专用 Android TV API 33 实例上复现并定位，修复只改电视设置页左列分类项，未触碰播放器菜单返回逻辑（`TvController` 无改动）。
+
+复现与对照：
+
+- 触摸选择分类（如「字幕」）后，右栏首个滑块获得焦点；此时系统 Back 无任何效果，连续两次 Back 仍停在滑块，页面也不退出。
+- 纯遥控从左侧分类按 → 进入右栏后，系统 Back 可正常把焦点移回左列；左列上按 Back 则退出设置页。
+- 触摸进入后，先按任一送达视图层的非返回键（确认键、方向键、普通字母键）再按 Back，焦点即可移回左列；系统音量键没有该效果。
+
+根因：
+
+- Material3 `Surface(onClick)` / `clickable` 的焦点目标使用 `Focusability.SystemDefined`。本机 compose ui 1.8.3 依赖字节码中，`Focusability.canFocus` 对该值返回「输入模式不是触摸」，触摸后窗口处于触摸模式，点击类控件即不可聚焦。
+- `SettingsTv` 的 BackHandler 对左侧分类项调用 `FocusRequester.requestFocus(Enter)`，触摸模式下返回 false；`tryFocusEnter` 静默吞掉失败，于是返回键被消费但焦点不变。
+- 预测性返回不会退出触摸模式，所以连续返回持续无效；普通按键经过视图层会退出触摸模式，之后同一请求即可成功。`Slider` 使用 `Modifier.focusable()`（`Focusability.Always`），触摸模式下仍可聚焦，因此右栏滑块能被程序化聚焦、而分类项/芯片/开关不能。
+
+修复：
+
+- 仅在 `SettingsTv` 左列分类项增加 `Modifier.focusProperties { canFocus = true }`，使触摸模式下返回仍能把焦点移回左列；方向键模式行为不变。手机/平板设置与共享组件未改。
+
+静态检查：
+
+- Kotlin PSI 语法解析通过（仅语法，不是编译）。
+- `focusProperties` 与 `FocusProperties.canFocus` 已对照 compose ui 1.8.3 依赖字节码确认存在且非实验 API。
+- `git diff --check` 通过；改动仅此一处源码文件加报告。未运行本地 Gradle。
+
+设备复现证据位于 Git 忽略目录 `.bvtest/settings-back-20261026/`：
+
+- [排查结论与证据索引](../.bvtest/settings-back-20261026/investigation-results.json)
+- [触摸进入后返回无效](../.bvtest/settings-back-20261026/68-back-noop.xml)
+- [按键后返回恢复](../.bvtest/settings-back-20261026/69-back-after-A.xml)
+- [纯遥控进入后返回正常](../.bvtest/settings-back-20261026/31-back-after-remote-entry.xml)
+
+运行时验收状态：修复尚未随 CI 构建，需下一轮 Alpha Build 产物验证「触摸选中字幕后按系统 Back 只把焦点移回左列、再次 Back 退出设置页」。

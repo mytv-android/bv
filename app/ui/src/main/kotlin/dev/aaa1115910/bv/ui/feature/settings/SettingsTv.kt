@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -114,6 +115,9 @@ internal fun SettingsTv(nav: NavController, initial: SettingsCategory) {
                                 },
                                 modifier = Modifier
                                     .focusRequester(itemRequesters.getValue(category))
+                                    // clickable 的焦点目标在触摸模式下不可聚焦；触摸选中分类后
+                                    // 按系统返回时，这里仍需能把焦点移回左列。
+                                    .focusProperties { canFocus = true }
                                     .onBvKey { key ->
                                         if (key == BvKey.Right) {
                                             enterRequested = category
