@@ -20,7 +20,7 @@ dependencyResolutionManagement {
         create("gradleLibs") { from(files("gradle/gradle.versions.toml")) }
     }
 }
-rootProject.name = "BV"
+rootProject.name = "myBV"
 include(":app")
 include(":app:shared")
 include(":app:ui")

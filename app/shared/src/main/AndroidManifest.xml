@@ -9,6 +9,8 @@
 
     <queries>
         <package android:name="tw.com.gamer.android.animad" />
+        <!-- 新版首次启动时探测旧版 BV 是否安装，用于迁移数据 -->
+        <package android:name="dev.aaa1115910.bv" />
     </queries>
 
     <application
@@ -30,6 +32,14 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/provider_paths" />
         </provider>
+
+        <!-- 只读迁移通道：运行时校验调用方签名，仅同签名的 myBV 可读取 -->
+        <provider
+            android:name=".migration.LegacyMigrationProvider"
+            android:authorities="${applicationId}.migration"
+            android:exported="true"
+            android:grantUriPermissions="false"
+            android:process=":migration" />
     </application>
 
 </manifest>

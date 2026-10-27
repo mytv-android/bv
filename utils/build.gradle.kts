@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "${AppConfiguration.appId}.utils"
+    namespace = "${AppConfiguration.namespaceId}.utils"
     compileSdk = AppConfiguration.compileSdk
 
     defaultConfig {

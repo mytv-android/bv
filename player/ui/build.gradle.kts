@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "${AppConfiguration.appId}.player.ui"
+    namespace = "${AppConfiguration.namespaceId}.player.ui"
     compileSdk = AppConfiguration.compileSdk
 
     defaultConfig {

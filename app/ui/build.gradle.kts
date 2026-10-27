@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = AppConfiguration.appId + ".appui"
+    namespace = AppConfiguration.namespaceId + ".appui"
     compileSdk = AppConfiguration.compileSdk
 
     defaultConfig {

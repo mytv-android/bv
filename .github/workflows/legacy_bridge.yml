@@ -1,0 +1,70 @@
+name: Legacy Migration Bridge Build
+
+# 手动构建“旧 applicationId 的最后一个版本”：安装到已装 BV 的设备上不丢数据，
+# 并把设置/登录态通过 LegacyMigrationProvider 暴露给新版 myBV。
+# 不要把这个 APK 发布到正式/预发布 release，否则新版应用的更新检查会误选到旧包名安装包。
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-bridge:
+    name: Build legacy BV migration bridge
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          fetch-depth: 0
+          submodules: 'true'
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Write google-services.json
+        env:
+          DATA: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: echo $DATA > app/google-services.json
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Add signing properties
+        env:
+          SIGNING_PROPERTIES: ${{ secrets.SIGNING_PROPERTIES }}
+        run: |
+          echo ${{ secrets.SIGNING_PROPERTIES }} > encoded_signing_properties
+          base64 -Dd -i encoded_signing_properties > signing.properties
+
+      - name: Add jks file
+        run: |
+          echo ${{ secrets.SIGN_KEY }} > ./encoded_key
+          base64 -Dd -i encoded_key > key.jks
+
+      - name: Build bridge apk
+        env:
+          BV_LEGACY_APP_ID: 'true'
+        run: ./gradlew assembleDefaultAlpha
+
+      - name: Read alpha apk output metadata
+        id: apk-meta-alpha
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: app/build/outputs/apk/default/alpha/output-metadata.json
+
+      - name: Parse apk infos
+        id: apk-infos
+        run: |
+          echo "alpha_info_version_code=${{ fromJson(steps.apk-meta-alpha.outputs.content).elements[0].versionCode }}" >> $GITHUB_ENV
+          echo "alpha_info_version_name=${{ fromJson(steps.apk-meta-alpha.outputs.content).elements[0].versionName }}" >> $GITHUB_ENV
+
+      - name: Upload bridge apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: Legacy BV migration bridge
+          path: app/build/outputs/apk/default/alpha/BV_${{ env.alpha_info_version_code }}_${{ env.alpha_info_version_name }}_default_universal.apk

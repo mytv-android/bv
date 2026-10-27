@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "${AppConfiguration.appId}.player.shared"
+    namespace = "${AppConfiguration.namespaceId}.player.shared"
     compileSdk = AppConfiguration.compileSdk
 
     defaultConfig {

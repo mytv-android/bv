@@ -30,7 +30,7 @@ import com.airbnb.lottie.compose.animateLottieCompositionAsState
 import com.airbnb.lottie.compose.rememberLottieComposition
 import com.airbnb.lottie.compose.rememberLottieDynamicProperties
 import com.airbnb.lottie.compose.rememberLottieDynamicProperty
-import dev.aaa1115910.bv.R
+import com.github.mytv.bv.R
 import kotlinx.coroutines.isActive
 import kotlin.math.min
 

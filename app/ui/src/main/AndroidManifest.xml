@@ -10,7 +10,7 @@
 
     <application android:banner="@drawable/tv_banner">
         <activity
-            android:name="dev.aaa1115910.bv.ui.MainActivity"
+            android:name="com.github.mytv.bv.ui.MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|density|uiMode"
             android:exported="true"
             android:resizeableActivity="true"

@@ -59,7 +59,7 @@
       <option name="NATIVE_MEMORY_SAMPLE_RATE_BYTES" value="2048" />
     </Profilers>
     <option name="DEEP_LINK" value="" />
-    <option name="ACTIVITY_CLASS" value="dev.aaa1115910.bv.activities.settings.SettingsActivity" />
+    <option name="ACTIVITY_CLASS" value="com.github.mytv.bv.activities.settings.SettingsActivity" />
     <option name="SEARCH_ACTIVITY_IN_GLOBAL_SCOPE" value="false" />
     <option name="SKIP_ACTIVITY_VALIDATION" value="false" />
     <method v="2">

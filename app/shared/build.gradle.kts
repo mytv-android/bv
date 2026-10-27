@@ -11,7 +11,7 @@ plugins {
 }
 
 android {
-    namespace = AppConfiguration.appId
+    namespace = AppConfiguration.namespaceId
     compileSdk = AppConfiguration.compileSdk
 
     defaultConfig {

@@ -1,7 +1,15 @@
 import java.io.File
 
 object AppConfiguration {
-    const val appId = "dev.aaa1115910.bv"
+    private const val NEW_APP_ID = "com.github.mytv.bv"
+    const val LEGACY_APP_ID = "dev.aaa1115910.bv"
+    private const val LEGACY_APP_ID_ENV = "BV_LEGACY_APP_ID"
+
+    /** 代码命名空间始终是新包名，迁移桥接版只是把安装身份换回旧 applicationId。 */
+    const val namespaceId = NEW_APP_ID
+    val appId: String =
+        if (System.getenv(LEGACY_APP_ID_ENV) == "true") LEGACY_APP_ID else NEW_APP_ID
+
     const val compileSdk = 36
     const val minSdk = 23
     const val targetSdk = 36

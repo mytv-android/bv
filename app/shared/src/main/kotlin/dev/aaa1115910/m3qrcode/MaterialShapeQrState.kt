@@ -25,7 +25,7 @@ import androidx.core.graphics.ColorUtils
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.google.zxing.qrcode.encoder.Encoder
 import com.google.zxing.qrcode.encoder.QRCode
-import dev.aaa1115910.bv.R
+import com.github.mytv.bv.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.math.ceil
