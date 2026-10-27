@@ -90,14 +90,9 @@ class BVApp : Application() {
     }
 
     /** 迁移 Provider 使用 :migration 进程，启动时跳过所有网络/服务初始化。 */
-    private fun isMigrationProcess(): Boolean {
-        val name = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            processName
-        } else {
-            runCatching { File("/proc/self/cmdline").readText().trimEnd('\u0000') }.getOrNull()
-        }
-        return name?.endsWith(":migration") == true
-    }
+    private fun isMigrationProcess(): Boolean = runCatching {
+        File("/proc/self/cmdline").readText().substringBefore('\u0000').endsWith(":migration")
+    }.getOrDefault(false)
 
     /**
      * 全局 Coil ImageLoader：封面等图片到达时 150ms 淡入（内存缓存命中不会重复淡入），
