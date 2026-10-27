@@ -9,8 +9,8 @@ object AppConfiguration {
 
     /** 代码命名空间始终是新包名，迁移桥接版只是把安装身份换回旧 applicationId。 */
     const val namespaceId = NEW_APP_ID
-    val appId: String =
-        if (System.getenv(LEGACY_APP_ID_ENV) == "true") LEGACY_APP_ID else NEW_APP_ID
+    val isLegacyBridge: Boolean = System.getenv(LEGACY_APP_ID_ENV) == "true"
+    val appId: String = if (isLegacyBridge) LEGACY_APP_ID else NEW_APP_ID
 
     /** 新版 myBV 的签名证书 SHA-256；桥接版用于在双方签名不同的情况下校验调用方。 */
     val myBvCertSha256: String =

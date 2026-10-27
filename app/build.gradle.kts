@@ -63,6 +63,9 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        // 桥接版是旧 BV 的覆盖更新，名称必须保持 BV；新版才是 myBV
+        manifestPlaceholders["appName"] =
+            if (AppConfiguration.isLegacyBridge) "BV" else "myBV"
     }
 
     flavorDimensions.add("channel")
@@ -95,6 +98,8 @@ android {
                 "proguard-rules.pro"
             )
             applicationIdSuffix = ".debug"
+            manifestPlaceholders["appName"] =
+                if (AppConfiguration.isLegacyBridge) "BV Debug" else "myBV Debug"
             configure<CrashlyticsExtension> {
                 mappingFileUploadEnabled = false
             }
@@ -106,6 +111,8 @@ android {
                 "proguard-rules.pro"
             )
             applicationIdSuffix = ".r8test"
+            manifestPlaceholders["appName"] =
+                if (AppConfiguration.isLegacyBridge) "BV R8 Test" else "myBV R8 Test"
             if (signingConfigured) signingConfig = signingConfigs.getByName("key")
             configure<CrashlyticsExtension> {
                 mappingFileUploadEnabled = false
