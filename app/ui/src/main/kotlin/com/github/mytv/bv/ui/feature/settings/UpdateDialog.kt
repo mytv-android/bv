@@ -93,7 +93,7 @@ private fun PackageInfo.signerDigest(): String? = runCatching {
     signatures?.joinToString(",") { signature ->
         val cert = CertificateFactory.getInstance("X.509")
             .generateCertificate(signature.toByteArray().inputStream()) as X509Certificate
-        MessageDigest.getInstance("SHA-256").digest(cert.publicKey.encoded)
+        MessageDigest.getInstance("SHA-256").digest(cert.encoded)
             .joinToString("") { (it.toInt() and 0xff).toString(16).padStart(2, '0') }
     }
 }.getOrNull()

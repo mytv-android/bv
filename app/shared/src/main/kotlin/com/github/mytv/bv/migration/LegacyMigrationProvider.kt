@@ -159,7 +159,7 @@ class LegacyMigrationProvider : ContentProvider() {
                 val certificate = CertificateFactory.getInstance("X.509")
                     .generateCertificate(signature.toByteArray().inputStream()) as X509Certificate
                 MessageDigest.getInstance("SHA-256")
-                    .digest(certificate.publicKey.encoded)
+                    .digest(certificate.encoded)
                     .joinToString("") { byte -> "%02x".format(byte) }
             }.getOrNull()
         }
