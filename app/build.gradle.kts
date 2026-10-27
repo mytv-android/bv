@@ -26,10 +26,10 @@ val signingProperties = Properties().apply {
 }
 // 同时兼容 bv 旧格式(keystore.path/keystore.pwd)与 myMusic 格式(storeFile/storePassword)
 val signingKeystore = rootProject.file(
-    System.getenv("KEYSTORE")
+    (System.getenv("KEYSTORE")
         ?: signingProperties.getProperty("storeFile")
         ?: signingProperties.getProperty("keystore.path")
-        ?: "keystore.jks"
+        ?: "keystore.jks").trim()
 )
 val signingConfigured = signingProp.exists() || signingKeystore.exists()
 
@@ -38,15 +38,15 @@ android {
         if (signingConfigured) {
             create("key") {
                 storeFile = signingKeystore
-                storePassword = System.getenv("KEYSTORE_PASSWORD")
+                storePassword = (System.getenv("KEYSTORE_PASSWORD")
                     ?: signingProperties.getProperty("storePassword")
-                    ?: signingProperties.getProperty("keystore.pwd")
-                keyAlias = System.getenv("KEY_ALIAS")
+                    ?: signingProperties.getProperty("keystore.pwd"))?.trim()
+                keyAlias = (System.getenv("KEY_ALIAS")
                     ?: signingProperties.getProperty("keyAlias")
-                    ?: signingProperties.getProperty("keystore.alias")
-                keyPassword = System.getenv("KEY_PASSWORD")
+                    ?: signingProperties.getProperty("keystore.alias"))?.trim()
+                keyPassword = (System.getenv("KEY_PASSWORD")
                     ?: signingProperties.getProperty("keyPassword")
-                    ?: signingProperties.getProperty("keystore.alias_pwd")
+                    ?: signingProperties.getProperty("keystore.alias_pwd"))?.trim()
             }
         }
     }
