@@ -2,66 +2,98 @@ package com.github.mytv.bv.migration
 
 import android.content.Context
 import android.net.Uri
+import android.os.Bundle
 import android.util.Log
-import android.widget.Toast
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
-import com.github.mytv.bv.R
 import com.github.mytv.bv.dataStore
+import com.github.mytv.bv.util.Prefs
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import java.io.File
 
 /**
- * 新版 myBV 首次启动时，从仍安装着的旧版 BV(applicationId=dev.aaa1115910.bv) 迁移：
+ * 新版 myBV 从仍安装着的旧版 BV(applicationId=dev.aaa1115910.bv) 迁移：
  * - Room 数据库(搜索历史/用户列表)在主库尚未创建时整体拷贝；
  * - DataStore(设置/登录 cookie/refresh token)按 key 合并，新版已有的值优先。
  *
- * 旧版必须是带 [LegacyMigrationProvider] 的桥接版；比它更旧的版本没有迁移通道，
- * 只能重新登录。迁移成功后写入标记文件，后续启动不再重复。
+ * 旧版必须是带 [LegacyMigrationProvider] 的桥接版。新版首次进入且没有本地数据时，
+ * UI 通过 [shouldPromptMigration] 弹出迁移确认，用户确认后再调用 [migrate]。
  */
 object LegacyDataMigrator {
     private const val TAG = "LegacyDataMigrator"
     private const val MARKER_FILE = "legacy_migration_v1.done"
+    private const val DB_CHECK_MARKER = "legacy_db_checked_v1"
 
-    fun migrateIfNeeded(context: Context) {
+    /**
+     * 在 Koin/UI 打开 Room 之前静默拷贝旧数据库：搜索历史和账号列表先就位，
+     * 设置与登录态仍然等用户在迁移提示里确认后再合并。
+     */
+    fun prepareDatabase(context: Context) {
         if (context.packageName != LegacyMigrationContract.NEW_APP_ID) return
         val appContext = context.applicationContext
-        val marker = File(appContext.filesDir, MARKER_FILE)
-        if (marker.exists()) return
+        if (File(appContext.filesDir, MARKER_FILE).exists()) return
+        if (File(appContext.filesDir, DB_CHECK_MARKER).exists()) return
+        if (appContext.getDatabasePath(LegacyMigrationContract.DATABASE_NAME).exists()) return
         if (!isLegacyInstalled(appContext)) return
+        val info = queryInfo(appContext) ?: return
+        if (!info.getBoolean(LegacyMigrationContract.KEY_HAS_DATABASE, false)) {
+            runCatching { File(appContext.filesDir, DB_CHECK_MARKER).createNewFile() }
+            return
+        }
+        if (copyDatabase(appContext, legacyAuthority())) {
+            runCatching { File(appContext.filesDir, DB_CHECK_MARKER).createNewFile() }
+        }
+    }
 
-        val authority = Uri.parse("content://${LegacyMigrationContract.LEGACY_AUTHORITY}")
-        val info = runCatching {
-            appContext.contentResolver.call(
-                authority,
-                LegacyMigrationContract.METHOD_INFO,
-                null,
-                null,
-            )
-        }.onFailure {
-            Log.i(TAG, "legacy migration provider unavailable: ${it.message}")
-        }.getOrNull() ?: return
+    /** 未登录且桥接版仍安装时提示迁移。 */
+    fun shouldPromptMigration(context: Context): Boolean {
+        if (context.packageName != LegacyMigrationContract.NEW_APP_ID) return false
+        if (File(context.filesDir, MARKER_FILE).exists()) return false
+        if (!isLegacyInstalled(context)) return false
+        return !Prefs.isLogin
+    }
+
+    /** 执行迁移；成功或本轮不需要迁移时返回 true，桥接版不可用等失败情况返回 false。 */
+    fun migrate(context: Context): Boolean {
+        if (context.packageName != LegacyMigrationContract.NEW_APP_ID) return false
+        val appContext = context.applicationContext
+        val marker = File(appContext.filesDir, MARKER_FILE)
+        if (marker.exists()) return true
+        if (!isLegacyInstalled(appContext)) return false
+
+        val authority = legacyAuthority()
+        val info = queryInfo(appContext) ?: return false
 
         val hasDatabase = info.getBoolean(LegacyMigrationContract.KEY_HAS_DATABASE, false)
         val hasDataStore = info.getBoolean(LegacyMigrationContract.KEY_HAS_DATASTORE, false)
-        if (!hasDatabase && !hasDataStore) return
+        if (!hasDatabase && !hasDataStore) return false
 
         var success = true
         if (hasDatabase) success = copyDatabase(appContext, authority) && success
         if (hasDataStore) success = mergePreferences(appContext, authority) && success
-        if (!success) return
+        if (!success) return false
 
         runCatching { marker.createNewFile() }
         Log.i(TAG, "legacy data migrated")
-        Toast.makeText(
-            appContext,
-            R.string.legacy_migration_success,
-            Toast.LENGTH_LONG,
-        ).show()
+        return true
     }
+
+    private fun legacyAuthority(): Uri =
+        Uri.parse("content://${LegacyMigrationContract.LEGACY_AUTHORITY}")
+
+    private fun queryInfo(context: Context): Bundle? = runCatching {
+        context.contentResolver.call(
+            legacyAuthority(),
+            LegacyMigrationContract.METHOD_INFO,
+            null,
+            null,
+        )
+    }.onFailure {
+        Log.i(TAG, "legacy migration provider unavailable: ${it.message}")
+    }.getOrNull()
 
     private fun isLegacyInstalled(context: Context): Boolean = runCatching {
         context.packageManager.getPackageInfo(LegacyMigrationContract.LEGACY_APP_ID, 0)

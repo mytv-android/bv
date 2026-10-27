@@ -10,6 +10,8 @@ import androidx.navigation.compose.rememberNavController
 import com.github.mytv.bv.ui.designsystem.theme.BvRoot
 import com.github.mytv.bv.ui.feature.accounts.UserLockGate
 import com.github.mytv.bv.ui.feature.login.DeepLinkEffect
+import com.github.mytv.bv.ui.feature.migration.LegacyMigrationPrompts
+import com.github.mytv.bv.ui.feature.settings.LaunchUpdatePrompt
 import com.github.mytv.bv.ui.navigation.AppShell
 import com.github.mytv.bv.util.CacheManager
 import com.github.mytv.bv.util.Prefs
@@ -41,6 +43,8 @@ class MainActivity : ComponentActivity() {
                         val nav = rememberNavController()
                         AppShell(nav)
                         DeepLinkEffect(intent, nav)
+                        LegacyMigrationPrompts()
+                        LaunchUpdatePrompt()
                     }
                 }
             }

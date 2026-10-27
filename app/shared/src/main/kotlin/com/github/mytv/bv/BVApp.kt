@@ -63,8 +63,8 @@ class BVApp : Application() {
         context = this.applicationContext
         // 迁移 Provider 跑在独立进程，只需要读写本应用数据文件，不能执行整套启动流程
         if (isMigrationProcess()) return
-        // 必须在 DataStore/Room 首次访问之前执行：迁移会写入 Settings 文件并拷贝数据库
-        LegacyDataMigrator.migrateIfNeeded(this)
+        // 必须在 Koin/UserRepository 打开 Room 之前把旧数据库就位
+        LegacyDataMigrator.prepareDatabase(this)
         HandroidLoggerAdapter.DEBUG = BuildConfig.DEBUG
         dataStoreManager = DataStoreManager(applicationContext.dataStore)
         initImageLoader()

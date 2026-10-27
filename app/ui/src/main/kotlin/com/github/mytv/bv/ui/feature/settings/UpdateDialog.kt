@@ -40,6 +40,7 @@ import com.github.mytv.bv.network.GithubApi
 import com.github.mytv.bv.network.entity.Release
 import com.github.mytv.bv.ui.PreferenceWrites
 import com.github.mytv.bv.ui.designsystem.theme.BvType
+import com.github.mytv.bv.ui.feature.migration.shouldShowLegacyMigrationPrompt
 import com.github.mytv.bv.util.CacheManager
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.content.ProgressListener
@@ -129,7 +130,10 @@ private fun signatureMatches(context: Context, apk: File): Boolean {
  * 网络与文件操作在 IO 线程，状态一律回到主线程再写。
  */
 @Composable
-internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
+internal fun SettingsUpdateDialog(
+    onDismiss: () -> Unit,
+    initialRelease: Release? = null,
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var status by remember { mutableStateOf(UpdateStatus.UpdatingInfo) }
@@ -235,7 +239,15 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
         }
     }
 
-    LaunchedEffect(Unit) { checkUpdate() }
+    LaunchedEffect(Unit) {
+        val initial = initialRelease
+        if (initial != null) {
+            release = initial
+            status = UpdateStatus.Ready
+        } else {
+            checkUpdate()
+        }
+    }
 
     val busy = status == UpdateStatus.Downloading || status == UpdateStatus.Installing
     val dismiss: () -> Unit = {
@@ -335,6 +347,36 @@ internal fun SettingsUpdateDialog(onDismiss: () -> Unit) {
             dismissEnabled = !busy,
             confirmRequester = confirmRequester,
             dismissRequester = dismissRequester,
+        )
+    }
+}
+
+/**
+ * 进入应用时静默检查一次更新，只有存在更高版本才弹窗；迁移提示出现时让路。
+ * 桥接版也从这里获得“进入应用即检查更新”的行为。
+ */
+@Composable
+internal fun LaunchUpdatePrompt() {
+    val context = LocalContext.current
+    var pending by remember { mutableStateOf<Release?>(null) }
+    LaunchedEffect(Unit) {
+        val skip = withContext(Dispatchers.IO) {
+            runCatching { shouldShowLegacyMigrationPrompt(context) }.getOrDefault(false)
+        }
+        if (skip) return@LaunchedEffect
+        val latest = withContext(Dispatchers.IO) {
+            runCatching {
+                PreferenceWrites.awaitPending()
+                GithubApi.getLatestBuild()
+            }.getOrNull()
+        } ?: return@LaunchedEffect
+        val revision = latest.revision ?: return@LaunchedEffect
+        if (revision > BuildConfig.VERSION_CODE) pending = latest
+    }
+    pending?.let { latest ->
+        SettingsUpdateDialog(
+            onDismiss = { pending = null },
+            initialRelease = latest,
         )
     }
 }

@@ -11,6 +11,8 @@
         <package android:name="tw.com.gamer.android.animad" />
         <!-- 新版首次启动时探测旧版 BV 是否安装，用于迁移数据 -->
         <package android:name="dev.aaa1115910.bv" />
+        <!-- 桥接版探测 myBV 是否已安装，用于提示迁移 -->
+        <package android:name="com.github.mytv.bv" />
     </queries>
 
     <application

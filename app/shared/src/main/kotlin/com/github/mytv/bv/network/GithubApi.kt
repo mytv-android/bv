@@ -3,6 +3,7 @@ package com.github.mytv.bv.network
 import android.os.Build
 import com.github.mytv.bv.BVApp
 import com.github.mytv.bv.BuildConfig
+import com.github.mytv.bv.migration.LegacyMigrationContract
 import com.github.mytv.bv.network.entity.Release
 import com.github.mytv.bv.util.Prefs
 import io.ktor.client.HttpClient
@@ -61,6 +62,10 @@ object GithubApi {
     }
     private val isDebug get() = BuildConfig.DEBUG
     private val isAlpha get() = Prefs.updateAlpha
+
+    /** 桥接版固定走正式通道：它要能看到随后发布的 myBV 正式包。 */
+    private val isLegacyBridge get() =
+        BuildConfig.APPLICATION_ID == LegacyMigrationContract.LEGACY_APP_ID
 
     init {
         createClient()
@@ -130,6 +135,7 @@ object GithubApi {
             if (releases.isEmpty()) break
             for (release in releases) {
                 if (!release.isPreRelease) continue
+                if (!isLegacyBridge && release.isBridgeRelease) continue
                 if ((release.revision ?: Int.MIN_VALUE) >= (best?.revision ?: Int.MIN_VALUE)) {
                     best = release
                 }
@@ -140,8 +146,29 @@ object GithubApi {
 
     suspend fun getLatestReleaseBuild(): Release = getLatestRelease()
 
+    /**
+     * 正式通道不能只看 /releases/latest：桥接版会长期标记为 Latest，
+     * 之后发布的 myBV 正式包仍要能被桥接版发现。这里按 versionCode 取最大的正式发布；
+     * myBV 自己则跳过桥接版发布，避免把更新装成旧包名应用。
+     */
+    suspend fun getLatestStableBuild(): Release {
+        var best: Release? = null
+        for (page in 1..MAX_RELEASE_PAGES) {
+            val releases = getReleases(page = page)
+            if (releases.isEmpty()) break
+            for (release in releases) {
+                if (release.isPreRelease) continue
+                if (!isLegacyBridge && release.isBridgeRelease) continue
+                if ((release.revision ?: Int.MIN_VALUE) >= (best?.revision ?: Int.MIN_VALUE)) {
+                    best = release
+                }
+            }
+        }
+        return best ?: throw GithubApiException("没有找到正式版本")
+    }
+
     suspend fun getLatestBuild(): Release =
-        if (isAlpha) getLatestPreReleaseBuild() else getLatestReleaseBuild()
+        if (!isLegacyBridge && isAlpha) getLatestPreReleaseBuild() else getLatestStableBuild()
 
     /**
      * 直连失败时依次换乘加速镜像；上次成功的线路优先。

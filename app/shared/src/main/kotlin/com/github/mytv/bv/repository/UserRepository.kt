@@ -43,6 +43,9 @@ class UserRepository(
     var username by mutableStateOf("")
     var avatar by mutableStateOf("")
 
+    /** 旧版数据迁移完成后重新读取登录态，避免用户重启应用。 */
+    fun reloadAuthFromPrefs() = reloadFromPrefs()
+
     private fun reloadFromPrefs() {
         logger.info { "Reload auth data from prefs" }
 

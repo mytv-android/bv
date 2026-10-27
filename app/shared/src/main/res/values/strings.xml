@@ -8,8 +8,6 @@
 
     <string name="app_name">myBV</string>
 
-    <string name="legacy_migration_success">已从旧版 BV 迁移设置与登录状态，可卸载旧版</string>
-
     <string name="blacklist_user_toast">您已被开发者拉黑</string>
 
     <string name="codec_detail_audio_bitrate_range_title">音频码率范围</string>

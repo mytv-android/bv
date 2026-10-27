@@ -38,6 +38,10 @@ data class Release(
     val isPreRelease = prerelease
     val isRelease = !prerelease
 
+    /** 迁移桥接版用 bridge- 前缀的 tag 标记；新版更新检查必须跳过它，避免装回旧包名。 */
+    val isBridgeRelease: Boolean
+        get() = tagName.startsWith("bridge-") || name.contains("桥接")
+
     /** 资产文件名形如 BV_<versionCode>_<versionName>.<buildType>_<flavor>_<abi>.apk。 */
     val revision: Int?
         get() = assets.mapNotNull { it.versionCode }.maxOrNull()

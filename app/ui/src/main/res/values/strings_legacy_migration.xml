@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="legacy_bridge_prompt_title">新版 myBV 已安装</string>
+    <string name="legacy_bridge_prompt_message">打开 myBV 即可把设置和登录状态迁移过去，迁移完成后可以卸载本应用。</string>
+    <string name="legacy_bridge_prompt_open">打开 myBV</string>
+    <string name="legacy_bridge_prompt_later">稍后</string>
+
+    <string name="legacy_new_prompt_title">检测到旧版 BV</string>
+    <string name="legacy_new_prompt_message">可以把旧版 BV 的设置和登录状态迁移到 myBV，迁移完成后旧版即可卸载。</string>
+    <string name="legacy_new_prompt_migrate">开始迁移</string>
+    <string name="legacy_new_prompt_later">稍后</string>
+    <string name="legacy_new_prompt_migrating">正在迁移…</string>
+    <string name="legacy_new_prompt_failed">迁移失败，请确认旧版 BV 已更新到桥接版后重试</string>
+    <string name="legacy_new_prompt_success">迁移完成，可以卸载旧版 BV</string>
+</resources>
