@@ -155,6 +155,7 @@ private fun NewAppMigrationPrompt(context: Context) {
                         if (ok) {
                             // 迁移在 Koin 初始化之后才发生，重新把登录态灌回仓库
                             runCatching { BVApp.instance?.initRepository() }
+                            runCatching { BVApp.instance?.initProxy() }
                             runCatching {
                                 BVApp.koinApplication.koin.get<UserRepository>()
                                     .reloadAuthFromPrefs()
