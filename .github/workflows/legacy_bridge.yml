@@ -1,15 +1,28 @@
 name: Legacy Migration Bridge Build
 
-# 手动构建“旧 applicationId 的最后一个版本”：安装到已装 BV 的设备上不丢数据，
-# 并把设置/登录态通过 LegacyMigrationProvider 暴露给新版 myBV。
-# 不要把这个 APK 发布到正式/预发布 release，否则新版应用的更新检查会误选到旧包名安装包。
+# 手动构建迁移用 APK：
+# - legacy：旧 applicationId 的桥接版，发布到 bv 的 release，覆盖安装不丢数据；
+# - mybv：新包名 myBV，用于首个 myBV release 或迁移验证。
+# 若 myBV 使用与桥接版不同的签名，先把 myBV 证书 SHA-256 写入仓库变量
+# MYBV_CERT_SHA256，桥接版才会信任它。
+
+
 
 on:
   workflow_dispatch:
+    inputs:
+      build_target:
+        description: "legacy = 旧包名桥接版；mybv = 新包名 myBV"
+        required: true
+        default: legacy
+        type: choice
+        options:
+          - legacy
+          - mybv
 
 jobs:
   build-bridge:
-    name: Build legacy BV migration bridge
+    name: Build migration apk
     runs-on: macos-latest
 
     steps:
@@ -46,9 +59,11 @@ jobs:
           echo ${{ secrets.SIGN_KEY }} > ./encoded_key
           base64 -Dd -i encoded_key > key.jks
 
-      - name: Build bridge apk
+      - name: Build apk
         env:
-          BV_LEGACY_APP_ID: 'true'
+          BV_LEGACY_APP_ID: ${{ inputs.build_target == 'legacy' && 'true' || 'false' }}
+          BV_VERSION_CODE_OFFSET: ${{ inputs.build_target == 'mybv' && '1' || '0' }}
+          MYBV_CERT_SHA256: ${{ vars.MYBV_CERT_SHA256 }}
         run: ./gradlew assembleDefaultAlpha
 
       - name: Read alpha apk output metadata
@@ -63,8 +78,8 @@ jobs:
           echo "alpha_info_version_code=${{ fromJson(steps.apk-meta-alpha.outputs.content).elements[0].versionCode }}" >> $GITHUB_ENV
           echo "alpha_info_version_name=${{ fromJson(steps.apk-meta-alpha.outputs.content).elements[0].versionName }}" >> $GITHUB_ENV
 
-      - name: Upload bridge apk
+      - name: Upload apk
         uses: actions/upload-artifact@v4
         with:
-          name: Legacy BV migration bridge
+          name: ${{ inputs.build_target == 'mybv' && 'myBV app' || 'Legacy BV migration bridge' }}
           path: app/build/outputs/apk/default/alpha/BV_${{ env.alpha_info_version_code }}_${{ env.alpha_info_version_name }}_default_universal.apk

@@ -45,7 +45,7 @@ class GithubApiException(
 object GithubApi {
     private const val API_BASE = "https://api.github.com"
     private const val OWNER = "mytv-android"
-    private const val REPO = "bv"
+    private const val REPO = "myBV"
     private const val MAX_RELEASE_PAGES = 3
 
     /** 上次成功的加速线路（镜像前缀，空串为直连），只在进程内记忆。 */

@@ -3,16 +3,22 @@ package com.github.mytv.bv.migration
 import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.Context
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
 import android.os.Binder
+import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.os.Process
+import com.github.mytv.bv.BuildConfig
 import com.github.mytv.bv.dao.AppDatabase
 import java.io.File
 import java.io.FileNotFoundException
+import java.security.MessageDigest
+import java.security.cert.CertificateFactory
+import java.security.cert.X509Certificate
 
 /**
  * 旧版应用升级到桥接版后暴露的只读迁移入口：DataStore 与 Room 文件。
@@ -25,7 +31,7 @@ class LegacyMigrationProvider : ContentProvider() {
     override fun onCreate(): Boolean = true
 
     override fun call(method: String, arg: String?, extras: Bundle?): Bundle? {
-        requireSameSignature()
+        requireTrustedCaller()
         if (method != LegacyMigrationContract.METHOD_INFO) return null
         val context = context ?: return null
         val databaseFile = context.getDatabasePath(LegacyMigrationContract.DATABASE_NAME)
@@ -40,7 +46,7 @@ class LegacyMigrationProvider : ContentProvider() {
     }
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
-        requireSameSignature()
+        requireTrustedCaller()
         val file = resolveAsset(uri) ?: throw FileNotFoundException("unknown migration asset: $uri")
         if (!file.exists()) throw FileNotFoundException(file.absolutePath)
         if (uri.lastPathSegment == LegacyMigrationContract.PATH_DATABASE) {
@@ -94,14 +100,68 @@ class LegacyMigrationProvider : ContentProvider() {
         }
     }
 
-    private fun requireSameSignature() {
+    /**
+     * 只信任 myBV 包名，且签名与桥接版一致，或与构建桥接版时固定的
+     * MYBV_CERT_SHA256 一致。这样新版换签名也能迁移，第三方应用读不到登录态。
+     */
+    private fun requireTrustedCaller() {
         val callerUid = Binder.getCallingUid()
         if (callerUid == Process.myUid()) return
         val packageManager = context?.packageManager ?: throw SecurityException("no context")
-        if (packageManager.checkSignatures(callerUid, Process.myUid()) !=
+        val callerPackages = packageManager.getPackagesForUid(callerUid).orEmpty()
+        if (LegacyMigrationContract.NEW_APP_ID !in callerPackages) {
+            throw SecurityException("migration provider is only available to myBV")
+        }
+        if (packageManager.checkSignatures(callerUid, Process.myUid()) ==
             PackageManager.SIGNATURE_MATCH
         ) {
-            throw SecurityException("migration provider is only available to same-signed apps")
+            return
+        }
+        val pinned = BuildConfig.MYBV_CERT_SHA256.trim().lowercase()
+        if (pinned.isNotEmpty() &&
+            callerCertDigests(packageManager).any { it.equals(pinned, ignoreCase = true) }
+        ) {
+            return
+        }
+        throw SecurityException("myBV signing certificate is not trusted for migration")
+    }
+
+    @Suppress("DEPRECATION")
+    private fun signingFlags(): Int =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            PackageManager.GET_SIGNATURES
+        }
+
+    private fun callerPackageInfo(packageManager: PackageManager): PackageInfo? = runCatching {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            packageManager.getPackageInfo(
+                LegacyMigrationContract.NEW_APP_ID,
+                PackageManager.PackageInfoFlags.of(signingFlags().toLong()),
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.getPackageInfo(LegacyMigrationContract.NEW_APP_ID, signingFlags())
+        }
+    }.getOrNull()
+
+    @Suppress("DEPRECATION")
+    private fun callerCertDigests(packageManager: PackageManager): List<String> {
+        val info = callerPackageInfo(packageManager) ?: return emptyList()
+        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.signingInfo?.apkContentsSigners
+        } else {
+            info.signatures
+        }
+        return signatures.orEmpty().mapNotNull { signature ->
+            runCatching {
+                val certificate = CertificateFactory.getInstance("X.509")
+                    .generateCertificate(signature.toByteArray().inputStream()) as X509Certificate
+                MessageDigest.getInstance("SHA-256")
+                    .digest(certificate.publicKey.encoded)
+                    .joinToString("") { byte -> "%02x".format(byte) }
+            }.getOrNull()
         }
     }
 

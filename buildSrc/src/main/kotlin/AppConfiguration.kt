@@ -4,11 +4,17 @@ object AppConfiguration {
     private const val NEW_APP_ID = "com.github.mytv.bv"
     const val LEGACY_APP_ID = "dev.aaa1115910.bv"
     private const val LEGACY_APP_ID_ENV = "BV_LEGACY_APP_ID"
+    private const val VERSION_CODE_OFFSET_ENV = "BV_VERSION_CODE_OFFSET"
+    private const val MYBV_CERT_SHA256_ENV = "MYBV_CERT_SHA256"
 
     /** 代码命名空间始终是新包名，迁移桥接版只是把安装身份换回旧 applicationId。 */
     const val namespaceId = NEW_APP_ID
     val appId: String =
         if (System.getenv(LEGACY_APP_ID_ENV) == "true") LEGACY_APP_ID else NEW_APP_ID
+
+    /** 新版 myBV 的签名证书 SHA-256；桥接版用于在双方签名不同的情况下校验调用方。 */
+    val myBvCertSha256: String =
+        System.getenv(MYBV_CERT_SHA256_ENV)?.trim()?.lowercase().orEmpty()
 
     const val compileSdk = 36
     const val minSdk = 23
@@ -24,7 +30,10 @@ object AppConfiguration {
         "$major.$minor.$patch${".$hotFix".takeIf { hotFix != 0 } ?: ""}" +
                 ".r${versionCode}.${"git rev-list HEAD --abbrev-commit --max-count=1".exec()}"
     }
-    val versionCode: Int by lazy { "git rev-list --count HEAD".exec().toInt() }
+    val versionCode: Int by lazy {
+        "git rev-list --count HEAD".exec().toInt() +
+                (System.getenv(VERSION_CODE_OFFSET_ENV)?.toIntOrNull() ?: 0)
+    }
     const val libVLCVersion = "3.0.18"
     var googleServicesAvailable = true
     const val blacklistUrl =

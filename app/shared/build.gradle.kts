@@ -38,6 +38,11 @@ android {
             )
             buildConfigField(
                 type = "String",
+                name = "MYBV_CERT_SHA256",
+                value = "\"${AppConfiguration.myBvCertSha256}\""
+            )
+            buildConfigField(
+                type = "String",
                 name = "BLACKLIST_URL",
                 value = "\"${AppConfiguration.blacklistUrl}\""
             )

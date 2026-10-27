@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import com.github.mytv.bv.BuildConfig
 import com.github.mytv.bv.appui.R
+import com.github.mytv.bv.migration.LegacyMigrationContract
 import com.github.mytv.bv.network.GithubApi
 import com.github.mytv.bv.network.entity.Release
 import com.github.mytv.bv.ui.PreferenceWrites
@@ -104,22 +105,35 @@ private fun PackageInfo.signerDigest(): String? = runCatching {
 private fun signatureMatches(context: Context, apk: File): Boolean {
     val pm = context.packageManager
     val flags = signatureFlags
-    val installed = runCatching {
+    val installedInfo = runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             pm.getPackageInfo(context.packageName, PackageManager.PackageInfoFlags.of(flags.toLong()))
         } else {
             @Suppress("DEPRECATION")
             pm.getPackageInfo(context.packageName, flags)
         }
-    }.getOrNull()?.signerDigest()
-    val archive = runCatching {
+    }.getOrNull()
+    val archiveInfo = runCatching {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             pm.getPackageArchiveInfo(apk.absolutePath, PackageManager.PackageInfoFlags.of(flags.toLong()))
         } else {
             @Suppress("DEPRECATION")
             pm.getPackageArchiveInfo(apk.absolutePath, flags)
         }
-    }.getOrNull()?.signerDigest()
+    }.getOrNull()
+    val installed = installedInfo?.signerDigest()
+    val archive = archiveInfo?.signerDigest()
+
+    // 桥接版更新到 myBV 是“新装另一个应用”，允许签名换新；优先用构建时固定的证书指纹。
+    if (context.packageName == LegacyMigrationContract.LEGACY_APP_ID &&
+        archiveInfo?.packageName == LegacyMigrationContract.NEW_APP_ID
+    ) {
+        val pinned = BuildConfig.MYBV_CERT_SHA256.trim()
+        if (pinned.isNotEmpty()) {
+            return archive.equals(pinned, ignoreCase = true)
+        }
+    }
+
     if (installed.isNullOrEmpty() || archive.isNullOrEmpty()) return true
     return installed.equals(archive, ignoreCase = true)
 }

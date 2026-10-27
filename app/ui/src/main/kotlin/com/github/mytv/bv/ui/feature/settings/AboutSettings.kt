@@ -62,7 +62,7 @@ import kotlin.math.pow
 private val aboutLogger = KotlinLogging.logger("BvAboutSettings")
 
 /** 项目地址（与 GithubApi 的更新源一致）。 */
-private const val GITHUB_URL = "https://github.com/mytv-android/bv"
+private const val GITHUB_URL = "https://github.com/mytv-android/myBV"
 
 /** Telegram 交流群。 */
 private const val TELEGRAM_URL = "https://t.me/mytv_android_channel"
