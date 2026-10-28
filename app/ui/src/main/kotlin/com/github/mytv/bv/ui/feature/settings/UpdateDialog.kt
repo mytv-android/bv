@@ -167,6 +167,19 @@ private fun installSucceeded(context: Context, apk: File): Boolean = runCatching
 }.getOrDefault(false)
 
 /**
+ * 是否有可装的更新。桥接版装的是另一个应用（myBV），拿自己的 versionCode 和 myBV 的
+ * revision 比没有意义：只要 myBV 还没装就提示安装；新版 myBV 则比较自己的 versionCode。
+ */
+private fun updateAvailable(context: Context, revision: Int): Boolean =
+    if (context.packageName == LegacyMigrationContract.LEGACY_APP_ID) {
+        runCatching {
+            context.packageManager.getPackageInfo(LegacyMigrationContract.NEW_APP_ID, 0)
+        }.isFailure
+    } else {
+        revision > BuildConfig.VERSION_CODE
+    }
+
+/**
  * 检查更新对话框：逻辑照抄 app/shared 的旧 UpdateDialog（GithubApi 取最新构建 → 比较 revision →
  * 下载到 cache/update_downloader → FileProvider 安装），只换成设计系统外观。
  * 网络与文件操作在 IO 线程，状态一律回到主线程再写。
@@ -200,7 +213,7 @@ internal fun SettingsUpdateDialog(
                     val latest = GithubApi.getLatestBuild()
                     val revision = latest.revision
                         ?: throw IllegalStateException("无法从发布信息中解析版本号")
-                    latest to (revision > BuildConfig.VERSION_CODE)
+                    latest to updateAvailable(context, revision)
                 }
             }
             result
@@ -453,7 +466,7 @@ internal fun LaunchUpdatePrompt() {
             }.getOrNull()
         } ?: return@LaunchedEffect
         val revision = latest.revision ?: return@LaunchedEffect
-        if (revision > BuildConfig.VERSION_CODE) pending = latest
+        if (updateAvailable(context, revision)) pending = latest
     }
     pending?.let { latest ->
         SettingsUpdateDialog(
