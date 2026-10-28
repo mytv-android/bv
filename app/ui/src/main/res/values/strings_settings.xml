@@ -194,6 +194,7 @@
     <string name="settings_update_body_check_error">获取更新信息失败</string>
     <string name="settings_update_body_download_error">下载失败</string>
     <string name="settings_update_body_install_error">安装失败</string>
+    <string name="settings_update_install_cancelled">安装没有完成，可能被取消了</string>
     <string name="settings_update_progress">%1$d / %2$d</string>
     <string name="settings_update_now">立即更新</string>
     <string name="settings_update_retry">再试一次</string>

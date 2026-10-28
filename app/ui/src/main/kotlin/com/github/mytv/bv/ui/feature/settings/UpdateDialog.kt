@@ -18,6 +18,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -34,6 +35,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.github.mytv.bv.BuildConfig
 import com.github.mytv.bv.appui.R
 import com.github.mytv.bv.migration.LegacyMigrationContract
@@ -46,6 +50,7 @@ import com.github.mytv.bv.util.CacheManager
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.client.content.ProgressListener
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -138,6 +143,30 @@ private fun signatureMatches(context: Context, apk: File): Boolean {
 }
 
 /**
+ * 系统安装器返回后确认是否真的装上了：拿安装包的包名去查已安装版本，versionCode 不低于安装包即算成功。
+ * 同包自更新和桥接版装 myBV 走同一套判断；读不到安装包信息按未安装处理，让对话框回到可重试的状态。
+ */
+private fun installSucceeded(context: Context, apk: File): Boolean = runCatching {
+    val pm = context.packageManager
+    val flags = signatureFlags
+    val archive = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        pm.getPackageArchiveInfo(apk.absolutePath, PackageManager.PackageInfoFlags.of(flags.toLong()))
+    } else {
+        @Suppress("DEPRECATION")
+        pm.getPackageArchiveInfo(apk.absolutePath, flags)
+    } ?: return@runCatching false
+    // 桥接版装的是另一个应用，按安装包自己的包名查；同包自更新则查自己
+    val installed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        pm.getPackageInfo(archive.packageName, PackageManager.PackageInfoFlags.of(0L))
+    } else {
+        @Suppress("DEPRECATION")
+        pm.getPackageInfo(archive.packageName, 0)
+    }
+    @Suppress("DEPRECATION")
+    installed.versionCode >= archive.versionCode
+}.getOrDefault(false)
+
+/**
  * 检查更新对话框：逻辑照抄 app/shared 的旧 UpdateDialog（GithubApi 取最新构建 → 比较 revision →
  * 下载到 cache/update_downloader → FileProvider 安装），只换成设计系统外观。
  * 网络与文件操作在 IO 线程，状态一律回到主线程再写。
@@ -157,6 +186,9 @@ internal fun SettingsUpdateDialog(
     val progress by animateFloatAsState(targetProgress, MaterialTheme.motionScheme.defaultEffectsSpec(), label = "updateProgress")
     var errorDetail by remember { mutableStateOf<String?>(null) }
     var active by remember { mutableStateOf(true) }
+    // 交给系统安装器之后要等本页重新 resume 才能确认结果，否则「安装中」会一直挂着
+    var installingApk by remember { mutableStateOf<File?>(null) }
+    var awaitingInstall by remember { mutableStateOf(false) }
 
     val checkUpdate: () -> Unit = {
         status = UpdateStatus.UpdatingInfo
@@ -236,7 +268,10 @@ internal fun SettingsUpdateDialog(
                                 status = UpdateStatus.InstallError
                             } else {
                                 status = UpdateStatus.Installing
+                                installingApk = file
+                                awaitingInstall = true
                                 if (!installApk(context, file)) {
+                                    awaitingInstall = false
                                     errorDetail = "没有权限打开安装程序，请允许本应用安装未知应用"
                                     status = UpdateStatus.InstallError
                                 }
@@ -262,11 +297,45 @@ internal fun SettingsUpdateDialog(
         }
     }
 
+    // 系统安装器是另一个应用：装上、取消之后本页只会 resume，不会重建。
+    // 回到前台时确认结果——装好了就关掉对话框（桥接版随后交给迁移提示），没装上则回到可重试的失败态。
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, awaitingInstall) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && awaitingInstall) {
+                awaitingInstall = false
+                val apk = installingApk
+                scope.launch {
+                    var installed = apk != null && withContext(Dispatchers.IO) { installSucceeded(context, apk) }
+                    if (!installed) {
+                        // 安装器可能比 PackageManager 提交稍早返回，稍等一下再判一次
+                        delay(1500)
+                        installed = apk != null && withContext(Dispatchers.IO) { installSucceeded(context, apk) }
+                    }
+                    if (installed) {
+                        active = false
+                        onDismiss()
+                    } else if (status == UpdateStatus.Installing) {
+                        errorDetail = context.getString(R.string.settings_update_install_cancelled)
+                        status = UpdateStatus.InstallError
+                    }
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val busy = status == UpdateStatus.Downloading || status == UpdateStatus.Installing
+    val close: () -> Unit = {
+        active = false
+        onDismiss()
+    }
+    // 按钮在下载/安装中保持禁用避免误触，但返回键必须能退出：安装完从安装器返回时
+    // 对话框还停在「安装中」，不让返回就只能按主页键杀出来。
     val dismiss: () -> Unit = {
         if (!busy) {
-            active = false
-            onDismiss()
+            close()
         }
     }
     val dismissRequester = remember { FocusRequester() }
@@ -278,7 +347,7 @@ internal fun SettingsUpdateDialog(
         if (hasConfirm) confirmRequester.tryFocusEnter() else dismissRequester.tryFocusEnter()
     }
 
-    SettingsDialog(onDismiss = dismiss) {
+    SettingsDialog(onDismiss = close) {
         Text(
             when (status) {
                 UpdateStatus.UpdatingInfo -> stringResource(R.string.settings_update_title_checking)
